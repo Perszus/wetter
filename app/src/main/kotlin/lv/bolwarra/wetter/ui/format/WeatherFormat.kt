@@ -1,9 +1,17 @@
 package lv.bolwarra.wetter.ui.format
 
 import androidx.annotation.StringRes
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.roundToInt
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
 
 /**
@@ -14,23 +22,76 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition
  */
 
 /**
- * Temperatures are rounded, never truncated, and always carry the degree sign
- * without a space — "18°". The unit letter is shown once in the header rather
- * than after every number.
- */
-fun formatTemperature(celsius: Double?): String =
-    if (celsius == null) NO_READING else "${celsius.roundToInt()}°"
-
-/**
  * What a reading looks like when there isn't one. An em dash, not a zero and not
  * an empty string: the row keeps its shape and says plainly that the number is
  * missing.
  */
-const val NO_READING: String = "—"
+const val NO_READING: String = "\u2014"
+
+/**
+ * Temperatures are rounded, never truncated, and always carry the degree sign
+ * without a space. The unit letter is shown once in the header rather than after
+ * every number.
+ */
+fun formatTemperature(celsius: Double?): String =
+    if (celsius == null) NO_READING else "${celsius.roundToInt()}\u00b0"
 
 /** Millimetres, to one decimal below 10 and whole above it. */
-fun formatMillimetres(mm: Double): String =
-    if (mm < 10.0) String.format(Locale.getDefault(), "%.1f", mm) else mm.roundToInt().toString()
+fun formatMillimetres(mm: Double?): String = when {
+    mm == null -> NO_READING
+    mm < 10.0 -> String.format(Locale.getDefault(), "%.1f", mm)
+    else -> mm.roundToInt().toString()
+}
+
+/** "4.2 mm", or an em dash. Used where the unit is not already in the label. */
+fun formatMillimetresWithUnit(mm: Double?): String =
+    if (mm == null) NO_READING else "${formatMillimetres(mm)} mm"
+
+/** Whole metres per second. Sub-unit precision on wind is noise. */
+fun formatWindSpeed(metresPerSecond: Double?): String =
+    if (metresPerSecond == null) NO_READING else "${metresPerSecond.roundToInt()} m/s"
+
+fun formatPercent(value: Int?): String = if (value == null) NO_READING else "$value%"
+
+fun formatPressure(hectopascals: Double?): String =
+    if (hectopascals == null) NO_READING else "${hectopascals.roundToInt()} hPa"
+
+/** Clock time in the location's own zone, 24-hour. */
+fun formatTime(instant: Instant?, zone: ZoneId): String =
+    if (instant == null) NO_READING else HOUR_MINUTE.format(instant.atZone(zone))
+
+/** "11h 37m" - how long the sun is up, or how long a shower lasts. */
+fun formatDuration(duration: Duration?): String {
+    if (duration == null) return NO_READING
+    val hours = duration.toHours()
+    val minutes = duration.toMinutes() % 60
+    return if (hours == 0L) "${minutes}m" else "${hours}h ${minutes}m"
+}
+
+/** Short weekday for a column of days: "Mon". */
+fun formatWeekdayShort(date: LocalDate): String =
+    date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+
+/** Day of the month, for the second line of a daily row. */
+fun formatDayOfMonth(date: LocalDate): String = date.dayOfMonth.toString()
+
+/** Full weekday, for a sentence rather than a column. */
+fun formatWeekday(date: LocalDate): String =
+    date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+
+/** How many whole calendar days apart two instants are, in the location's zone. */
+fun daysBetween(instant: Instant, now: Instant, zone: ZoneId): Long = ChronoUnit.DAYS.between(
+    now.atZone(zone).toLocalDate(),
+    instant.atZone(zone).toLocalDate(),
+)
+
+@StringRes
+fun PrecipitationKind.labelRes(): Int = when (this) {
+    PrecipitationKind.NONE -> R.string.kind_precipitation
+    PrecipitationKind.RAIN -> R.string.kind_rain
+    PrecipitationKind.SNOW -> R.string.kind_snow
+    PrecipitationKind.MIXED -> R.string.kind_sleet
+}
 
 @StringRes
 fun WeatherCondition.labelRes(): Int = when (this) {
@@ -52,3 +113,5 @@ fun WeatherCondition.labelRes(): Int = when (this) {
     WeatherCondition.THUNDERSTORM_WITH_HAIL -> R.string.condition_thunderstorm_hail
     WeatherCondition.UNKNOWN -> R.string.condition_unknown
 }
+
+private val HOUR_MINUTE: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")

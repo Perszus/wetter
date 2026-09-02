@@ -40,6 +40,59 @@
     <string name="state_no_provider">No source covers this location</string>
     <string name="state_no_provider_detail">None of the weather services Wetter uses forecasts for this place.</string>
 
+    <!-- The three pages. Words, not icons: nobody recognises a month from a picture. -->
+    <string name="domain_today">Today</string>
+    <string name="domain_week">Week</string>
+    <string name="domain_month">Month</string>
+
+    <!-- Tile headings -->
+    <string name="tile_rain">Rain today</string>
+    <string name="tile_next_rain">Next rain</string>
+    <string name="tile_daylight">Daylight</string>
+    <string name="tile_air">Air</string>
+
+    <!--
+      What falls. Used inside sentences ("Rain from 14:00"), so these are
+      capitalised as sentence openers rather than as nouns mid-clause.
+    -->
+    <string name="kind_precipitation">Precipitation</string>
+    <string name="kind_rain">Rain</string>
+    <string name="kind_snow">Snow</string>
+    <string name="kind_sleet">Sleet</string>
+
+    <string name="relative_today">today</string>
+    <string name="relative_tomorrow">tomorrow</string>
+
+    <string name="next_rain_none">Nothing forecast</string>
+    <string name="next_rain_none_detail">No rain in the rest of the forecast.</string>
+    <string name="next_rain_falling">%1$s, falling now</string>
+    <string name="next_rain_at">%1$s %2$s at %3$s</string>
+    <string name="next_rain_until">Until %1$s · %2$s</string>
+    <string name="next_rain_continues">Still falling at %1$s, where the forecast ends</string>
+
+    <!-- Metric labels -->
+    <string name="metric_sunrise">Sunrise</string>
+    <string name="metric_sunset">Sunset</string>
+    <string name="metric_day_length">Daylight</string>
+    <string name="metric_feels_like">Feels like</string>
+    <string name="metric_wind">Wind</string>
+    <string name="metric_humidity">Humidity</string>
+    <string name="metric_pressure">Pressure</string>
+    <string name="metric_cloud">Cloud</string>
+
+    <string name="tile_week_rain">Seven days</string>
+    <string name="tile_week_summary">The week</string>
+    <string name="week_today">Today</string>
+    <string name="week_days_of">%1$d of %2$d</string>
+    <string name="metric_wet_days">Wet days</string>
+    <string name="metric_wettest_day">Wettest</string>
+    <string name="metric_warmest">Warmest</string>
+    <string name="metric_coldest">Coldest</string>
+
+    <string name="tile_month_pending">Month</string>
+    <string name="month_pending">Not built yet.</string>
+    <string name="month_pending_detail">No service forecasts a month. This page will show how the month has gone so far against its long-run normal, with the fortnight of forecast that remains.</string>
+
     <!-- About -->
     <string name="about_version">Version %1$s</string>
     <string name="about_licence">GNU General Public License v3.0 or later</string>
