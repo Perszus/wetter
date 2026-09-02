@@ -1,0 +1,13 @@
+# Normalise to LF in the repository; let Git decide the working copy.
+* text=auto eol=lf
+
+# The wrapper script is executed by a POSIX shell on CI and on contributors'
+# machines. CRLF here produces "bad interpreter" and is a miserable thing to
+# debug, so it is pinned regardless of anyone's core.autocrlf.
+gradlew text eol=lf
+*.bat text eol=crlf
+
+*.jar binary
+*.png binary
+*.jpg binary
+*.webp binary

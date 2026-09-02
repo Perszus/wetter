@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Only the window background lives here: it is painted by the system before
+      Compose draws its first frame, so it must match WetterColors.surface or the
+      app opens with a flash of the wrong ground. Every other colour is defined
+      once, in ui/theme/Color.kt.
+    -->
+    <color name="window_background">#F4F6F7</color>
+    <color name="icon_background">#0E1A22</color>
+</resources>

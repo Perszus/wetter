@@ -1,0 +1,168 @@
+# Decisions
+
+Choices that are settled, with the reason. If you are about to change one of
+these, the reason is what you need to argue with.
+
+Decisions specific to the multi-provider system live in
+[providers.md](providers.md); the visual and architectural rules live in
+[design-principles.md](design-principles.md).
+
+---
+
+## Platform
+
+**minSdk 26, targetSdk and compileSdk 36.**
+API 26 is where `java.time` exists natively, which removes the need for library
+desugaring and lets the whole codebase use `Instant`, `LocalDate` and `ZoneId`
+without a shim. That alone justifies the floor.
+
+**Kotlin, Compose, and nothing else for the UI.**
+No view-based screens, so the app does not need `com.google.android.material`.
+The one activity is themed from a platform theme instead, which keeps a whole
+dependency out of the tree.
+
+**AGP 9.2.0 / Gradle 9.4.1 / Kotlin 2.3.20, built with JDK 17.**
+Java 17 rather than 21 because 17 is what the toolchain here provides.
+
+**AndroidX and Compose versions are pinned below the latest.**
+Everything newer requires `compileSdk 37`, and nothing in the app needs an API
+above 36. Bump these together with `compileSdk`, not before, and only for a
+reason beyond the version number.
+
+**No Google Play Services, Firebase, or any Google library beyond AndroidX.**
+Required for F-Droid, and consistent with the app having no backend.
+
+---
+
+## Licence and distribution
+
+**GPL-3.0-or-later.**
+The usual choice for an F-Droid application and the strongest guarantee that
+what is shipped stays inspectable. Every dependency must be compatible with it.
+
+**`dependenciesInfo` is disabled for release builds.**
+The dependency-metadata blob AGP normally embeds is signed with a Google key and
+cannot be reproduced from source, which F-Droid rejects.
+
+**No signing configuration in the repository.**
+F-Droid builds and signs release artefacts itself from a clean checkout. A
+release build here produces an unsigned APK on purpose.
+
+**`applicationId` is `lv.bolwarra.wetter` and is permanent.**
+Changing it after publication would orphan every installation.
+
+**Backup is off, explicitly and twice.**
+`allowBackup="false"` covers older releases, and a `data_extraction_rules` file
+excludes everything from both cloud backup and device transfer, because the
+attribute is deprecated from Android 12 and the rules file is what the platform
+actually reads. The app holds a location list and a cached forecast; both are
+trivially rebuilt and neither should leave the device.
+
+---
+
+## Domain
+
+**`java.time` throughout, not `kotlinx-datetime`.**
+This is an Android application, not a multiplatform library, and minSdk 26 makes
+`java.time` free. One less dependency and no conversions at the boundaries.
+
+**Units are canonical in the domain and converted only for display.**
+Celsius, millimetres, metres per second, hectopascals, percent. Carrying a unit
+with every value would mean every calculation has to ask what it is holding.
+
+**Sunrise and sunset live on `DailyWeather`, not on `WeatherForecast`.**
+They are properties of a day at a place, and the timeline needs them for every
+day it draws, not only for today.
+
+**`WeatherCondition` includes `SLEET`, which no WMO code produces.**
+MET Norway reports it, and in a Baltic winter it is most of what falls.
+
+**Sunrise, sunset and daylight are computed rather than fetched.**
+The NOAA solar position equations, in `SolarTime`. Not every provider publishes
+them, and the timeline's night shading is not optional decoration — an unshaded
+03:00 reads as an afternoon. Computing it costs one file of arithmetic, works
+offline, and agrees with itself across providers. The alternative was a second
+network call to a second service with a second set of terms.
+
+---
+
+## Data flow
+
+**Offline-first means reads never touch the network.**
+`WeatherRepository.observe` answers from the cache. `refresh` is a separate
+call, and its failure leaves what is on screen exactly where it is.
+
+**Thirty minutes of freshness.**
+Roughly how often the models publish a new run. Refreshing more often spends
+battery and somebody else's bandwidth to redraw the same numbers. A manual
+refresh ignores the window — somebody who asks has a reason.
+
+**Cache keys round coordinates to four decimals.**
+A position read from the device differs in the far decimals every time. An
+exact-match key would make every refresh a miss and every cached forecast
+unreachable.
+
+**The forecast cache is in memory, for now.**
+Explicitly a placeholder. It gives the offline-first *flow* without yet giving
+offline-first *behaviour*: closing the app empties it, and a widget could not
+read it. `ForecastCache` is the interface Room will implement in the persistence
+phase, which is the whole reason it exists with one implementation today.
+
+**Ktor over OkHttp, not Ktor's Android engine.**
+Connection reuse and correct coroutine cancellation matter when two providers
+may be tried in one refresh. Both are Apache-2.0 and build from source.
+
+**JSON parsing ignores unknown keys.**
+Providers add fields to their responses regularly. An app already installed on
+somebody's phone must not start reporting "malformed response" because a new
+variable appeared upstream.
+
+---
+
+## Deliberately not done
+
+**No dependency-injection framework.**
+The entire object graph is `WetterContainer` — about a dozen lines, read top to
+bottom. A framework would add a compiler plugin, an annotation vocabulary and a
+layer of indirection to solve a problem this app does not have.
+
+**No charting library.**
+The precipitation timeline will be ordinary Compose layout, with `Canvas`
+confined to the one component that genuinely needs to draw. Making `Canvas` the
+foundation of the app would make every future change a drawing problem.
+
+**No Material You dynamic colour.**
+The palette encodes meaning: precipitation owns the only saturated hue, and
+temperature is quieter than rain. A wallpaper-derived scheme would break that
+relationship on most devices.
+
+**No bottom navigation bar.**
+Locations and settings are visited a few times a month. Spending a permanent
+strip of every screen advertising them costs more than the chevron beside the
+location name.
+
+**No type-safe navigation routes.**
+No destination carries an argument, so the generated route types would buy
+nothing. Revisit if one ever does.
+
+**Notifications are not built and will not be until the core app is good.**
+An elaborate notification system on top of an app that cannot yet draw a rain
+timeline would be the wrong thing done well.
+
+---
+
+## Open questions
+
+**A bundled typeface.**
+The app currently uses the system sans, whose tabular figures are good and which
+costs no APK size. A bundled face under the SIL Open Font License would give
+tighter control of the numerals the whole design leans on. Not decided.
+
+**Where provider health should live.**
+In memory today. If real use shows the app repeatedly waking to a provider that
+has been down for hours, it should persist.
+
+**How precipitation probability should be shown.**
+Intensity drives bar height. Probability could be opacity, a second mark, or
+nothing at all — showing both risks a chart that encodes two things badly rather
+than one thing well. To be settled when the timeline is built.

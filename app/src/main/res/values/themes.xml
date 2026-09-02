@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Parented on the platform theme rather than Theme.Material3.* so the app does
+      not need the com.google.android.material view library: nothing here draws
+      Views. windowBackground is the only property that matters — the system paints
+      it before Compose's first frame, and a mismatch shows as a flash on launch.
+      The real theme is WetterTheme in ui/theme/Theme.kt.
+    -->
+    <style name="Theme.Wetter" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>
