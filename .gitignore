@@ -14,10 +14,16 @@ keystore.properties
 *.jks
 *.keystore
 
-# Working briefs, kept locally. Their content lives in docs/ in a form meant to
+# JVM crash dumps. Gradle drops these in whatever directory it died in, and
+# they are tens of thousands of lines of machine-local paths and heap state.
+hs_err_pid*.log
+replay_pid*.log
+
+# Working briefs and notes, kept locally. Their content lives in docs/ in a form meant to
 # be read rather than followed. Root-anchored so docs/providers.md is tracked.
 /philos.md
 /providers.md
+/notes.md
 
 # OS noise
 .DS_Store
