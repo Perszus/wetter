@@ -3,11 +3,11 @@ package lv.bolwarra.wetter.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import java.time.Duration
+import java.time.Instant
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.ui.screens.WeatherUiState
-import java.time.Duration
-import java.time.Instant
 
 /**
  * One line saying how much to trust what is on screen.
@@ -22,11 +22,7 @@ import java.time.Instant
  * answered belongs in About (docs/providers.md).
  */
 @Composable
-fun ForecastStatus(
-    state: WeatherUiState,
-    now: Instant,
-    modifier: Modifier = Modifier,
-) {
+fun ForecastStatus(state: WeatherUiState, now: Instant, modifier: Modifier = Modifier) {
     val forecast = state.forecast ?: return
 
     val (text, tone) = when {

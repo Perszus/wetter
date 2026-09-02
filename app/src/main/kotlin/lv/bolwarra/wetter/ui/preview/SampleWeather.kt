@@ -1,5 +1,9 @@
 package lv.bolwarra.wetter.ui.preview
 
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import lv.bolwarra.wetter.domain.model.CurrentWeather
 import lv.bolwarra.wetter.domain.model.DailyWeather
 import lv.bolwarra.wetter.domain.model.HourlyWeather
@@ -7,10 +11,6 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.ProviderMetadata
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 
 /**
  * A fixed forecast for @Preview and for tests that need something shaped like

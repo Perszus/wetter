@@ -20,10 +20,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * instead of being boxed into cards.
  */
 @Composable
-fun HairlineRule(
-    modifier: Modifier = Modifier,
-    color: Color = WetterTheme.colors.hairline,
-) {
+fun HairlineRule(modifier: Modifier = Modifier, color: Color = WetterTheme.colors.hairline) {
     val onePixel = with(LocalDensity.current) { (1f / density).dp }
     Box(
         modifier

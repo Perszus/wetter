@@ -1,43 +1,27 @@
 package lv.bolwarra.wetter
 
+import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
-import lv.bolwarra.wetter.data.network.WetterHttpClient
-import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
-import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
-import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
-import lv.bolwarra.wetter.data.repository.InMemoryForecastCache
-import lv.bolwarra.wetter.data.repository.WeatherRepository
-import lv.bolwarra.wetter.domain.provider.WeatherProvider
 
 /**
  * How Wetter is assembled.
  *
  * A file of `by lazy` rather than a dependency-injection framework. The whole
- * graph is eleven lines and is read top to bottom; a framework would add a
+ * graph is a handful of lines and is read top to bottom; a framework would add a
  * compile step, an annotation vocabulary and a layer of indirection to solve a
  * problem this app does not have (docs/design-principles.md).
  *
- * Registering a new provider means adding it to [providers]. Nothing else in the
- * application changes — not the router, not the repository, not the UI
- * (docs/providers.md).
+ * It is short because it can be. `:data` assembles its own internals, so nothing
+ * here knows what an HTTP client is or which weather services exist.
  */
 class WetterContainer {
 
-    private val httpClient by lazy { WetterHttpClient.create() }
+    private val weatherData by lazy { WeatherData(BuildConfig.VERSION_NAME) }
 
-    val providers: List<WeatherProvider> by lazy {
-        listOf(
-            OpenMeteoProvider(httpClient),
-            MetNorwayProvider(httpClient),
-        )
-    }
+    val repository get() = weatherData.repository
 
-    /** Every provider's required credit, for the About section (docs/providers.md). */
-    val attributions: List<String> by lazy { providers.map { it.attribution } }
-
-    private val router by lazy { WeatherProviderRouter(providers) }
-
-    val repository by lazy { WeatherRepository(router, InMemoryForecastCache()) }
+    /** Each weather service's required credit, for the About section. */
+    val attributions: List<String> get() = weatherData.attributions
 
     val selectedLocation by lazy { SelectedLocationStore() }
 }

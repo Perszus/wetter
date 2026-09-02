@@ -26,11 +26,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * unbroken line down the screen.
  */
 @Composable
-fun ScreenTitle(
-    title: String,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun ScreenTitle(title: String, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val spacing = WetterTheme.spacing
     Row(
         modifier = modifier

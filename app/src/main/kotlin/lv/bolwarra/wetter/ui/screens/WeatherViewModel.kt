@@ -56,6 +56,9 @@ class WeatherViewModel(
         // already-fresh cached forecast is shown as it is.
         viewModelScope.launch {
             selectedLocation.selected.collect { location ->
+                // A failure belongs to the place it happened in. Carrying it to
+                // the next one would tell somebody their new location is broken.
+                error.value = null
                 if (repository.needsRefresh(repository.cached(location))) refresh()
             }
         }

@@ -16,11 +16,32 @@ Notable changes to Wetter. The format follows
   `WeatherForecast` gained `supplement`, and the joining rules live in
   `ForecastStitcher`.
 
+- Split into three Gradle modules, `:app` -> `:data` -> `:domain`, so the
+  layering is enforced by the compiler rather than by review. `:domain` is a
+  plain Kotlin library with no dependency beyond the standard library; the
+  concrete providers, HTTP client, router and cache are `internal` to `:data`
+  and reachable only through `WeatherData`.
+- ktlint, configured from `.editorconfig` in the Android style, and checked in
+  CI alongside tests and lint.
+- CONTRIBUTING.md.
+
 ### Fixed
 
 - Choosing MET Norway in the Nordics used to mean losing five of seven days of
   hourly forecast, because its six-hourly tail was discarded and nothing
   replaced it.
+- Snow was drawn as rain for any provider that reports a precipitation amount
+  without splitting it into rain and snow — which is MET Norway's whole output,
+  and therefore most of what users in the Nordics would have seen all winter.
+  The condition now decides when there is no breakdown.
+- A temperature the provider did not supply was displayed as `0°`. Current and
+  hourly temperatures are nullable and render as an em dash.
+- CI ran `testDebugUnitTest`, which does not exist in a plain Kotlin module and
+  would have silently stopped running `:domain`'s tests after the split. The
+  workflow now uses variant-agnostic task names.
+- `InMemoryForecastCache` wrote with a read-then-write that could drop a
+  concurrent entry when two locations refreshed at once.
+- A failed refresh left its error on screen after switching to another location.
 
 ## [0.1.0] — 2026-09-02
 

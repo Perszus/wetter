@@ -20,11 +20,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * same instrument, and the eye should run straight down them (docs/design-principles.md).
  */
 @Composable
-fun SectionHeader(
-    label: String,
-    modifier: Modifier = Modifier,
-    trailing: String? = null,
-) {
+fun SectionHeader(label: String, modifier: Modifier = Modifier, trailing: String? = null) {
     Column(modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

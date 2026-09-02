@@ -65,9 +65,9 @@ in between at all.
 | Home-screen widget | not started |
 | Background refresh, notifications, settings | not started |
 
-108 unit tests cover the solar calculations, the intensity bands, provider
-selection, failover, forecast stitching, both response mappers and the
-repository.
+117 unit tests cover the solar calculations, the intensity bands, provider
+selection, failover, forecast stitching, both response mappers, the repository
+and the formatting.
 
 ---
 
@@ -76,9 +76,10 @@ repository.
 Requires JDK 17 and the Android SDK (compile and target API 36, minimum API 26).
 
 ```sh
-./gradlew assembleDebug        # build
-./gradlew testDebugUnitTest    # run the tests
-./gradlew lintDebug            # static analysis
+./gradlew test            # every module's unit tests
+./gradlew check           # tests, lint and formatting — what CI runs
+./gradlew ktlintFormat    # fix formatting
+./gradlew assembleDebug   # a runnable APK
 ```
 
 There is no signing configuration in the repository and none is needed to build
@@ -89,32 +90,37 @@ or run a debug build.
 ## How it is put together
 
 ```text
-ui/            Compose screens, components, theme — no knowledge of any provider
-  ↓
-domain/        Weather models, provider abstraction, selection policy, solar maths
-  ↓
-data/          Provider implementations, the router that picks between them, caching
+:app  ──▶  :data  ──▶  :domain
 ```
 
-The dependency arrow only points down. Nothing in `ui/` may import a concrete
-provider; nothing in `domain/` may import Ktor, Android or a wire format.
+Three Gradle modules, and the arrow only points one way. This is the layering
+rule made into a compile error rather than something a reviewer has to remember.
 
 ```text
-app/src/main/kotlin/lv/bolwarra/wetter/
-├── domain/
-│   ├── model/         WeatherForecast, HourlyWeather, conditions, errors
-│   ├── provider/      WeatherProvider, capabilities, coverage, selection, health
-│   └── SolarTime.kt   sunrise, sunset and daylight, computed rather than fetched
-├── data/
-│   ├── network/       the shared HTTP client
-│   ├── provider/      Open-Meteo, MET Norway, and the router
-│   ├── repository/    offline-first forecast access
-│   └── location/      the built-in location list (a stand-in)
-└── ui/
-    ├── components/    reusable pieces
-    ├── screens/       weather, locations, settings
-    └── theme/         colour, type, spacing
+:domain     a plain Kotlin library — no Android, no networking, nothing but stdlib
+├── model/          WeatherForecast, HourlyWeather, conditions, errors
+├── provider/       the WeatherProvider port, capabilities, coverage,
+│                   selection policy, health, forecast stitching
+└── SolarTime.kt    sunrise, sunset and daylight, computed rather than fetched
+
+:data       an Android library — how weather is actually obtained
+├── network/        the shared HTTP client (internal)
+├── provider/       Open-Meteo, MET Norway, the router (all internal)
+├── repository/     offline-first forecast access
+├── location/       the built-in location list (a stand-in)
+└── WeatherData.kt  the only way in: hands back a repository and attributions
+
+:app        the application
+├── ui/components/  reusable pieces
+├── ui/screens/     weather, locations, settings
+├── ui/theme/       colour, type, spacing
+└── WetterContainer.kt
 ```
+
+`:domain` has no dependency beyond the standard library, so Android or a wire
+format cannot reach the models or the policy even by accident. Inside `:data`
+the concrete providers, the HTTP client and the router are `internal`, so
+nothing above can name them.
 
 Further reading:
 
@@ -159,16 +165,12 @@ it the *only* thing is the point.
 
 ## Contributing
 
-Bug reports and patches are welcome. A few things worth knowing first:
+Bug reports and patches are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-- Every dependency has to be free software with a licence compatible with the
-  GPL, and buildable from source by F-Droid. A new one needs a reason.
-- Adding a weather provider means implementing `WeatherProvider` and registering
-  it in `WetterContainer`. Nothing else should need to change. Read
-  [docs/providers.md](docs/providers.md), particularly the checklist on terms of
-  service, before starting.
-- Comments explain *why*, not what. If a decision was non-obvious, the reasoning
-  belongs next to it.
+The short version: adding a weather provider should mean implementing
+`WeatherProvider` and adding one line to `WeatherData`, and nothing else.
+Dependencies must be free software that F-Droid can build. Comments explain
+*why*, not what.
 
 ---
 

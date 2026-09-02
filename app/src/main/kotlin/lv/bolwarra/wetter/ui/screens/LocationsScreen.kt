@@ -87,11 +87,7 @@ fun LocationsScreen(
 }
 
 @Composable
-private fun LocationRow(
-    location: WeatherLocation,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-) {
+private fun LocationRow(location: WeatherLocation, isSelected: Boolean, onClick: () -> Unit) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
 

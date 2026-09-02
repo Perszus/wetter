@@ -1,0 +1,34 @@
+# Shared formatting rules. Read by IntelliJ, Android Studio and ktlint, so the
+# IDE and CI agree without anyone having to configure either.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 100
+
+[*.{kt,kts}]
+# android_studio rather than ktlint_official: the official style forces every
+# argument list onto separate lines, which would reformat most of the codebase
+# to no benefit. This is the style the code is already written in.
+ktlint_code_style = android_studio
+# Trailing commas make one-line-per-argument diffs read as one changed line
+# rather than two, which matters more in review than it looks.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+# Compose composables are PascalCase by convention and the rule cannot tell them
+# from classes.
+ktlint_function_naming_ignore_when_annotated_with = Composable, Test
+
+[*.{yml,yaml,json,toml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.bat]
+end_of_line = crlf

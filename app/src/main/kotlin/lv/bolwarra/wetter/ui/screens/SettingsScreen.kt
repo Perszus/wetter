@@ -21,10 +21,7 @@ import lv.bolwarra.wetter.ui.components.SectionHeader
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 @Composable
-fun SettingsRoute(
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun SettingsRoute(onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Attributions come from the container as plain strings. The screen never
     // learns that OpenMeteoProvider or MetNorwayProvider exist (docs/providers.md).
     val application = LocalContext.current.applicationContext as WetterApplication
@@ -44,11 +41,7 @@ fun SettingsRoute(
  * providers is an obligation, not a feature (docs/providers.md).
  */
 @Composable
-fun SettingsScreen(
-    attributions: List<String>,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun SettingsScreen(attributions: List<String>, onBack: () -> Unit, modifier: Modifier = Modifier) {
     val spacing = WetterTheme.spacing
 
     Column(

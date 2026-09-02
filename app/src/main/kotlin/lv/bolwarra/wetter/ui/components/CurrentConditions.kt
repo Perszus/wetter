@@ -24,10 +24,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * actual subject of the app.
  */
 @Composable
-fun CurrentConditions(
-    current: CurrentWeather,
-    modifier: Modifier = Modifier,
-) {
+fun CurrentConditions(current: CurrentWeather, modifier: Modifier = Modifier) {
     val colors = WetterTheme.colors
 
     Column(modifier) {

@@ -25,11 +25,7 @@ enum class StatusTone { FRESH, STALE, FAILED }
  * take attention away from it (docs/design-principles.md).
  */
 @Composable
-fun StatusLine(
-    text: String,
-    tone: StatusTone,
-    modifier: Modifier = Modifier,
-) {
+fun StatusLine(text: String, tone: StatusTone, modifier: Modifier = Modifier) {
     val colors = WetterTheme.colors
     val dot = when (tone) {
         StatusTone.FRESH -> colors.textTertiary

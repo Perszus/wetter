@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.Instant
 import kotlinx.coroutines.delay
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.WeatherError
@@ -28,7 +29,6 @@ import lv.bolwarra.wetter.ui.components.ForecastStatus
 import lv.bolwarra.wetter.ui.components.WeatherHeader
 import lv.bolwarra.wetter.ui.preview.SampleWeather
 import lv.bolwarra.wetter.ui.theme.WetterTheme
-import java.time.Instant
 
 /**
  * Connects the weather screen to its view model. Kept separate from
@@ -99,7 +99,13 @@ fun WeatherScreen(
                 title = stringResource(emptyTitleFor(state.error)),
                 detail = stringResource(emptyDetailFor(state.error)),
                 actionLabel = stringResource(
-                    if (state.error == null) R.string.state_choose_location else R.string.action_retry,
+                    if (state.error ==
+                        null
+                    ) {
+                        R.string.state_choose_location
+                    } else {
+                        R.string.action_retry
+                    },
                 ),
                 onAction = if (state.error == null) onOpenLocations else onRetry,
             )

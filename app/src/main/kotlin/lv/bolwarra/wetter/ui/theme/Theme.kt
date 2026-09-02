@@ -15,10 +15,7 @@ import androidx.compose.runtime.ReadOnlyComposable
  * (docs/decisions.md).
  */
 @Composable
-fun WetterTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun WetterTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colors = if (darkTheme) DarkWetterColors else LightWetterColors
 
     CompositionLocalProvider(
@@ -36,10 +33,12 @@ fun WetterTheme(
 /** `WetterTheme.colors`, `WetterTheme.spacing`, `WetterTheme.type` at any call site. */
 object WetterTheme {
     val colors: WetterColors
-        @Composable @ReadOnlyComposable get() = LocalWetterColors.current
+        @Composable @ReadOnlyComposable
+        get() = LocalWetterColors.current
 
     val spacing: Spacing
-        @Composable @ReadOnlyComposable get() = LocalSpacing.current
+        @Composable @ReadOnlyComposable
+        get() = LocalSpacing.current
 
     val type: WetterType get() = WetterType
 }

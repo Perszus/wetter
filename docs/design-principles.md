@@ -75,8 +75,14 @@ instrument must not show.
   rendering.
 - **Abstractions need a reason.** An interface with one implementation is a
   smell unless a second is genuinely coming. There is no dependency-injection
-  framework, no event bus, no charting library and no multi-module split: the
-  whole object graph is a dozen lines in `WetterContainer`.
+  framework, no event bus and no charting library: the whole object graph is a
+  handful of lines in `WetterContainer` and `WeatherData`.
+- **The module boundary is the architecture rule made enforceable.** Three
+  modules, `:app -> :data -> :domain`, and the arrow only points one way.
+  `:domain` is a plain Kotlin library, so Android and networking cannot leak
+  into the models or the policy even by accident. Three is the necessary
+  number, not an architecture demonstration: the UI is not split into feature
+  modules and should not be.
 - **Prefer the simpler of two valid designs** unless the more complicated one
   buys something concrete and nameable.
 - **Files stay small and single-purpose.** Screens are composed of components;

@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -55,16 +54,6 @@ android {
         buildConfig = true
     }
 
-    testOptions {
-        unitTests {
-            // The router logs its decisions through android.util.Log, which is a
-            // stub in unit tests. Returning defaults lets the routing logic be
-            // tested on the JVM without wrapping the logger in an interface whose
-            // only purpose would be to be mocked.
-            isReturnDefaultValues = true
-        }
-    }
-
     packaging {
         resources.excludes += setOf(
             "/META-INF/{AL2.0,LGPL2.1}",
@@ -80,6 +69,9 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":domain"))
+    implementation(project(":data"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -87,15 +79,6 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.serialization.json)
-
-    // Ktor over OkHttp rather than the built-in Android engine: connection reuse
-    // and proper coroutine cancellation matter when two providers may be tried
-    // in one refresh. Both are Apache-2.0 and build from source.
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
@@ -107,5 +90,4 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.ktor.client.mock)
 }

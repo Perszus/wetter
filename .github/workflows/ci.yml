@@ -30,11 +30,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Task names without a variant, so a module that is not an Android
+      # module still gets run. `testDebugUnitTest` would quietly skip :domain.
+      - name: Formatting
+        run: ./gradlew ktlintCheck
+
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew test
 
       - name: Lint
-        run: ./gradlew lintDebug
+        run: ./gradlew lint
 
       # Last, because it is the slowest and the least likely to be the thing
       # that broke: a compile error would already have failed the tests.
@@ -46,5 +51,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: test-report
-          path: app/build/reports/tests/
+          path: |
+            */build/reports/tests/
+            */build/reports/ktlint/
           retention-days: 7

@@ -1,10 +1,10 @@
 package lv.bolwarra.wetter.ui.format
 
 import androidx.annotation.StringRes
-import lv.bolwarra.wetter.R
-import lv.bolwarra.wetter.domain.model.WeatherCondition
 import java.util.Locale
 import kotlin.math.roundToInt
+import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.model.WeatherCondition
 
 /**
  * The one place where domain values become text.
@@ -18,7 +18,15 @@ import kotlin.math.roundToInt
  * without a space — "18°". The unit letter is shown once in the header rather
  * than after every number.
  */
-fun formatTemperature(celsius: Double): String = "${celsius.roundToInt()}°"
+fun formatTemperature(celsius: Double?): String =
+    if (celsius == null) NO_READING else "${celsius.roundToInt()}°"
+
+/**
+ * What a reading looks like when there isn't one. An em dash, not a zero and not
+ * an empty string: the row keeps its shape and says plainly that the number is
+ * missing.
+ */
+const val NO_READING: String = "—"
 
 /** Millimetres, to one decimal below 10 and whole above it. */
 fun formatMillimetres(mm: Double): String =

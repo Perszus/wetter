@@ -13,9 +13,7 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
  * search and saved locations. The screen above is written against a list and a
  * selection, so that swap does not reach it.
  */
-class LocationsViewModel(
-    private val selectedLocation: SelectedLocationStore,
-) : ViewModel() {
+class LocationsViewModel(private val selectedLocation: SelectedLocationStore) : ViewModel() {
 
     val locations: List<WeatherLocation> = BuiltInLocations.all
 

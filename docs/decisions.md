@@ -60,6 +60,31 @@ trivially rebuilt and neither should leave the device.
 
 ---
 
+## Modules
+
+**Three modules: `:app` -> `:data` -> `:domain`.**
+Each earns its boundary by turning a rule a reviewer had to remember into one
+the compiler enforces.
+
+`:domain` is a plain Kotlin library rather than an Android one. It has no
+dependency beyond the standard library, so Android, Ktor and Compose cannot
+reach the weather models, the selection policy or the solar geometry even by
+mistake. Its tests run without the Android Gradle plugin, in about a second.
+
+`:data` cannot see the UI. The concrete providers, the router, the HTTP client
+and the cache are `internal` to it; the only way in is `WeatherData`, and the
+only way out is a `WeatherRepository` and a list of attributions. The split paid
+for itself immediately — it turned up that the application had been holding a
+Ktor `HttpClient`, which it had no business knowing existed.
+
+**The UI is deliberately not split into feature modules.** Three is the number
+that buys enforcement. More would be an architecture demonstration, which is
+exactly what design-principles.md rules out.
+
+**Shared test code lives in `:domain`'s test fixtures.** The fake provider is
+needed by both modules' tests, and a published `testFixtures` source set shares
+it; the alternative is two copies that drift apart.
+
 ## Domain
 
 **`java.time` throughout, not `kotlinx-datetime`.**
@@ -148,6 +173,9 @@ nothing. Revisit if one ever does.
 **Notifications are not built and will not be until the core app is good.**
 An elaborate notification system on top of an app that cannot yet draw a rain
 timeline would be the wrong thing done well.
+
+**No feature modules.**
+See Modules above. `:app` holds the whole UI and will keep holding it.
 
 ---
 
