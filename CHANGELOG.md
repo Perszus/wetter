@@ -12,7 +12,18 @@ Notable changes to Wetter. The format follows
   one question with its own tiles, instead of one page trying to answer all
   three. Today is the default. The location and current reading sit above the
   switcher, so changing page moves nothing that was already true.
-- **The precipitation timeline.** One bar per hour across the local day, height
+- **The precipitation curve.** A flowing area trace with a gradient fill,
+  scrubbable to read any point of it. The curve is a monotone cubic spline, so
+  it can never overshoot: ordinary smoothing dips below zero approaching a
+  shower and bulges above the peak inside it, drawing rain nobody forecast.
+- The curve states its own scale, and the scale adapts. A fixed 8 mm ceiling
+  draws a drizzly day as a flat line; scaling to the day's peak makes drizzle
+  and downpour look identical. Instead the ceiling steps between the
+  meteorological band tops and the chart says which one it is using, so the
+  scale can change but never silently.
+- Scrubbing reads out the interval a sample covers, not the instant under the
+  finger. Hourly data says `13:00-14:00`, because that is what was forecast.
+- **The precipitation timeline (superseded by the curve above).** One bar per hour across the local day, height
   for intensity on an absolute 8 mm/h scale that is never rescaled to the view,
   colour carrying confidence, a night wash behind the small hours, and past
   hours dimmed so the boundary between dim and bright is the current moment.

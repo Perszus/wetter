@@ -70,6 +70,15 @@
     <string name="next_rain_until">Until %1$s · %2$s</string>
     <string name="next_rain_continues">Still falling at %1$s, where the forecast ends</string>
 
+    <!--
+      The curve says what scale it is drawn on when nothing is selected, and
+      what interval a sample covers when something is. The interval matters:
+      an hourly forecast gives millimetres across an hour, not a value that
+      existed at one instant inside it.
+    -->
+    <string name="curve_scale">Full height %1$s mm in the hour</string>
+    <string name="curve_reading">%1$s–%2$s</string>
+
     <!-- Metric labels -->
     <string name="metric_sunrise">Sunrise</string>
     <string name="metric_sunset">Sunset</string>

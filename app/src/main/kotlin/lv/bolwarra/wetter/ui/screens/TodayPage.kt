@@ -27,7 +27,7 @@ import lv.bolwarra.wetter.domain.totalPrecipitation
 import lv.bolwarra.wetter.domain.window
 import lv.bolwarra.wetter.ui.components.Metric
 import lv.bolwarra.wetter.ui.components.MetricGrid
-import lv.bolwarra.wetter.ui.components.RainTimeline
+import lv.bolwarra.wetter.ui.components.RainCurve
 import lv.bolwarra.wetter.ui.components.Tile
 import lv.bolwarra.wetter.ui.format.NO_READING
 import lv.bolwarra.wetter.ui.format.formatDuration
@@ -62,7 +62,7 @@ fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modi
                 label = stringResource(R.string.tile_rain),
                 trailing = formatMillimetresWithUnit(ahead.totalPrecipitation() ?: 0.0),
             ) {
-                RainTimeline(hours = ahead, zone = zone)
+                RainCurve(hours = ahead, zone = zone)
             }
         }
 
