@@ -1,10 +1,13 @@
 package lv.bolwarra.wetter.domain.provider
 
 import lv.bolwarra.wetter.domain.model.CurrentWeather
+import lv.bolwarra.wetter.domain.model.DailyWeather
+import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.WeatherCondition
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -40,9 +43,11 @@ class FakeWeatherProvider(
             maximumForecastDays: Int = 7,
             resolutionKm: Double? = 11.0,
             updateIntervalHours: Double? = 1.0,
+            hourlyHorizonHours: Int = 7 * 24,
         ) = ProviderCapabilities(
             variables = WeatherVariable.entries.toSet(),
             maximumForecastDays = maximumForecastDays,
+            hourlyHorizonHours = hourlyHorizonHours,
             resolutionKm = resolutionKm,
             updateIntervalHours = updateIntervalHours,
         )
@@ -52,10 +57,13 @@ class FakeWeatherProvider(
             id: String,
             coverage: ProviderCoverage = ProviderCoverage(isGlobal = true),
             at: Instant = DEFAULT_INSTANT,
+            hourlyHours: Int = FULL_HOURLY,
+            capabilities: ProviderCapabilities = everyVariable(hourlyHorizonHours = hourlyHours),
         ) = FakeWeatherProvider(
             id = id,
             coverage = coverage,
-            respond = { location -> Result.success(forecastFrom(id, location, at)) },
+            capabilities = capabilities,
+            respond = { location -> Result.success(forecastFrom(id, location, at, hourlyHours)) },
         )
 
         /** A provider that always fails with the given error. */
@@ -69,10 +77,16 @@ class FakeWeatherProvider(
             respond = { Result.failure(WeatherFailure(error)) },
         )
 
+        /**
+         * @param hourlyHours how many hourly rows to generate, starting at [at].
+         *   The default is a full week, so a test that is not about the hourly
+         *   horizon never accidentally triggers the router into extending.
+         */
         fun forecastFrom(
             providerId: String,
             location: WeatherLocation,
             at: Instant = DEFAULT_INSTANT,
+            hourlyHours: Int = FULL_HOURLY,
         ) = WeatherForecast(
             location = location,
             current = CurrentWeather(
@@ -87,8 +101,34 @@ class FakeWeatherProvider(
                 humidity = null,
                 pressure = null,
             ),
-            hourly = emptyList(),
-            daily = emptyList(),
+            hourly = List(hourlyHours) { hour ->
+                HourlyWeather(
+                    timestamp = at.plus(Duration.ofHours(hour.toLong())),
+                    temperature = 4.0,
+                    precipitationProbability = null,
+                    precipitation = 0.0,
+                    rain = null,
+                    snowfall = null,
+                    condition = WeatherCondition.OVERCAST,
+                    windSpeed = null,
+                    cloudCover = null,
+                    isDay = true,
+                )
+            },
+            daily = List((hourlyHours + 23) / 24) { day ->
+                DailyWeather(
+                    date = at.plus(Duration.ofDays(day.toLong())).atZone(location.zone).toLocalDate(),
+                    temperatureMin = 0.0,
+                    temperatureMax = 8.0,
+                    condition = WeatherCondition.OVERCAST,
+                    precipitationTotal = 0.0,
+                    precipitationProbabilityMax = null,
+                    precipitationHours = null,
+                    sunrise = null,
+                    sunset = null,
+                    windSpeedMax = null,
+                )
+            },
             fetchedAt = at,
             provider = ProviderMetadata(
                 id = providerId,
@@ -101,5 +141,8 @@ class FakeWeatherProvider(
         )
 
         private val DEFAULT_INSTANT: Instant = Instant.parse("2026-03-14T09:00:00Z")
+
+        /** A week of hourly rows: past any horizon Wetter asks for. */
+        const val FULL_HOURLY = 7 * 24
     }
 }

@@ -6,6 +6,7 @@ import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.ForecastRequirements
+import lv.bolwarra.wetter.domain.provider.ForecastStitcher
 import lv.bolwarra.wetter.domain.provider.ProviderHealthRegistry
 import lv.bolwarra.wetter.domain.provider.ProviderScore
 import lv.bolwarra.wetter.domain.provider.ProviderSelectionContext
@@ -22,6 +23,13 @@ import java.time.Instant
  *
  * Everything above this sees one method that returns one forecast. The router is
  * the only component that knows more than one provider exists (docs/providers.md).
+ *
+ * It also makes sure there is always an hourly timeline to draw. The provider
+ * that wins on geography is often not the one with the longest hourly reach, so
+ * when the winner stops being hourly well short of the horizon Wetter needs, the
+ * router asks the next candidate for the rest and joins the two — see
+ * [ForecastStitcher] for why that is done this way and not by stretching the
+ * coarse steps.
  *
  * There is deliberately no retry against the same provider inside a single
  * refresh. A provider that just timed out will most likely time out again a
@@ -73,7 +81,7 @@ class WeatherProviderRouter(
 
             result.onSuccess { forecast ->
                 health.recordSuccess(provider.id, Instant.now(clock))
-                return Result.success(forecast)
+                return Result.success(extendIfShort(forecast, location, ranked))
             }
 
             val error = result.exceptionOrNull()?.asWeatherError() ?: WeatherError.Unknown()
@@ -93,6 +101,54 @@ class WeatherProviderRouter(
         }
 
         return Result.failure(WeatherFailure(firstError ?: WeatherError.Unknown()))
+    }
+
+    /**
+     * Fills in the hourly timeline past the point the chosen provider stops
+     * being hourly.
+     *
+     * At most one extra request, and it is entirely optional: if the second
+     * provider fails, the user still gets the forecast that already succeeded.
+     * Extending a forecast must never be able to cost somebody one.
+     *
+     * The candidate is taken from the same ranking that chose the primary, so
+     * the second-best provider for the location is also the one that extends it.
+     */
+    private suspend fun extendIfShort(
+        forecast: WeatherForecast,
+        location: WeatherLocation,
+        ranked: List<ProviderScore>,
+    ): WeatherForecast {
+        val now = Instant.now(clock)
+        if (!ForecastStitcher.needsExtending(forecast, requirements.hourlyHorizon, now)) {
+            return forecast
+        }
+
+        val coveredHours = ForecastStitcher.hourlyCoverage(forecast, now).toHours()
+        val candidate = ranked.firstOrNull { score ->
+            score.eligible &&
+                score.provider.id != forecast.provider.id &&
+                score.provider.capabilities.hourlyHorizonHours > coveredHours
+        }?.provider ?: return forecast
+
+        log("${forecast.provider.id} is hourly for ${coveredHours}h; extending with ${candidate.id}")
+
+        val result = candidate.getForecast(location)
+        val extension = result.getOrNull()
+        if (extension == null) {
+            val error = result.exceptionOrNull()?.asWeatherError() ?: WeatherError.Unknown()
+            health.recordFailure(
+                providerId = candidate.id,
+                now = Instant.now(clock),
+                error = error,
+                retryAfter = result.exceptionOrNull()?.retryAfter(),
+            )
+            log("could not extend with ${candidate.id}: $error")
+            return forecast
+        }
+
+        health.recordSuccess(candidate.id, Instant.now(clock))
+        return ForecastStitcher.stitch(forecast, extension)
     }
 
     /**

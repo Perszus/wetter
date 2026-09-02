@@ -6,7 +6,21 @@ Notable changes to Wetter. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Adaptive hourly range. A provider that stops being hourly short of the horizon
+  is extended from the next-best candidate, so there is always an hour-by-hour
+  timeline across the forecast. The regional model keeps the near term, where
+  precipitation timing matters most; coarse steps are never stretched into
+  hours to fill the gap. `ProviderCapabilities` gained `hourlyHorizonHours`,
+  `WeatherForecast` gained `supplement`, and the joining rules live in
+  `ForecastStitcher`.
+
+### Fixed
+
+- Choosing MET Norway in the Nordics used to mean losing five of seven days of
+  hourly forecast, because its six-hourly tail was discarded and nothing
+  replaced it.
 
 ## [0.1.0] — 2026-09-02
 

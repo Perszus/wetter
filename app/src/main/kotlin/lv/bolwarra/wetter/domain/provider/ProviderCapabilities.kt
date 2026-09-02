@@ -12,6 +12,17 @@ data class ProviderCapabilities(
     val variables: Set<WeatherVariable>,
     val maximumForecastDays: Int,
     /**
+     * How far ahead the provider publishes genuinely hour-by-hour values.
+     *
+     * Distinct from [maximumForecastDays], and the distinction matters: MET
+     * Norway forecasts nine days but is hourly for only the first sixty hours,
+     * dropping to six-hourly after that. A timeline drawn from six-hourly steps
+     * as though they were hours would be six times too wide and wrong about when
+     * the rain starts, so the router uses this to decide when a forecast needs
+     * extending from a second source.
+     */
+    val hourlyHorizonHours: Int,
+    /**
      * Approximate horizontal grid spacing of the underlying model, in kilometres.
      * Lower is better for precipitation, where a shower is often smaller than the
      * cell that is meant to contain it. Null when the provider does not say.

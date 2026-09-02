@@ -43,6 +43,9 @@ class OpenMeteoProvider(
         // Open-Meteo serves every variable Wetter knows how to draw.
         variables = WeatherVariable.entries.toSet(),
         maximumForecastDays = 16,
+        // Hourly for the whole of whatever range is asked for, which is what
+        // makes it the natural source for extending a shorter forecast.
+        hourlyHorizonHours = 16 * 24,
         // It blends several models and picks the best available per location, so
         // this is a conservative floor rather than a figure for one grid.
         resolutionKm = 11.0,

@@ -1,5 +1,6 @@
 package lv.bolwarra.wetter.domain.model
 
+import lv.bolwarra.wetter.domain.provider.ForecastSupplement
 import lv.bolwarra.wetter.domain.provider.ProviderMetadata
 import java.time.Instant
 import java.time.LocalDate
@@ -28,6 +29,11 @@ data class WeatherForecast(
      * (docs/providers.md).
      */
     val provider: ProviderMetadata,
+    /**
+     * The second source, when the hourly timeline had to be extended past where
+     * [provider] stops being hourly. Null on an ordinary forecast.
+     */
+    val supplement: ForecastSupplement? = null,
 )
 
 data class CurrentWeather(

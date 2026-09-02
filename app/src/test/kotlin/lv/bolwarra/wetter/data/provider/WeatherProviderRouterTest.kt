@@ -9,6 +9,7 @@ import lv.bolwarra.wetter.domain.provider.ProviderHealthRegistry
 import lv.bolwarra.wetter.domain.provider.ProviderRegion
 import lv.bolwarra.wetter.domain.provider.asWeatherError
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Clock
@@ -224,5 +225,71 @@ class WeatherProviderRouterTest {
         val second = router.getForecast(riga, incumbentId = first).getOrThrow().provider.id
 
         assertEquals(first, second)
+    }
+
+    // --- keeping the hourly timeline going -----------------------------------
+
+    @Test
+    fun `a short hourly forecast is extended by the next candidate`() = runTest {
+        // The shape of the real pairing: a regional model that wins on geography
+        // but is hourly for only 60 hours, and a global one that is hourly for a
+        // week.
+        val regional = FakeWeatherProvider.succeeding("regional", nordicCoverage, hourlyHours = 60)
+        val global = FakeWeatherProvider.succeeding("global", hourlyHours = 7 * 24)
+
+        val forecast = router(regional, global).getForecast(riga).getOrThrow()
+
+        assertEquals("the better model still owns the forecast", "regional", forecast.provider.id)
+        assertEquals("global", forecast.supplement!!.provider.id)
+        assertEquals(7 * 24, forecast.hourly.size)
+        assertEquals(1, global.calls)
+    }
+
+    @Test
+    fun `a forecast that already reaches far enough costs no extra request`() = runTest {
+        val regional = FakeWeatherProvider.succeeding("regional", nordicCoverage, hourlyHours = 7 * 24)
+        val global = FakeWeatherProvider.succeeding("global", hourlyHours = 7 * 24)
+
+        val forecast = router(regional, global).getForecast(riga).getOrThrow()
+
+        assertNull(forecast.supplement)
+        assertEquals(0, global.calls)
+    }
+
+    @Test
+    fun `a failed extension still yields the forecast that worked`() = runTest {
+        val regional = FakeWeatherProvider.succeeding("regional", nordicCoverage, hourlyHours = 60)
+        val global = FakeWeatherProvider.failing("global", WeatherError.Timeout)
+
+        val forecast = router(regional, global).getForecast(riga).getOrThrow()
+
+        // Extending a forecast must never be able to cost somebody one.
+        assertEquals("regional", forecast.provider.id)
+        assertEquals(60, forecast.hourly.size)
+        assertNull(forecast.supplement)
+    }
+
+    @Test
+    fun `nothing is extended when no other provider reaches further`() = runTest {
+        val regional = FakeWeatherProvider.succeeding("regional", nordicCoverage, hourlyHours = 60)
+        val alsoShort = FakeWeatherProvider.succeeding("also-short", hourlyHours = 48)
+
+        val forecast = router(regional, alsoShort).getForecast(riga).getOrThrow()
+
+        assertNull(forecast.supplement)
+        assertEquals(0, alsoShort.calls)
+    }
+
+    @Test
+    fun `extending counts as a success for the provider that supplied it`() = runTest {
+        val health = ProviderHealthRegistry()
+        health.recordFailure("global", now, WeatherError.Timeout)
+
+        val regional = FakeWeatherProvider.succeeding("regional", nordicCoverage, hourlyHours = 60)
+        val global = FakeWeatherProvider.succeeding("global", hourlyHours = 7 * 24)
+
+        router(regional, global, health = health).getForecast(riga)
+
+        assertTrue(health.of("global").isHealthy)
     }
 }

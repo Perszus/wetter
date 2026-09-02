@@ -17,6 +17,8 @@ location. The rest of the app never learns which.
               │                             │
               └──────────────┬──────────────┘
                              ↓
+                      ForecastStitcher
+                             ↓
                        WeatherForecast
 ```
 
@@ -42,8 +44,8 @@ interface WeatherProvider {
 ordinary event in a multi-provider system — it is the router's cue to try the
 next candidate, not an exception to propagate upwards.
 
-**Capabilities** are a set of `WeatherVariable`, a maximum forecast length, a
-model resolution and an update interval. They record what a provider actually
+**Capabilities** are a set of `WeatherVariable`, a maximum forecast length, an
+hourly horizon, a model resolution and an update interval. They record what a provider actually
 delivers, not what its documentation promises.
 
 **Coverage** is whether the provider answers globally, plus a list of rectangles
@@ -93,6 +95,51 @@ no reason they could perceive.
 anything healthy, but not excluded — otherwise an outage on both sides of a
 fallback pair would leave the app unable to recover on its own.
 
+## Keeping the timeline hourly
+
+The best provider for a place is often not the one that reaches furthest. MET
+Norway runs a 2.5 km model over the Nordics and is the right source for whether
+it rains this afternoon — but it is hourly for only about sixty hours, after
+which its series drops to six-hourly steps. Choosing it naively would mean a
+better forecast for two days and *no hourly timeline at all* for the other five.
+
+So a forecast is assembled adaptively. The winner supplies the hours it has, and
+the next-best candidate supplies the rest:
+
+```text
+hours 0–60      MET Norway        2.5 km, the model that knows this coastline
+hours 60–168    Open-Meteo        global blend, still hour by hour
+                     ↑ the join, exactly where MET Norway stops being hourly
+```
+
+`ProviderCapabilities.hourlyHorizonHours` is what makes this decidable, and it is
+deliberately separate from `maximumForecastDays` — MET Norway forecasts nine days
+and is hourly for two and a half of them.
+
+The rules, all enforced in `ForecastStitcher`:
+
+- **Nothing is invented.** Six-hourly steps are never spread into hours. A bar
+  six times too wide is worse than no bar, because it is wrong about *when*.
+- **The join lands where the first source stops.** It is not moved to a day
+  boundary, because that would throw away up to a day of the better model to
+  make the seam tidier.
+- **A day's summary comes from whoever drew that day's hours**, so the daily row
+  can never describe one model while the bars above it draw another.
+- **The extension is optional.** It costs at most one extra request, and if that
+  request fails the user still gets the forecast that already succeeded.
+  Extending a forecast must never be able to cost somebody one.
+- **A small shortfall is ignored.** A forecast starting at local midnight is
+  always a few hours short of any round horizon by mid-morning; only a gap over
+  twelve hours is worth a second request.
+
+`ForecastRequirements.hourlyHorizon` is six days rather than seven: the daily
+forecast runs a week, and six guarantees hour-by-hour detail for every day of it
+bar the tail of the last.
+
+The result records both sources — `provider` stays the primary, and `supplement`
+names the second and the instant it took over. Neither is shown on the main
+screen. Both are credited in About, as their licences require.
+
 ## Failover
 
 The router tries the preferred provider, then at most one fallback. It never
@@ -133,7 +180,10 @@ should start from a clean slate rather than resume a stale grudge.
 2. Add a package under `data/provider/`, containing the response types
    (`internal`), a mapper, and the `WeatherProvider` implementation.
 3. Declare honest capabilities. If a documented field is null in practice, leave
-   it out: the selector's job is to predict what will arrive.
+   it out: the selector's job is to predict what will arrive. Take particular
+   care with `hourlyHorizonHours` — it is how far the provider is *genuinely*
+   hour by hour, which for several services is much less than how far it
+   forecasts at all.
 4. Declare coverage. Give a region its own `resolutionKm` if a finer model runs
    there.
 5. Register it in `WetterContainer.providers`. Nothing else changes.
@@ -186,6 +236,9 @@ record:
   somebody is.
 - Runs a 2.5 km model over the Nordic area and a global model elsewhere, which
   is why its Nordic region carries its own resolution.
+- Hourly for about 60 hours, then six-hourly to day nine. Wetter uses the hourly
+  part and extends the rest from Open-Meteo — see
+  [Keeping the timeline hourly](#keeping-the-timeline-hourly).
 - Publishes no snow depth, no sunrise and no sunset. The first is left absent;
   the other two are computed from the sun's position, which is why the provider
   claims the sunrise capability.

@@ -158,6 +158,7 @@ class ScoringProviderSelectorTest {
             capabilities = ProviderCapabilities(
                 variables = setOf(WeatherVariable.HOURLY, WeatherVariable.DAILY),
                 maximumForecastDays = 7,
+                hourlyHorizonHours = 7 * 24,
                 resolutionKm = 1.0,
                 updateIntervalHours = 1.0,
             ),
@@ -187,6 +188,7 @@ class ScoringProviderSelectorTest {
             capabilities = ProviderCapabilities(
                 variables = setOf(WeatherVariable.HOURLY, WeatherVariable.PRECIPITATION),
                 maximumForecastDays = 7,
+                hourlyHorizonHours = 7 * 24,
                 resolutionKm = 11.0,
                 updateIntervalHours = 1.0,
             ),

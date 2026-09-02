@@ -65,6 +65,9 @@ class MetNorwayProvider(
         // Snow depth is absent: precipitation arrives as one liquid-equivalent
         // figure, so Wetter cannot say how many centimetres will lie.
         maximumForecastDays = 9,
+        // The series is hourly for roughly two and a half days and six-hourly
+        // after that. Sixty is the conservative reading of "roughly".
+        hourlyHorizonHours = 60,
         resolutionKm = GLOBAL_RESOLUTION_KM,
         updateIntervalHours = 1.0,
     )

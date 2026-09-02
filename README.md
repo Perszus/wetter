@@ -26,6 +26,13 @@ one runs a fine grid, falling back to a global one elsewhere, and failing over
 when a service is having a bad afternoon. You never have to know which one
 answered. See [docs/providers.md](docs/providers.md).
 
+**There is always an hourly timeline.** The best model for a place often has the
+shortest reach: MET Norway's 2.5 km Nordic model is hourly for about sixty hours
+and six-hourly after that. Rather than choose between a better forecast and a
+longer one, Wetter takes the hours the regional model has and continues with a
+global one, joined exactly where the first stops. Coarse steps are never
+stretched into hours to fill a gap.
+
 **It works offline.** Reading a forecast never waits on the network. A failed
 refresh leaves the last forecast on screen and says how old it is, rather than
 replacing it with an error.
@@ -48,6 +55,7 @@ in between at all.
 | Domain model, provider abstraction | done |
 | Open-Meteo and MET Norway providers | done |
 | Geographic provider selection, health, failover | done |
+| Adaptive hourly range — a short forecast extended from a second source | done |
 | Offline-first repository | done, but the cache is in memory only |
 | Current conditions on screen | done |
 | **Precipitation timeline** | **not started** |
@@ -57,8 +65,9 @@ in between at all.
 | Home-screen widget | not started |
 | Background refresh, notifications, settings | not started |
 
-89 unit tests cover the solar calculations, the intensity bands, provider
-selection, failover, both response mappers and the repository.
+108 unit tests cover the solar calculations, the intensity bands, provider
+selection, failover, forecast stitching, both response mappers and the
+repository.
 
 ---
 
