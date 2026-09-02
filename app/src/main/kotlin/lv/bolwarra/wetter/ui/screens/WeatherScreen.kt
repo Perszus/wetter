@@ -25,9 +25,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.delay
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.WeatherError
@@ -52,6 +57,13 @@ fun WeatherRoute(
     viewModel: WeatherViewModel = viewModel(factory = WetterViewModels.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+
+    // Every return to the foreground asks whether the data has aged out.
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { viewModel.refreshIfStale() }
+    }
+
     // Which page you are on survives a rotation but not a relaunch: it is where
     // you are looking right now, not a preference.
     var domain by rememberSaveable { mutableStateOf(WeatherDomain.Today) }
@@ -89,14 +101,23 @@ fun WeatherScreen(
 ) {
     val spacing = WetterTheme.spacing
 
-    // The age on screen has to keep counting, or "2 min ago" is still on display
-    // an hour later. A minute is the finest the line ever reads, so a minute is
-    // as often as this needs to wake up.
+    // The whole screen is read against this instant - the mark on the dial, the
+    // rolling rain window, which day "tomorrow" means - so it has to keep up
+    // with the clock rather than with when the screen happened to open.
+    //
+    // Aligned to the minute rather than every sixty seconds from launch, because
+    // this drives a clock face and a clock face should move when the minute
+    // does. Tied to RESUMED for the same reason it is re-read on arrival: a
+    // frozen process resumes mid-delay, and the first thing shown would
+    // otherwise be the time it was put down.
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     var now by remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(CLOCK_TICK_MS)
-            now = Instant.now()
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                now = Instant.now()
+                delay(millisUntilNextMinute(now))
+            }
         }
     }
 
@@ -184,7 +205,11 @@ private fun emptyDetailFor(error: WeatherError?) = when (error) {
     else -> R.string.state_could_not_fetch_detail
 }
 
-private const val CLOCK_TICK_MS = 60_000L
+/** Time until the wall clock rolls over to the next minute. */
+private fun millisUntilNextMinute(now: Instant): Long =
+    Duration.between(now, now.plus(Duration.ofMinutes(1)).truncatedTo(ChronoUnit.MINUTES))
+        .toMillis()
+        .coerceAtLeast(1L)
 
 private val sampleState = WeatherUiState(
     location = SampleWeather.location,

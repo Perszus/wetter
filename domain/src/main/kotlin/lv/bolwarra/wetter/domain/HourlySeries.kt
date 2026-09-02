@@ -94,6 +94,43 @@ fun List<HourlyWeather>.totalPrecipitation(): Double? {
     return if (reported.isEmpty()) null else reported.sum()
 }
 
+/**
+ * Accumulation between two instants, pro-rating the hours the range cuts.
+ *
+ * Needed because the timeline rolls by the minute while the data arrives in
+ * whole hours. Asked at 14:45 for the next six hours, summing whole buckets
+ * would charge the window the entire 14:00 hour - three quarters of which has
+ * already fallen - and the headline would not be the total for the stretch of
+ * chart underneath it.
+ *
+ * The share is taken linearly across the hour, which is the same assumption the
+ * curve between two samples already makes.
+ */
+fun List<HourlyWeather>.totalPrecipitation(from: Instant, to: Instant): Double? {
+    if (!to.isAfter(from)) return null
+
+    val hours = sortedBy { it.timestamp }
+    var total = 0.0
+    var reported = false
+
+    hours.forEachIndexed { index, hour ->
+        val millimetres = hour.precipitation ?: return@forEachIndexed
+        val end = hours.getOrNull(index + 1)?.timestamp
+            ?: hour.timestamp.plus(Duration.ofHours(1))
+        val overlap = Duration.between(
+            maxOf(hour.timestamp, from),
+            minOf(end, to),
+        )
+        if (overlap.isNegative || overlap.isZero) return@forEachIndexed
+
+        val span = Duration.between(hour.timestamp, end)
+        reported = true
+        total += millimetres * overlap.toMillis() / span.toMillis().toDouble()
+    }
+
+    return if (reported) total else null
+}
+
 /** The heaviest hour in the series. */
 fun List<HourlyWeather>.peakPrecipitation(): Double? = mapNotNull { it.precipitation }.maxOrNull()
 

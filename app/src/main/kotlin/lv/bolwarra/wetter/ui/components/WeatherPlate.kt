@@ -43,6 +43,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.sin
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.labelRes
@@ -83,13 +84,13 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
 
-    val windSpeed = forecast.current.windSpeed ?: 0.0
+    // Resolved against the clock, not taken from the fetch. Everything else on
+    // this face moves - the mark, the light - and a temperature that did not
+    // would end up contradicting the mark beside it.
+    val current = forecast.conditionsAt(now)
+    val windSpeed = current.windSpeed ?: 0.0
     val beamAngle = rememberBeamAngle(windSpeed)
-
-    val rainExpectedToday = forecast.rainExpectedToday(now)
-    // Forced on while the placement is being judged. Delete the flag and this
-    // becomes `rainExpectedToday`, which is already correct.
-    val showUmbrella = ALWAYS_SHOW_UMBRELLA || rainExpectedToday
+    val showUmbrella = forecast.rainExpectedToday(now)
 
     BoxWithConstraints(
         modifier = modifier
@@ -149,7 +150,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Text(
-                    text = formatTemperature(forecast.current.temperature),
+                    text = formatTemperature(current.temperature),
                     style = WetterTheme.type.reading,
                     color = colors.textPrimary,
                 )
@@ -162,7 +163,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
             }
             Spacer(Modifier.height(spacing.xs))
             Text(
-                text = stringResource(forecast.current.condition.labelRes()),
+                text = stringResource(current.condition.labelRes()),
                 style = WetterTheme.type.title,
                 color = colors.textSecondary,
                 textAlign = TextAlign.Center,
@@ -253,8 +254,13 @@ private fun WeatherForecast.rainExpectedToday(now: Instant): Boolean {
 private fun rememberBeamAngle(windSpeedMs: Double): Float {
     if (windSpeedMs < STILL_AIR_MS) return 0f
 
-    val fraction = (windSpeedMs / GALE_MS).coerceIn(0.0, 1.0)
-    val seconds = FASTEST_LAP_S + (SLOWEST_LAP_S - FASTEST_LAP_S) * (1.0 - fraction)
+    // Inversely proportional, not linear between two endpoints. Linear against a
+    // 20 m/s ceiling squashed every wind anyone actually sees into the slow end:
+    // 2 m/s and 5 m/s came out 31 and 36 seconds apart, which is no difference at
+    // all to watch. This way doubling the wind halves the lap, which is what
+    // "representative of the speed" has to mean.
+    val seconds = (REFERENCE_MS * REFERENCE_LAP_S / windSpeedMs)
+        .coerceIn(FASTEST_LAP_S, SLOWEST_LAP_S)
 
     val transition = rememberInfiniteTransition(label = "wind")
     val angle by transition.animateFloat(
@@ -396,12 +402,6 @@ private fun angleOf(instant: Instant, zone: ZoneId): Float {
     return -QUARTER_TURN + minutes / MINUTES_IN_DAY * FULL_TURN
 }
 
-/**
- * Temporary. Shows the umbrella regardless of the forecast so its placement and
- * weight can be judged against a dry day. Remove with the flag in the composable.
- */
-private const val ALWAYS_SHOW_UMBRELLA = true
-
 private val PLATE_MAX = 240.dp
 
 private val MARK_SIZE = 26.dp
@@ -449,15 +449,34 @@ private const val WAVE_AMPLITUDE = 0.42f
 private const val WAVE_RESOLUTION = 1f
 private val WAVE_STROKE = 2.dp
 
-/** Beaufort 4 and 6, roughly: branches moving, then leaning into it. */
-private const val MODERATE_WIND_MS = 3.5
-private const val STRONG_WIND_MS = 8.0
+/**
+ * The Beaufort 4 and 6 boundaries.
+ *
+ * Below 5.5 is up to a gentle breeze - present, not worth remarking on. From
+ * there to 10.8 is moderate and fresh: dust and paper lift, small trees sway.
+ * At 10.8 the scale calls it a strong breeze and describes umbrellas becoming
+ * difficult to use, which is the same wind that takes a hat off. That is the
+ * level worth a third line, and it is reachable on a coast several times a
+ * month - not a once-a-decade storm nobody would ever see the indicator fill
+ * for.
+ *
+ * The previous values claimed to be these boundaries and were not; they were 3
+ * and 5, which put "strong" at a fresh breeze.
+ */
+private const val MODERATE_WIND_MS = 5.5
+private const val STRONG_WIND_MS = 10.8
 
 /** Below this the air is still, the light holds, and the animation stops. */
 private const val STILL_AIR_MS = 0.5
 
-/** Roughly a strong gale. Past it the light is already as fast as it usefully gets. */
-private const val GALE_MS = 20.0
+/**
+ * The anchor for the rotation: an ordinary breeze takes twelve seconds to go
+ * round. Everything else falls out of that inversely - 2 m/s is thirty seconds,
+ * 11 m/s is five and a half, and a gale is at the floor.
+ */
+private const val REFERENCE_MS = 5.0
+private const val REFERENCE_LAP_S = 12.0
 
-private const val FASTEST_LAP_S = 2.5
-private const val SLOWEST_LAP_S = 40.0
+/** Faster than this reads as a spinner; slower is indistinguishable from still. */
+private const val FASTEST_LAP_S = 3.0
+private const val SLOWEST_LAP_S = 45.0

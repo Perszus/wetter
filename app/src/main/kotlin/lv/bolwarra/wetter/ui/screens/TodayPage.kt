@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import java.time.Duration
 import java.time.Instant
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.at
+import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
@@ -40,6 +42,7 @@ import lv.bolwarra.wetter.ui.format.formatDuration
 import lv.bolwarra.wetter.ui.format.formatMillimetresWithUnit
 import lv.bolwarra.wetter.ui.format.formatPercent
 import lv.bolwarra.wetter.ui.format.formatPressure
+import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatWeekday
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
@@ -56,7 +59,11 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
     val zone = forecast.location.zone
     val spacing = WetterTheme.spacing
-    val ahead = forecast.hourly.window(now, TIMELINE_HOURS)
+    val span = Duration.ofHours(TIMELINE_HOURS)
+    // One hour more than is drawn. The window rolls by the minute but the data
+    // arrives in whole hours, so covering six hours from 14:45 needs the row
+    // that starts at 20:00.
+    val ahead = forecast.hourly.window(now, TIMELINE_HOURS + 1)
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -65,16 +72,18 @@ fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modi
         if (ahead.isNotEmpty()) {
             Tile(
                 label = stringResource(R.string.tile_rain),
-                trailing = formatMillimetresWithUnit(ahead.totalPrecipitation() ?: 0.0),
+                trailing = formatMillimetresWithUnit(
+                    ahead.totalPrecipitation(now, now.plus(span)) ?: 0.0,
+                ),
             ) {
-                RainCurve(hours = ahead, zone = zone)
+                RainCurve(hours = ahead, zone = zone, from = now, span = span)
                 Spacer(Modifier.height(spacing.m))
                 NextRainBar(forecast, now)
             }
         }
 
         DaylightTile(forecast, now)
-        AirTile(forecast)
+        AirTile(forecast, now)
     }
 }
 
@@ -90,7 +99,6 @@ fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modi
 private fun NextRainBar(forecast: WeatherForecast, now: Instant) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
-    val zone = forecast.location.zone
     val spell = forecast.hourly.nextPrecipitation(now)
 
     Row(
@@ -176,19 +184,24 @@ private fun DaylightTile(forecast: WeatherForecast, now: Instant) {
                 ),
                 Metric(
                     stringResource(R.string.metric_feels_like),
-                    lv.bolwarra.wetter.ui.format.formatTemperature(
-                        forecast.current.apparentTemperature,
-                    ),
+                    formatTemperature(forecast.conditionsAt(now).apparentTemperature),
                 ),
             ),
         )
     }
 }
 
-/** The secondary readings — true, occasionally useful, never the headline. */
+/**
+ * The secondary readings — true, occasionally useful, never the headline.
+ *
+ * Every one of them is resolved against [now]. Cloud cover used to come from the
+ * first row of the series, which is only this hour on a forecast fetched this
+ * hour; on anything older it was reporting a cloud cover from the past under a
+ * heading that says nothing about the past.
+ */
 @Composable
-private fun AirTile(forecast: WeatherForecast) {
-    val current = forecast.current
+private fun AirTile(forecast: WeatherForecast, now: Instant) {
+    val current = forecast.conditionsAt(now)
     Tile(label = stringResource(R.string.tile_air)) {
         MetricGrid(
             listOf(
@@ -197,7 +210,7 @@ private fun AirTile(forecast: WeatherForecast) {
                 Metric(stringResource(R.string.metric_pressure), formatPressure(current.pressure)),
                 Metric(
                     stringResource(R.string.metric_cloud),
-                    formatPercent(forecast.hourly.firstOrNull()?.cloudCover),
+                    formatPercent(forecast.hourly.at(now)?.cloudCover),
                 ),
             ),
         )

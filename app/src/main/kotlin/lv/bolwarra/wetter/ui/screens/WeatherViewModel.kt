@@ -65,6 +65,24 @@ class WeatherViewModel(
     }
 
     /**
+     * Fetches only if the cache has aged out.
+     *
+     * Called when the screen comes back to the foreground. Freshness was
+     * otherwise settled once, when this view model was built, and never asked
+     * again: an app left in the background for an afternoon came back to
+     * whatever it was showing when it left. The periodic worker usually covers
+     * that, but "usually" is doing real work in that sentence - Doze and battery
+     * saver defer it freely, and those are exactly the conditions of a phone
+     * that has been in a pocket for three hours.
+     */
+    fun refreshIfStale() {
+        viewModelScope.launch {
+            val location = selectedLocation.selected.value
+            if (repository.needsRefresh(repository.cached(location))) refresh()
+        }
+    }
+
+    /**
      * Fetches regardless of freshness. A person who asks for a refresh has a
      * reason, and telling them the data is recent enough would be arguing with
      * them about their own window.

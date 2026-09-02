@@ -71,14 +71,23 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * peak inside it, drawing rainfall nobody forecast. See [MonotoneCurve].
  */
 @Composable
-fun RainCurve(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Modifier) {
+fun RainCurve(
+    hours: List<HourlyWeather>,
+    zone: ZoneId,
+    from: Instant,
+    span: Duration,
+    modifier: Modifier = Modifier,
+) {
     if (hours.size < 2) return
 
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     val measurer = rememberTextMeasurer()
 
-    val points = remember(hours) { resample(hours.sortedBy { it.timestamp }) }
+    val points = remember(hours, from, span) {
+        resample(hours.sortedBy { it.timestamp }).clipTo(from, from.plus(span))
+    }
+    if (points.size < 2) return
 
     var scrubbed by remember { mutableStateOf<Int?>(null) }
 
@@ -158,6 +167,20 @@ fun RainCurve(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
         }
     }
 }
+
+/**
+ * The stretch actually being asked about.
+ *
+ * The spline is fitted over whole hours because that is what it has to fit; the
+ * window shown is then cut out of it. Cutting first would fit the curve to a
+ * truncated first hour and bend its left end.
+ *
+ * The cut lands on the existing ten-minute grid rather than exactly on [from],
+ * which keeps the half-hour rules underneath on the half hour. Ten minutes of
+ * slack at the left edge is the price, against the hour it replaces.
+ */
+private fun List<CurvePoint>.clipTo(from: Instant, to: Instant): List<CurvePoint> =
+    filter { !it.at.isBefore(from) && !it.at.isAfter(to) }
 
 /** One moment on the curve. */
 private data class CurvePoint(
