@@ -1,5 +1,6 @@
 package lv.bolwarra.wetter.ui.format
 
+import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import java.time.Duration
 import java.time.Instant
@@ -84,6 +85,41 @@ fun formatDayOfMonth(date: LocalDate): String = date.dayOfMonth.toString()
 /** Full weekday, for a sentence rather than a column. */
 fun formatWeekday(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+
+/**
+ * How far off a day is, in the terms people actually use for it.
+ *
+ * The distinction is not decorative. "Rain starts at 23:00" is a fine thing to
+ * say about tonight and a misleading thing to say about next Wednesday, and the
+ * boundary between a weekday name and a date is the point where the name stops
+ * being unambiguous — seven days out, "Wednesday" is today's name again.
+ */
+enum class DayDistance { TODAY, TOMORROW, THIS_WEEK, LATER }
+
+/** Which of those a moment falls into, judged by calendar date in [zone]. */
+fun dayDistance(instant: Instant, now: Instant, zone: ZoneId): DayDistance {
+    val days = daysBetween(instant, now, zone)
+    return when {
+        days <= 0L -> DayDistance.TODAY
+        days == 1L -> DayDistance.TOMORROW
+        days < DAYS_IN_WEEK -> DayDistance.THIS_WEEK
+        else -> DayDistance.LATER
+    }
+}
+
+/**
+ * "12 September", ordered the way the reader's locale orders it.
+ *
+ * The year is deliberately absent: no forecast reaches far enough for it to be
+ * in question.
+ */
+fun formatDayAndMonth(date: LocalDate): String {
+    val pattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), DAY_MONTH_SKELETON)
+    return DateTimeFormatter.ofPattern(pattern, Locale.getDefault()).format(date)
+}
+
+private const val DAYS_IN_WEEK = 7L
+private const val DAY_MONTH_SKELETON = "dMMMM"
 
 /** How many whole calendar days apart two instants are, in the location's zone. */
 fun daysBetween(instant: Instant, now: Instant, zone: ZoneId): Long = ChronoUnit.DAYS.between(

@@ -32,7 +32,10 @@ import lv.bolwarra.wetter.ui.components.Metric
 import lv.bolwarra.wetter.ui.components.MetricGrid
 import lv.bolwarra.wetter.ui.components.RainCurve
 import lv.bolwarra.wetter.ui.components.Tile
+import lv.bolwarra.wetter.ui.format.DayDistance
 import lv.bolwarra.wetter.ui.format.NO_READING
+import lv.bolwarra.wetter.ui.format.dayDistance
+import lv.bolwarra.wetter.ui.format.formatDayAndMonth
 import lv.bolwarra.wetter.ui.format.formatDuration
 import lv.bolwarra.wetter.ui.format.formatMillimetresWithUnit
 import lv.bolwarra.wetter.ui.format.formatPercent
@@ -130,16 +133,20 @@ private fun PrecipitationSpell?.describe(now: Instant, forecast: WeatherForecast
         }
     }
 
-    val startsToday = start.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()
-    return if (startsToday) {
+    val date = start.atZone(zone).toLocalDate()
+    val day = when (dayDistance(start, now, zone)) {
+        DayDistance.TODAY -> null
+        DayDistance.TOMORROW -> stringResource(R.string.relative_tomorrow)
+        DayDistance.THIS_WEEK -> formatWeekday(date)
+        // Seven days out a weekday name is today's name again, so it stops being
+        // an answer and becomes a riddle.
+        DayDistance.LATER -> formatDayAndMonth(date)
+    }
+
+    return if (day == null) {
         stringResource(R.string.next_rain_starts, kind, formatTime(start, zone))
     } else {
-        stringResource(
-            R.string.next_rain_starts_on,
-            kind,
-            formatWeekday(start.atZone(zone).toLocalDate()),
-            formatTime(start, zone),
-        )
+        stringResource(R.string.next_rain_starts_on, kind, day, formatTime(start, zone))
     }
 }
 

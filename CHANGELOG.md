@@ -54,8 +54,10 @@ Notable changes to Wetter. The format follows
   in millimetres.
 - Scrubbing names the intensity — "3:40 · Light" — alongside the rate, because
   "light" is the half anybody can act on.
-- Next rain is a pill under the curve rather than a card of its own: "Rain
-  starts at 23:00".
+- Next rain is a pill under the curve rather than a card of its own, and it
+  names the day when the day is not today: "Rain starts at 23:00", "… starts
+  tomorrow at 08:00", "… starts Wednesday at 14:00", and a date beyond that,
+  because seven days out a weekday name is today's name again.
 - **The precipitation timeline (superseded by the curve above).** One bar per hour across the local day, height
   for intensity on an absolute 8 mm/h scale that is never rescaled to the view,
   colour carrying confidence, a night wash behind the small hours, and past
