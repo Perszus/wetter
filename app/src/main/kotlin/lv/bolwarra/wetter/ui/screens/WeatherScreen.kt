@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -24,11 +25,11 @@ import kotlinx.coroutines.delay
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.ui.WetterViewModels
-import lv.bolwarra.wetter.ui.components.CurrentConditions
 import lv.bolwarra.wetter.ui.components.DomainSwitcher
 import lv.bolwarra.wetter.ui.components.EmptyState
 import lv.bolwarra.wetter.ui.components.ForecastStatus
 import lv.bolwarra.wetter.ui.components.WeatherHeader
+import lv.bolwarra.wetter.ui.components.WeatherPlate
 import lv.bolwarra.wetter.ui.preview.SampleWeather
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
@@ -121,9 +122,17 @@ fun WeatherScreen(
 
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Spacer(Modifier.height(spacing.s))
-            CurrentConditions(forecast.current)
+            WeatherPlate(
+                forecast = forecast,
+                now = now,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
             Spacer(Modifier.height(spacing.m))
-            ForecastStatus(state = state, now = now)
+            ForecastStatus(
+                state = state,
+                now = now,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
 
             Spacer(Modifier.height(spacing.xl))
             DomainSwitcher(selected = domain, onSelect = onSelectDomain)

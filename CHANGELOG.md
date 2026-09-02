@@ -12,6 +12,16 @@ Notable changes to Wetter. The format follows
   one question with its own tiles, instead of one page trying to answer all
   three. Today is the default. The location and current reading sit above the
   switcher, so changing page moves nothing that was already true.
+- **The current reading is a dial.** A thermostat face: the temperature at the
+  centre of a round plate, with the rim carrying the shape of the day — midnight
+  at the top, an hour a tick, the stretch between sunrise and sunset lit, and a
+  mark at the current moment. It turns over the day whether or not anything is
+  animating.
+- The travelling highlight on the rim is the wind: it crawls in still air and
+  races in a gale, and dead calm holds it still, which stops the animation
+  rather than spinning it pointlessly. Wind *direction* is deliberately absent —
+  the angle around that circle already means time of day, and a compass bearing
+  on the same degrees would make every reading ambiguous.
 - **The precipitation curve.** A flowing area trace with a gradient fill,
   scrubbable to read any point of it. The curve is a monotone cubic spline, so
   it can never overshoot: ordinary smoothing dips below zero approaching a
