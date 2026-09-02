@@ -147,6 +147,30 @@ satisfied; the point is not to break them.
   is signed with a Google key and is not reproducible from source.
 - **Locales are pinned** in `androidResources.localeFilters`, so the build does
   not vary with what is installed on the machine running it.
+- **`vcsInfo` stays disabled** for release. AGP otherwise embeds a description
+  of the git checkout the build came from, which was the one and only thing that
+  differed between two independent builds of the same commit.
+
+### The release build is reproducible — check it
+
+Two builds of the same commit produce a byte-identical APK. That is worth
+keeping true, so verify it when anything about the build configuration changes:
+
+```sh
+git clone --depth 1 https://github.com/Perszus/wetter /tmp/wetter-repro
+cd /tmp/wetter-repro && ./gradlew assembleRelease
+sha256sum app/build/outputs/apk/release/app-release-unsigned.apk
+# must match the same command run anywhere else on the same commit
+```
+
+If the hashes diverge, unzip both and diff the entry hashes — that names the
+offending file immediately, which is how `version-control-info.textproto` was
+found.
+
+This is not required by either store: F-Droid builds and signs the APK itself.
+It matters because it means anyone can confirm that the published binary
+contains this source and nothing else, which is the whole argument for shipping
+free software in the first place.
 
 ## After a release
 

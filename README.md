@@ -45,6 +45,10 @@ without it.
 service. There is nothing in between belonging to us, because there is nothing
 in between at all.
 
+**You can check all of that.** The release build is byte-for-byte reproducible:
+build this source yourself and you get an identical APK, so the published binary
+can be shown to contain this code and nothing else.
+
 ---
 
 ## Where it is now

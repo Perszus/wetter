@@ -82,6 +82,14 @@ version that changes with how the source was fetched is not a version.
 Otherwise the resource set varies with whatever is installed on the machine
 running the build, which is one more way two builds of one commit can differ.
 
+**The release build is byte-for-byte reproducible, and `vcsInfo` is off.**
+Two independent builds of a commit produce an identical APK. Getting there took
+one setting: AGP embeds `META-INF/version-control-info.textproto` describing the
+git checkout, and that was the only file that differed. Neither store requires
+this, but it is what lets anyone confirm that a published binary contains this
+source and nothing else — which is the point of shipping free software.
+docs/RELEASING.md has the command to check it.
+
 **GPL-3.0-or-later, with an additional permission under section 7 for
 distribution through application stores.**
 Play's Developer Distribution Agreement can be read as imposing the further

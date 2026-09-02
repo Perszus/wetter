@@ -32,6 +32,9 @@ Notable changes to Wetter. The format follows
 - An additional permission under GPL section 7 allowing distribution through
   application stores, so a Play listing does not require chasing every future
   contributor for consent. See `LICENSE-EXCEPTION.txt`.
+- Byte-for-byte reproducible release builds. Two independent builds of a commit
+  now produce an identical APK, verified from a fresh shallow clone with no
+  keystore. AGP's `vcsInfo` embedding was the only thing standing in the way.
 
 ### Fixed
 
