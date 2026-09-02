@@ -94,13 +94,13 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .height(PLATE_MAX),
+            .height(PLATE_MAX + MARK_SIZE),
         contentAlignment = Alignment.Center,
     ) {
-        // The marks sit low and wide: down near the base of the dial, and pushed
-        // out past its sides. Kept on the diagonal they crowded the glass and
-        // looked like they were squeezing it; out here the dial keeps its full
-        // width and they read as things standing beside it.
+        // Picture a line drawn across the bottom of the dial: the marks stand on
+        // it, and move out along it to either side. Kept on the diagonal they
+        // crowded the glass and looked like they were squeezing it; out here the
+        // dial keeps its full width and they read as things standing beside it.
         //
         // The dial gives up whatever room the marks need, so it is measured from
         // what is left rather than assumed.
@@ -108,7 +108,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
         val dial = minOf(maxWidth - lane * 2, PLATE_MAX, maxHeight)
         val radius = dial / 2
         val outwards = radius + MARK_GAP + MARK_SIZE / 2
-        val downwards = radius * MARK_BASE
+        val downwards = radius * MARK_BASE_OF_CIRCLE
 
         Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {
@@ -406,8 +406,12 @@ private val MARK_SIZE = 26.dp
 /** Clear air between the glass and the marks, so they are beside it, not on it. */
 private val MARK_GAP = 10.dp
 
-/** How far down the dial the marks sit, as a fraction of its radius. */
-private const val MARK_BASE = 0.66f
+/**
+ * The marks sit on the line tangent to the bottom of the dial, and travel out
+ * along it. Hence exactly the radius: any less and they are floating somewhere
+ * around the base rather than standing on it.
+ */
+private val MARK_BASE_OF_CIRCLE = 1f
 
 private val EDGE_WIDTH = 3.dp
 private val TICK_GAP = 6.dp
@@ -435,7 +439,7 @@ private const val BEAM_ALPHA = 0.5f
 private const val WIND_LINES = 3
 private const val WAVE_LIT = 1f
 private const val WAVE_UNLIT = 0.16f
-private const val WAVE_CYCLES = 2f
+private const val WAVE_CYCLES = 1f
 
 /** As a fraction of the gap between lines, so deeper waves cannot collide. */
 private const val WAVE_AMPLITUDE = 0.42f
