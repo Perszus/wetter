@@ -32,8 +32,22 @@ Notable changes to Wetter. The format follows
   and downpour look identical. Instead the ceiling steps between the
   meteorological band tops and the chart says which one it is using, so the
   scale can change but never silently.
-- Scrubbing reads out the interval a sample covers, not the instant under the
-  finger. Hourly data says `13:00-14:00`, because that is what was forecast.
+- The curve is walked every ten minutes and scrubs at that resolution, reading
+  out a *rate* — `≈0.4 mm/h` — rather than an accumulation. That distinction is
+  what makes the fine reading honest: millimetres accumulated across an hour
+  cannot be read at 01:20, but a rate at that moment can be interpolated. The
+  tilde marks points that fall between the forecast's own samples.
+- The window is the next six hours rather than the next day, on a real time
+  axis: hour labels with half-hour ticks between them.
+- No day/night shading, and no "updated N minutes ago". Keeping the forecast
+  current is the app's job, not something to report to the reader — with the
+  known cost that a device offline for a day now shows day-old numbers silently.
+- The domain switcher is a pill sized to its words and centred, rather than a
+  full-width bar, and the pages slide between one another in the direction they
+  sit rather than cutting.
+- The chart states its scale as an axis maximum rather than a sentence. The
+  ceiling still adapts, so it still has to be stated — but as a number in the
+  corner, which is a convention, not prose to parse.
 - **The precipitation timeline (superseded by the curve above).** One bar per hour across the local day, height
   for intensity on an absolute 8 mm/h scale that is never rescaled to the view,
   colour carrying confidence, a night wash behind the small hours, and past

@@ -1,6 +1,7 @@
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,15 +26,19 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 /**
  * Which page you are on: Today, Week, Month.
  *
- * A recessed track with the selected segment raised out of it. Only the selected
- * segment is filled, because the one thing this control is here to say is which
- * page you are looking at — lighting all three would say nothing.
+ * A pill, centred, sized to its words rather than stretched across the screen —
+ * a control this small has no business being as wide as the content it switches.
  *
- * Selection is shown by ground and weight rather than by colour, and that is the
- * whole reason this does not use the accent. Precipitation owns the only
- * saturated hue in the app; spending it on a navigation control that is on
- * screen at all times would put a permanent blue block above a chart whose
- * entire job is to be the blue thing you look at.
+ * Only the selected segment is filled, because the one thing this is here to say
+ * is which page you are looking at; lighting all three would say nothing. The
+ * fill is a raised ground rather than the accent, and that is deliberate:
+ * precipitation owns the only saturated hue in this app, and a permanent
+ * coloured block sitting directly above the rain chart would compete with the
+ * thing it is there to make you look at.
+ *
+ * The horizontal padding inside each segment is doing real work. On a fully
+ * rounded shape the ends curve away from the text, so a label set tight against
+ * them reads as crowded even when it technically fits.
  */
 @Composable
 fun DomainSwitcher(
@@ -42,46 +47,49 @@ fun DomainSwitcher(
     modifier: Modifier = Modifier,
 ) {
     val colors = WetterTheme.colors
-    val track = RoundedCornerShape(TRACK_RADIUS)
+    val pill = RoundedCornerShape(percent = 50)
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(WetterTheme.spacing.touchTarget)
-            .clip(track)
-            .background(colors.surfaceSunken)
-            .padding(SEGMENT_INSET)
-            .selectableGroup(),
-    ) {
-        WeatherDomain.entries.forEach { domain ->
-            val isSelected = domain == selected
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(SEGMENT_RADIUS))
-                    .background(
-                        if (isSelected) colors.surfaceRaised else colors.surface.copy(alpha = 0f),
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(
+            modifier = Modifier
+                .height(TRACK_HEIGHT)
+                .clip(pill)
+                .background(colors.surfaceSunken)
+                .border(width = 1.dp, color = colors.hairline, shape = pill)
+                .padding(TRACK_INSET)
+                .selectableGroup(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            WeatherDomain.entries.forEach { domain ->
+                val isSelected = domain == selected
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .clip(pill)
+                        .background(if (isSelected) colors.surfaceRaised else colors.surfaceSunken)
+                        .selectable(
+                            selected = isSelected,
+                            role = Role.Tab,
+                            onClick = { onSelect(domain) },
+                        )
+                        .padding(horizontal = SEGMENT_PADDING),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(domain.label),
+                        style = WetterTheme.type.body,
+                        fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                        color = if (isSelected) colors.textPrimary else colors.textTertiary,
+                        maxLines = 1,
                     )
-                    .selectable(
-                        selected = isSelected,
-                        role = Role.Tab,
-                        onClick = { onSelect(domain) },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(domain.label),
-                    style = WetterTheme.type.title,
-                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                    color = if (isSelected) colors.textPrimary else colors.textTertiary,
-                    maxLines = 1,
-                )
+                }
             }
         }
     }
 }
 
-private val TRACK_RADIUS = 10.dp
-private val SEGMENT_RADIUS = 7.dp
-private val SEGMENT_INSET = 3.dp
+private val TRACK_HEIGHT = 38.dp
+private val TRACK_INSET = 3.dp
+
+/** Enough that a fully rounded end never crowds the word inside it. */
+private val SEGMENT_PADDING = 20.dp

@@ -46,7 +46,7 @@
     <string name="domain_month">Month</string>
 
     <!-- Tile headings -->
-    <string name="tile_rain">Rain · next 24 hours</string>
+    <string name="tile_rain">Rain · next 6 hours</string>
     <string name="tile_next_rain">Next rain</string>
     <string name="tile_daylight">Sun</string>
     <string name="tile_air">Air</string>
@@ -70,14 +70,9 @@
     <string name="next_rain_until">Until %1$s · %2$s</string>
     <string name="next_rain_continues">Still falling at %1$s, where the forecast ends</string>
 
-    <!--
-      The curve says what scale it is drawn on when nothing is selected, and
-      what interval a sample covers when something is. The interval matters:
-      an hourly forecast gives millimetres across an hour, not a value that
-      existed at one instant inside it.
-    -->
-    <string name="curve_scale">Full height %1$s mm in the hour</string>
-    <string name="curve_reading">%1$s–%2$s</string>
+    <string name="curve_rate">%1$s mm/h</string>
+    <!-- A tilde marks a point read between the forecast’s own samples. -->
+    <string name="curve_rate_about">≈%1$s mm/h</string>
 
     <!-- Metric labels -->
     <string name="metric_sunrise">Sunrise</string>

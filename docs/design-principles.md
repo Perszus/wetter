@@ -22,7 +22,13 @@ dashboard. It should read as measured, quiet, and precise.
    deliberately quieter than rain.
 2. **Nothing waits on the network.** A cached forecast renders immediately. A
    refresh happens behind it, and its failure never removes what is on screen.
-3. **The app is honest about age.** A forecast that is two hours old says so.
+   The cache is on disk and a background worker keeps it fresh, so this holds
+   across a restart rather than only within one session.
+3. **Staleness is the app's problem, not the reader's.** There is deliberately
+   no "updated 42 minutes ago" line. Somebody opening a weather app wants the
+   weather, not a report on the app's own housekeeping; keeping the forecast
+   current is work the app should simply do. The cost of this is real and worth
+   knowing: a device offline for a day shows day-old numbers without saying so.
 4. **No account, no telemetry, no advertising, no backend of ours.**
 5. **One permission.** `INTERNET`. Location is optional and only requested when
    somebody chooses to use it.

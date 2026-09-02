@@ -219,7 +219,11 @@ private fun AirTile(forecast: WeatherForecast) {
 }
 
 /**
- * A day ahead, not the calendar day. Long enough to cover tonight and tomorrow
- * morning, short enough that an hour is still a readable column.
+ * The next six hours, rolling from the current hour.
+ *
+ * Short on purpose. This is the window in which a forecast is worth acting on
+ * and in which it is most likely to be right; a day of it flattened the part
+ * anybody was going to use into an eighth of the width. What happens later is
+ * the Week page's job, and whether it rains at all is the Next rain tile's.
  */
-private const val TIMELINE_HOURS = 24L
+private const val TIMELINE_HOURS = 6L

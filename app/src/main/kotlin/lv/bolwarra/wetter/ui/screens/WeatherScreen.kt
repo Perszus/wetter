@@ -1,5 +1,12 @@
 package lv.bolwarra.wetter.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +34,6 @@ import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.DomainSwitcher
 import lv.bolwarra.wetter.ui.components.EmptyState
-import lv.bolwarra.wetter.ui.components.ForecastStatus
 import lv.bolwarra.wetter.ui.components.WeatherHeader
 import lv.bolwarra.wetter.ui.components.WeatherPlate
 import lv.bolwarra.wetter.ui.preview.SampleWeather
@@ -127,21 +133,36 @@ fun WeatherScreen(
                 now = now,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
-            Spacer(Modifier.height(spacing.m))
-            ForecastStatus(
-                state = state,
-                now = now,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-
             Spacer(Modifier.height(spacing.xl))
             DomainSwitcher(selected = domain, onSelect = onSelectDomain)
             Spacer(Modifier.height(spacing.m))
 
-            when (domain) {
-                WeatherDomain.Today -> TodayPage(forecast, now)
-                WeatherDomain.Week -> WeekPage(forecast, now)
-                WeatherDomain.Month -> MonthPage(forecast, now)
+            AnimatedContent(
+                targetState = domain,
+                transitionSpec = {
+                    // The pages sit in a row, so moving between them should look
+                    // like moving along that row: pick Week from Today and the
+                    // new page arrives from the right, because it is to the
+                    // right. A cut gives no sense of where you have gone.
+                    val forward = targetState.ordinal > initialState.ordinal
+                    val enter = slideInHorizontally { width ->
+                        if (forward) width else -width
+                    } + fadeIn()
+                    val exit = slideOutHorizontally { width ->
+                        if (forward) -width else width
+                    } + fadeOut()
+                    // Height is not animated: the pages differ a lot in length
+                    // and watching the page below stretch is worse than having
+                    // it settle at once.
+                    enter togetherWith exit using SizeTransform(clip = false)
+                },
+                label = "domain",
+            ) { page ->
+                when (page) {
+                    WeatherDomain.Today -> TodayPage(forecast, now)
+                    WeatherDomain.Week -> WeekPage(forecast, now)
+                    WeatherDomain.Month -> MonthPage(forecast, now)
+                }
             }
 
             Spacer(Modifier.height(spacing.xxl))
