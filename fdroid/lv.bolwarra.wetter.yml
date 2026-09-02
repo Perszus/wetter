@@ -1,22 +1,10 @@
-# F-Droid build recipe for Wetter.
-#
-# This file is a copy kept alongside the source so it is reviewed with the code.
-# The one F-Droid actually uses lives in their own repository, at
-# metadata/lv.bolwarra.wetter.yml in https://gitlab.com/fdroid/fdroiddata —
-# submitting the app means opening a merge request there with this content.
-#
-# Descriptions, the summary and changelogs are deliberately absent: F-Droid reads
-# them from fastlane/metadata/android/ in this repository, which is the same
-# directory Play reads. One source of store text, two stores.
-
 Categories:
-  - Time
-  - Science & Education
+  - Weather
 License: GPL-3.0-or-later
 AuthorName: Roberts Kains
 SourceCode: https://github.com/Perszus/wetter
 IssueTracker: https://github.com/Perszus/wetter/issues
-Changelog: https://github.com/Perszus/wetter/blob/main/CHANGELOG.md
+Changelog: https://github.com/Perszus/wetter/blob/HEAD/CHANGELOG.md
 
 RepoType: git
 Repo: https://github.com/Perszus/wetter.git
@@ -28,11 +16,8 @@ Builds:
     subdir: app
     gradle:
       - yes
-    # No prebuild, no sudo, no patching. If this list ever needs an entry, that
-    # is a sign the project has taken on something that cannot be built from a
-    # clean checkout — which is worth fixing rather than working around.
 
-AutoUpdateMode: Version
+AutoUpdateMode: Version v%v
 UpdateCheckMode: Tags ^v[0-9.]+$
 CurrentVersion: 0.1.0
 CurrentVersionCode: 1

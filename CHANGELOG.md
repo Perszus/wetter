@@ -32,6 +32,11 @@ Notable changes to Wetter. The format follows
 - An additional permission under GPL section 7 allowing distribution through
   application stores, so a Play listing does not require chasing every future
   contributor for consent. See `LICENSE-EXCEPTION.txt`.
+- F-Droid metadata validated with F-Droid's own tooling: `fdroid lint` reports
+  no findings and `fdroid rewritemeta` leaves it unchanged, so it can go into an
+  fdroiddata merge request verbatim. Fixed an invalid `Categories` value (`Time`
+  is not a category; the app is `Weather`) and a `Changelog` URL that pointed at
+  `/main` rather than `/HEAD`.
 - Byte-for-byte reproducible release builds. Two independent builds of a commit
   now produce an identical APK, verified from a fresh shallow clone with no
   keystore. AGP's `vcsInfo` embedding was the only thing standing in the way.

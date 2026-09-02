@@ -112,24 +112,79 @@ F-Droid builds from the tag, on their servers, with no keystore present. That is
 why `assembleRelease` succeeds unsigned rather than failing — a guard there would
 break their build.
 
-Submitting the app the first time:
+Submitting the app the first time follows F-Droid's own documented process
+(<https://gitlab.com/fdroid/fdroiddata/-/blob/master/CONTRIBUTING.md>), and it
+uses their tooling rather than hand-written YAML.
 
-1. Check the build works the way theirs will:
-   ```sh
-   git clone https://github.com/Perszus/wetter /tmp/wetter-clean
-   cd /tmp/wetter-clean && git checkout v0.1.0
-   ./gradlew assembleRelease        # must succeed with no keystore.properties
-   ```
-2. Open a *Request For Packaging* issue at
-   <https://gitlab.com/fdroid/rfp/-/issues>, or go straight to a merge request
-   against <https://gitlab.com/fdroid/fdroiddata> adding
-   `metadata/lv.bolwarra.wetter.yml`. The content is kept in this repository at
-   [`fdroid/lv.bolwarra.wetter.yml`](../fdroid/lv.bolwarra.wetter.yml).
+**1. Open a Request For Packaging.** First-time contributors are asked to do this
+before anything else: <https://gitlab.com/fdroid/rfp/-/issues>.
 
-After that, `AutoUpdateMode: Version` means F-Droid picks up new tags on its own.
-A release usually appears within a few days. Nothing needs doing per release
-beyond pushing the tag — unless the build recipe changes, in which case update
-both copies of the yml.
+**2. Install fdroidserver and fork fdroiddata.**
+
+```sh
+pip install git+https://gitlab.com/fdroid/fdroidserver.git
+git clone https://gitlab.com/YOUR_USERNAME/fdroiddata.git
+cd fdroiddata
+```
+
+**3. Generate the metadata rather than writing it.**
+
+```sh
+fdroid import --url https://github.com/Perszus/wetter --subdir app
+```
+
+This writes `metadata/lv.bolwarra.wetter.yml`, which then needs editing by hand
+to add what it cannot infer. The finished result is kept in this repository at
+[`fdroid/lv.bolwarra.wetter.yml`](../fdroid/lv.bolwarra.wetter.yml) and can be
+copied across verbatim — it is already in `fdroid rewritemeta` canonical form and
+passes `fdroid lint` with no findings.
+
+**4. Check it with their tools before opening anything.**
+
+```sh
+fdroid readmeta                        # the file parses
+fdroid rewritemeta lv.bolwarra.wetter  # canonical formatting; should be a no-op
+fdroid checkupdates lv.bolwarra.wetter # the tag pattern finds the release
+fdroid lint lv.bolwarra.wetter         # no findings
+fdroid build -v -l lv.bolwarra.wetter  # builds the way their servers will
+```
+
+`fdroid lint` validates `Categories` against `config/categories.yml` in the
+fdroiddata checkout, so it only means anything when run from inside one. There is
+no category called `Time` — the app is `Weather`.
+
+**5. Open a merge request** against <https://gitlab.com/fdroid/fdroiddata> once
+the CI pipeline on your fork passes.
+
+After that, `AutoUpdateMode: Version v%v` means F-Droid picks up new tags on its
+own, and a release usually appears within a few days. Nothing needs doing per
+release beyond pushing the tag — unless the build recipe changes, in which case
+update both copies of the yml.
+
+### Why the metadata carries no description
+
+`Summary` and `Description` are valid fields, and are deliberately absent.
+F-Droid reads `fastlane/metadata/android/` from this repository instead — the
+same directory Play reads — so the store text has one source rather than two
+that drift.
+
+### What the inclusion policy requires
+
+Checked against <https://f-droid.org/en/docs/Inclusion_Policy/>. All of it is
+already true, and the point is not to break it:
+
+- **FLOSS licence** recognised by the FSF, OSI or DFSG. GPL-3.0-or-later is.
+- **No proprietary tracking, advertising or analytics libraries.** These are
+  "strictly forbidden", and there are none.
+- **Built with a 100% FLOSS toolchain.** No Oracle JDK, no proprietary build
+  step.
+- **Binary dependencies only from trusted sources** — Maven Central, Google's
+  Maven repository for AndroidX, the Android SDK. No vendored blobs.
+- **No executable downloaded at runtime** without explicit opt-in. Wetter
+  downloads nothing but JSON.
+- **A distinct application id.** Duplicates are automatically rejected.
+- **Actually maintained and actually useful** — not a demo, not a rebranding,
+  not a website in a WebView.
 
 ### Keeping F-Droid able to build it
 
