@@ -23,8 +23,8 @@ import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
-import lv.bolwarra.wetter.domain.onDay
 import lv.bolwarra.wetter.domain.totalPrecipitation
+import lv.bolwarra.wetter.domain.window
 import lv.bolwarra.wetter.ui.components.Metric
 import lv.bolwarra.wetter.ui.components.MetricGrid
 import lv.bolwarra.wetter.ui.components.RainTimeline
@@ -51,19 +51,18 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
     val zone = forecast.location.zone
     val spacing = WetterTheme.spacing
-    val today = now.atZone(zone).toLocalDate()
-    val hoursToday = forecast.hourly.onDay(today, zone)
+    val ahead = forecast.hourly.window(now, TIMELINE_HOURS)
 
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.m),
     ) {
-        if (hoursToday.isNotEmpty()) {
+        if (ahead.isNotEmpty()) {
             Tile(
                 label = stringResource(R.string.tile_rain),
-                trailing = formatMillimetresWithUnit(hoursToday.totalPrecipitation() ?: 0.0),
+                trailing = formatMillimetresWithUnit(ahead.totalPrecipitation() ?: 0.0),
             ) {
-                RainTimeline(hours = hoursToday, now = now, zone = zone)
+                RainTimeline(hours = ahead, zone = zone)
             }
         }
 
@@ -218,3 +217,9 @@ private fun AirTile(forecast: WeatherForecast) {
         )
     }
 }
+
+/**
+ * A day ahead, not the calendar day. Long enough to cover tonight and tomorrow
+ * morning, short enough that an hour is still a readable column.
+ */
+private const val TIMELINE_HOURS = 24L

@@ -4,6 +4,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
@@ -20,6 +21,23 @@ import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 /** The hours belonging to one calendar date at a place. */
 fun List<HourlyWeather>.onDay(date: LocalDate, zone: ZoneId): List<HourlyWeather> =
     filter { it.timestamp.atZone(zone).toLocalDate() == date }
+
+/**
+ * A rolling window of hours starting at the hour containing [from].
+ *
+ * This, rather than a calendar day, is what the timeline draws. Providers do not
+ * agree on where an hourly series begins — Open-Meteo returns the day from local
+ * midnight, MET Norway returns it from the current hour — so slicing by date
+ * gives a full chart from one and a stump from the other, depending on the time
+ * of day and on which provider happened to win the location. A window from now
+ * is the same length whoever answered, and is the question being asked anyway.
+ */
+fun List<HourlyWeather>.window(from: Instant, hours: Long): List<HourlyWeather> {
+    val start = from.truncatedTo(ChronoUnit.HOURS)
+    val end = start.plus(Duration.ofHours(hours))
+    return filter { !it.timestamp.isBefore(start) && it.timestamp.isBefore(end) }
+        .sortedBy { it.timestamp }
+}
 
 /**
  * Every unbroken run of wet hours, in order.

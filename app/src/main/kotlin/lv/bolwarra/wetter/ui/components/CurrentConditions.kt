@@ -40,7 +40,7 @@ fun CurrentConditions(current: CurrentWeather, modifier: Modifier = Modifier) {
                 text = stringResource(R.string.unit_celsius),
                 style = WetterTheme.type.readingUnit,
                 color = colors.textTertiary,
-                modifier = Modifier.padding(start = 6.dp, top = 10.dp),
+                modifier = Modifier.padding(start = 3.dp, top = 16.dp),
             )
         }
 

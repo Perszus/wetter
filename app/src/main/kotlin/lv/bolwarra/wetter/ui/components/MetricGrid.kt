@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import lv.bolwarra.wetter.ui.format.NO_READING
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /** One labelled reading. */
@@ -26,8 +27,14 @@ data class Metric(val label: String, val value: String)
 fun MetricGrid(metrics: List<Metric>, modifier: Modifier = Modifier) {
     val spacing = WetterTheme.spacing
 
+    // A reading the provider never supplies would sit here as a dash for ever.
+    // Dropping it is not hiding anything: the tile simply has one fewer thing in
+    // it, which is the truth.
+    val present = metrics.filter { it.value != NO_READING }
+    if (present.isEmpty()) return
+
     Column(modifier.fillMaxWidth()) {
-        metrics.chunked(COLUMNS).forEachIndexed { index, row ->
+        present.chunked(COLUMNS).forEachIndexed { index, row ->
             if (index > 0) Spacer(Modifier.height(spacing.l))
             Row(
                 Modifier.fillMaxWidth(),

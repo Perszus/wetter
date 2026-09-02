@@ -46,9 +46,9 @@
     <string name="domain_month">Month</string>
 
     <!-- Tile headings -->
-    <string name="tile_rain">Rain today</string>
+    <string name="tile_rain">Rain · next 24 hours</string>
     <string name="tile_next_rain">Next rain</string>
-    <string name="tile_daylight">Daylight</string>
+    <string name="tile_daylight">Sun</string>
     <string name="tile_air">Air</string>
 
     <!--

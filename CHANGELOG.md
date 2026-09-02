@@ -8,6 +8,27 @@ Notable changes to Wetter. The format follows
 
 ### Added
 
+- Three pages behind a domain switcher — Today, Week and Month — each answering
+  one question with its own tiles, instead of one page trying to answer all
+  three. Today is the default. The location and current reading sit above the
+  switcher, so changing page moves nothing that was already true.
+- **The precipitation timeline.** One bar per hour across the local day, height
+  for intensity on an absolute 8 mm/h scale that is never rescaled to the view,
+  colour carrying confidence, a night wash behind the small hours, and past
+  hours dimmed so the boundary between dim and bright is the current moment.
+  Built from ordinary Compose layout — no charting library, no `Canvas`.
+- Precipitation spells in the domain layer: when rain starts, how hard it gets,
+  when it stops, and whether it was still falling when the forecast ran out. A
+  single dry hour splits a shower rather than being bridged.
+- Week page: seven days drawn against one shared temperature scale.
+- The timeline shows a rolling 24 hours from the current hour rather than the
+  calendar day. Providers disagree about where an hourly series starts —
+  Open-Meteo returns the day from local midnight, MET Norway from the current
+  hour — so slicing by date gave a full chart from one and a five-hour stump
+  from the other, depending on the time of day.
+- Month page is an honest stub. No service forecasts a month, so it needs the
+  archive endpoint and month-to-date actuals against the long-run normal.
+
 - Adaptive hourly range. A provider that stops being hourly short of the horizon
   is extended from the next-best candidate, so there is always an hour-by-hour
   timeline across the forecast. The regional model keeps the near term, where

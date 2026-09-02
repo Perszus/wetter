@@ -65,7 +65,12 @@ fun formatDuration(duration: Duration?): String {
     if (duration == null) return NO_READING
     val hours = duration.toHours()
     val minutes = duration.toMinutes() % 60
-    return if (hours == 0L) "${minutes}m" else "${hours}h ${minutes}m"
+    return when {
+        hours == 0L -> "${minutes}m"
+        // "1h 0m" is not how anybody writes an hour.
+        minutes == 0L -> "${hours}h"
+        else -> "${hours}h ${minutes}m"
+    }
 }
 
 /** Short weekday for a column of days: "Mon". */
