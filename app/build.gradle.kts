@@ -65,6 +65,16 @@ android {
             // build. The guard against an unsigned *Play* upload is below, on
             // bundleRelease alone.
             signingConfig = if (hasKeystore) signingConfigs.getByName("release") else null
+
+            // AGP otherwise embeds META-INF/version-control-info.textproto,
+            // describing the git checkout the build came from. It is the only
+            // thing that differed between two independent builds of the same
+            // commit, so switching it off is what makes the release APK
+            // byte-for-byte reproducible — and it keeps details of the build
+            // machine's working copy out of a shipped artefact.
+            vcsInfo {
+                include = false
+            }
         }
     }
 
