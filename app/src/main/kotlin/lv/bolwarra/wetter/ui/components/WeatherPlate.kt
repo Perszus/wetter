@@ -153,7 +153,7 @@ private fun rememberBeamAngle(windSpeedMs: Double): Float {
  * objects are lit from somewhere.
  */
 private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
-    val radius = size.minDimension / 2f
+    val radius = ringRadius()
     drawCircle(
         brush = Brush.radialGradient(
             colors = listOf(
@@ -176,7 +176,7 @@ private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
  * circle rather than something with thickness.
  */
 private fun DrawScope.drawGlassEdge(edge: Color, face: Color) {
-    val radius = size.minDimension / 2f - EDGE_INSET.toPx()
+    val radius = ringRadius()
     drawCircle(color = edge, radius = radius, style = Stroke(EDGE_WIDTH.toPx()))
     drawCircle(
         brush = Brush.verticalGradient(
@@ -194,7 +194,7 @@ private fun DrawScope.drawGlassEdge(edge: Color, face: Color) {
 
 /** One tick an hour, inside the edge. Midnight at the top, clockwise. */
 private fun DrawScope.drawHourTicks(colour: Color) {
-    val outer = size.minDimension / 2f - EDGE_INSET.toPx() - EDGE_WIDTH.toPx() - TICK_GAP.toPx()
+    val outer = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
     repeat(HOURS_IN_DAY) { hour ->
         val quarter = hour % 6 == 0
         val length = if (quarter) TICK_LONG else TICK_SHORT
@@ -214,7 +214,7 @@ private fun DrawScope.drawHourTicks(colour: Color) {
  * than on it, so the rim stays a clean unbroken circle.
  */
 private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
-    val outer = size.minDimension / 2f - EDGE_INSET.toPx() - EDGE_WIDTH.toPx() - TICK_GAP.toPx()
+    val outer = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
     rotate(degrees = angleOf(now, zone) + QUARTER_TURN, pivot = center) {
         drawLine(
             color = colour,
@@ -235,7 +235,7 @@ private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
  * a set of bands.
  */
 private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
-    val radius = size.minDimension / 2f - EDGE_INSET.toPx()
+    val radius = ringRadius()
     rotate(degrees = angle, pivot = center) {
         drawCircle(
             brush = Brush.sweepGradient(
@@ -256,6 +256,16 @@ private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
 }
 
 /**
+ * The one circle everything is measured from.
+ *
+ * The stroke straddles this radius, so half its width falls outside it and the
+ * ring's outer face lands flush with the bounds. The porcelain is drawn to the
+ * same radius, which is what makes the ring the plate's edge rather than a
+ * second circle inside it.
+ */
+private fun DrawScope.ringRadius(): Float = size.minDimension / 2f - EDGE_WIDTH.toPx() / 2f
+
+/**
  * Where an instant sits on the face, in `drawArc` degrees — which measure from
  * three o'clock, so midnight at the top is minus ninety.
  */
@@ -266,7 +276,6 @@ private fun angleOf(instant: Instant, zone: ZoneId): Float {
 }
 
 private val PLATE_MAX = 240.dp
-private val EDGE_INSET = 8.dp
 private val EDGE_WIDTH = 3.dp
 private val TICK_GAP = 6.dp
 private val TICK_LONG = 7.dp
@@ -285,7 +294,7 @@ private const val LIGHT_FROM_ABOVE = 0.35f
 private const val GLAZE_SPREAD = 1.25f
 private const val GLAZE_HIGHLIGHT = 0.55f
 private const val GLASS_CATCH = 0.7f
-private const val RIM_SHADE = 0.7f
+private const val RIM_SHADE = 0.35f
 
 private const val BEAM_ALPHA = 0.5f
 
