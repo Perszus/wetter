@@ -49,7 +49,47 @@ F-Droid builds and signs release artefacts itself from a clean checkout. A
 release build here produces an unsigned APK on purpose.
 
 **`applicationId` is `lv.bolwarra.wetter` and is permanent.**
-Changing it after publication would orphan every installation.
+Changing it after publication would orphan every installation. It is the same on
+both stores: forking it per store would split the listing, the reviews and the
+install count to solve a problem it does not actually solve.
+
+**Published on both F-Droid and Google Play, from one commit and one set of
+store text.**
+`fastlane/metadata/android/` is read by both, so the description and changelog
+are written once. The build needs no flavours, because there is nothing
+Play-specific in the app to flavour — no billing, no services, no proprietary
+anything.
+
+**The two stores will carry different signatures, and this is not fixable.**
+Play App Signing is mandatory for new apps, so Google holds the key for anything
+distributed there. Android will not update an F-Droid install over a Play one or
+the reverse. The README says so plainly rather than letting somebody discover it
+when their saved locations vanish.
+
+**Release signing is optional, and deliberately so.**
+`assembleRelease` succeeds without a keystore and produces an unsigned APK,
+because that is exactly what F-Droid's build servers do and failing there would
+break them. `bundleRelease` — which only ever exists to be uploaded to Play —
+fails immediately without one, so an unsigned upload is caught in a second
+rather than at the end of a long transfer.
+
+**`versionCode` and `versionName` are written by hand.**
+Deriving them from the repository, by commit count or `git describe`, makes the
+build depend on clone depth. F-Droid does not guarantee a full clone, and a
+version that changes with how the source was fetched is not a version.
+
+**Locales are pinned to what is actually translated.**
+Otherwise the resource set varies with whatever is installed on the machine
+running the build, which is one more way two builds of one commit can differ.
+
+**GPL-3.0-or-later, with an additional permission under section 7 for
+distribution through application stores.**
+Play's Developer Distribution Agreement can be read as imposing the further
+restrictions section 6 forbids. The copyright holder may distribute their own
+work however they like, so this changes nothing today — but it would become an
+obstacle the moment somebody else contributes, and it is far easier to grant now
+than to collect from a dozen people later. The permission is narrow: it removes
+an obstacle to distribution and grants nothing else. See LICENSE-EXCEPTION.txt.
 
 **Backup is off, explicitly and twice.**
 `allowBackup="false"` covers older releases, and a `data_extraction_rules` file

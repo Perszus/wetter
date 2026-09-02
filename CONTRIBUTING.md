@@ -98,4 +98,11 @@ and what is already here do not.
 ## Licence
 
 By contributing you agree that your work is licensed under the GNU General
-Public License v3.0 or later, the same as the rest of the project.
+Public License v3.0 or later, the same as the rest of the project, **including
+the additional permission in [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt)**.
+
+That permission allows Wetter to be distributed through application stores whose
+terms would otherwise conflict with section 6 of the GPL. It is asked for up
+front because it is trivial to grant now and effectively impossible to collect
+from a dozen contributors later. It grants nothing else — your work stays
+copyleft, and nobody may ship a closed fork of it.

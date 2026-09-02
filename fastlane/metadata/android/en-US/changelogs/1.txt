@@ -1,0 +1,5 @@
+The first release.
+
+Forecasts from two meteorological services, chosen automatically for your
+location, with an hourly timeline that does not run out. Works offline, asks for
+one permission, and collects nothing.

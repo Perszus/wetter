@@ -71,6 +71,19 @@ and the formatting.
 
 ---
 
+## Getting it
+
+Not published yet — the first release waits until the precipitation timeline
+exists, because a store listing should describe an app that does the thing it
+describes. When it ships it will be on both **F-Droid** and **Google Play**.
+
+One thing worth knowing in advance: Google Play holds the signing key for
+anything distributed through it, so the Play build and the F-Droid build cannot
+share a signature and **Android will not update one over the other**. Pick a
+store and stay with it. See [docs/RELEASING.md](docs/RELEASING.md).
+
+---
+
 ## Building
 
 Requires JDK 17 and the Android SDK (compile and target API 36, minimum API 26).
@@ -177,5 +190,12 @@ Dependencies must be free software that F-Droid can build. Comments explain
 ## Licence
 
 GNU General Public License v3.0 or later. See [LICENSE](LICENSE).
+
+There is one additional permission, granted under section 7, allowing the work
+to be distributed through application stores whose terms would otherwise
+conflict with section 6 — which is what makes a Google Play listing possible
+without asking every contributor for permission afterwards. It grants nothing
+else: the source stays copyleft and a closed fork is still forbidden. See
+[LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt).
 
 Copyright © 2026 Roberts Kains.

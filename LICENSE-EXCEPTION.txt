@@ -1,0 +1,44 @@
+ADDITIONAL PERMISSION UNDER GNU GPL VERSION 3 SECTION 7
+
+Wetter is licensed under the GNU General Public License, version 3 or later, as
+set out in the LICENSE file. The following additional permission is granted to
+every recipient, under section 7 of that licence.
+
+    Additional permission under GNU GPL version 3 section 7:
+
+    You have permission to convey the resulting work through an application
+    distribution platform, including but not limited to Google Play and the
+    Apple App Store, even where the terms of that platform impose restrictions
+    that would otherwise conflict with section 6 of the GNU General Public
+    License version 3.
+
+    This permission applies only to conveying the work through such a platform.
+    It grants no permission to add restrictions of any other kind, and it does
+    not affect any other requirement of the licence — in particular, the
+    corresponding source must remain available under the GNU General Public
+    License version 3 or later.
+
+    If you modify this work, you may remove this additional permission from your
+    modified version. You are not required to do so.
+
+
+WHY THIS EXISTS
+
+Wetter is meant to be installable by anyone, from wherever they already get
+software. For many people that is Google Play, and Play's Developer Distribution
+Agreement places conditions on redistribution that section 6 of the GPL can be
+read as forbidding. The copyright holder may distribute their own work on any
+terms they choose, so this changes nothing while there is one author — but it
+would become a real obstacle the moment somebody else contributes, and it is
+much easier to grant now than to collect from a dozen contributors later.
+
+The permission is deliberately narrow. It removes an obstacle to distribution and
+nothing else: the source stays copyleft, modifications stay copyleft, and nobody
+gains the right to ship a closed fork.
+
+Note that Wetter on F-Droid and Wetter on Google Play cannot share a signature —
+Play holds the signing key for anything distributed through it. Install from one
+or the other.
+
+This text is offered in good faith and is not legal advice. If the project ever
+takes on contributors at any scale, it is worth having a lawyer read it.

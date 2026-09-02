@@ -1,0 +1,35 @@
+Most weather apps lead with a temperature and a picture of a sun. The question people actually open one to answer is narrower and more urgent:
+
+Is it going to rain, when, how hard, and when will it stop?
+
+Wetter is built around that question. Precipitation gets the emphasis, the colour and the space. Temperature is deliberately quieter.
+
+<b>A precision instrument, not a dashboard</b>
+
+No cartoon weather, no stacks of cards, no gradients used as decoration. Restrained typography, hairline rules, and a palette where rain owns the only saturated colour — so a glance tells you what is coming without anything competing for your attention. It looks right in both light and dark.
+
+<b>It picks the best source for where you are</b>
+
+Wetter knows about several national and international meteorological services, what each is good at and where. It prefers a regional model where one runs a fine grid, falls back to a global one elsewhere, and quietly switches when a service is unavailable. You never have to know which one answered.
+
+Where the regional model has the finer forecast but the shorter reach, Wetter uses it for the near term and continues with a longer-range source afterwards, so there is always an hour-by-hour timeline.
+
+<b>It works without a connection</b>
+
+The forecast you already have appears immediately. A failed update leaves it on screen and tells you how old it is, rather than replacing it with an error.
+
+<b>Privacy is the architecture, not a promise</b>
+
+• No account
+• No analytics, no crash reporting, no advertising, no tracking of any kind
+• One permission: internet access
+• Location access is optional — the app is fully usable without it
+• No server of ours. Your device asks a weather service directly, and nothing sits in between
+
+The only thing that leaves your device is a pair of coordinates, sent to a weather service so it can answer. That is unavoidable for a weather app. Making it the only thing is the point.
+
+<b>Free software</b>
+
+Wetter is licensed under the GNU General Public License v3.0 or later. The complete source is public, and anyone can read exactly what it does and build it themselves.
+
+Weather data by Open-Meteo.com and by MET Norway (met.no), both licensed CC BY 4.0.

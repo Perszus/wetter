@@ -24,6 +24,14 @@ Notable changes to Wetter. The format follows
 - ktlint, configured from `.editorconfig` in the Android style, and checked in
   CI alongside tests and lint.
 - CONTRIBUTING.md.
+- Store distribution set up for both F-Droid and Google Play from one commit:
+  shared `fastlane/metadata/android/` store text, an F-Droid build recipe, a
+  privacy policy, and `docs/RELEASING.md` covering both. Release signing is
+  optional so F-Droid can build unsigned, while `bundleRelease` fails fast
+  without an upload key.
+- An additional permission under GPL section 7 allowing distribution through
+  application stores, so a Play listing does not require chasing every future
+  contributor for consent. See `LICENSE-EXCEPTION.txt`.
 
 ### Fixed
 
