@@ -12,16 +12,17 @@ Notable changes to Wetter. The format follows
   one question with its own tiles, instead of one page trying to answer all
   three. Today is the default. The location and current reading sit above the
   switcher, so changing page moves nothing that was already true.
-- **The current reading is a dial.** A thermostat face: the temperature at the
-  centre of a round plate, with the rim carrying the shape of the day — midnight
-  at the top, an hour a tick, the stretch between sunrise and sunset lit, and a
-  mark at the current moment. It turns over the day whether or not anything is
-  animating.
-- The travelling highlight on the rim is the wind: it crawls in still air and
-  races in a gale, and dead calm holds it still, which stops the animation
-  rather than spinning it pointlessly. Wind *direction* is deliberately absent —
-  the angle around that circle already means time of day, and a compass bearing
-  on the same degrees would make every reading ambiguous.
+- **The current reading is a dial.** A thermostat face: a porcelain disc with
+  the temperature at its centre, a glass edge around it, hour ticks, and a short
+  mark inside the rim showing where in the day you are.
+- A light travels the glass edge at the speed of the wind — a drift in still
+  air, a rush in a gale. Dead calm holds it still, which is itself the reading
+  and stops the animation rather than spinning it at nobody. It is one sweep
+  gradient rotated whole, so the tail is a continuous falloff rather than
+  banding, and the seam where the sweep wraps sits at full transparency.
+- Wind *direction* is deliberately not on the ring: the angle there already
+  means time of day, and a compass bearing on the same degrees would make every
+  reading ambiguous. Direction belongs in the Air tile, in words.
 - **The precipitation curve.** A flowing area trace with a gradient fill,
   scrubbable to read any point of it. The curve is a monotone cubic spline, so
   it can never overshoot: ordinary smoothing dips below zero approaching a

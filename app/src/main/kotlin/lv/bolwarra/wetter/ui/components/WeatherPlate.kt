@@ -23,9 +23,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -35,10 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
-import kotlin.math.cos
-import kotlin.math.sin
 import lv.bolwarra.wetter.R
-import lv.bolwarra.wetter.domain.model.DailyWeather
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.labelRes
@@ -47,55 +44,55 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 /**
  * The current reading, as a dial.
  *
- * A thermostat face rather than a number in the corner: one round plate, the
- * temperature at its centre, and the rim carrying the shape of the day. It is
- * the most instrument-like form there is, and it is the only place in the app
- * where a single moment gets this much room.
+ * A thermostat face: a porcelain disc with the temperature at its centre and a
+ * glass edge around it, along which a light travels at the speed of the wind.
  *
- * ### What the rim says
+ * ### The light is the wind
  *
- * **The ring is a day.** Midnight at the top, clockwise, one tick an hour. The
- * stretch between sunrise and sunset is drawn lit and the rest dark, with a mark
- * at the current moment — so the plate is a sundial, and it turns over the day
- * whether or not anything is animating.
+ * Its speed is the wind speed — a slow drift in still air, a visible rush in a
+ * gale. That is the whole reason it is allowed to move at all: "4 m/s" is a
+ * number most people cannot picture, and a speed they can watch is the part that
+ * lands. Dead calm holds it still, which is itself the reading and also stops
+ * the animation rather than spinning it at nobody.
  *
- * **The beam is the wind.** A short travelling highlight whose speed is the wind
- * speed: it crawls in still air and races in a gale. Dead calm holds it still,
- * which is itself the reading, and also means the animation stops rather than
- * spinning pointlessly on a screen nobody is watching.
+ * Wind *direction* is deliberately not on the ring. The angle around this circle
+ * already means time of day — that is what the ticks and the time mark are — and
+ * a compass bearing on the same degrees would be two coordinate systems sharing
+ * one set of numbers. Direction belongs in the Air tile, in words.
  *
- * ### What the rim deliberately does not say
+ * ### The light is one gradient, not several arcs
  *
- * Wind *direction* is not on the ring, and cannot be. The angle around this
- * circle already means time of day; putting a compass bearing on the same
- * circle would be two coordinate systems sharing one set of degrees, and every
- * reading of it would be ambiguous. The direction belongs in the Air tile, in
- * words.
+ * It is a sweep gradient rotated as a whole, so the tail is a genuine continuous
+ * falloff. Drawing a few arcs of stepped opacity is the easy approximation and
+ * it looks like what it is: banding. The seam where the sweep wraps sits at full
+ * transparency, so it never shows.
  */
 @Composable
 fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
-    val today = forecast.daily.firstOrNull { it.date == now.atZone(zone).toLocalDate() }
 
     val windSpeed = forecast.current.windSpeed ?: 0.0
     val beamAngle = rememberBeamAngle(windSpeed)
 
     Box(
         modifier = modifier
+            // The cap has to come before fillMaxWidth: fillMaxWidth pins the
+            // minimum equal to the maximum, and widthIn cannot pull a maximum
+            // below a minimum that is already fixed.
             .widthIn(max = PLATE_MAX)
             .fillMaxWidth()
             .aspectRatio(1f),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            drawPlate(colors.surfaceRaised, colors.surfaceSunken)
+            drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
+            drawGlassEdge(colors.hairline, colors.surfaceRaised)
             drawHourTicks(colors.hairline)
-            drawDayArc(today, now, zone, colors.temperatureWarm, colors.night)
-            drawNowMark(now, zone, colors.textPrimary)
+            drawTimeMark(now, zone, colors.textSecondary)
             if (windSpeed >= STILL_AIR_MS) {
-                drawWindBeam(beamAngle, colors.temperatureWarm)
+                drawWindLight(beamAngle, colors.textPrimary)
             }
         }
 
@@ -127,21 +124,14 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     }
 }
 
-/**
- * The beam's position, turning at the speed of the wind.
- *
- * Mapped so that a light breeze is a slow drift and a gale is a visible rush,
- * which is the point — "4 m/s" is a number most people cannot picture, and a
- * speed they can watch is the part that lands.
- */
+/** The light's position, turning at the speed of the wind. */
 @Composable
 private fun rememberBeamAngle(windSpeedMs: Double): Float {
     if (windSpeedMs < STILL_AIR_MS) return 0f
 
-    val seconds = (
-        FASTEST_LAP_S +
-            (SLOWEST_LAP_S - FASTEST_LAP_S) * (1.0 - windFraction(windSpeedMs))
-        )
+    val fraction = (windSpeedMs / GALE_MS).coerceIn(0.0, 1.0)
+    val seconds = FASTEST_LAP_S + (SLOWEST_LAP_S - FASTEST_LAP_S) * (1.0 - fraction)
+
     val transition = rememberInfiniteTransition(label = "wind")
     val angle by transition.animateFloat(
         initialValue = 0f,
@@ -155,142 +145,119 @@ private fun rememberBeamAngle(windSpeedMs: Double): Float {
     return angle
 }
 
-/** 0 at a standstill, 1 at a gale. Above that the beam stops getting faster. */
-private fun windFraction(metresPerSecond: Double): Double =
-    (metresPerSecond / GALE_MS).coerceIn(0.0, 1.0)
-
-/** The face: a disc a step above the page, sunk very slightly at its rim. */
-private fun DrawScope.drawPlate(face: Color, rim: Color) {
+/**
+ * The body of the plate: glazed ceramic, lit from above.
+ *
+ * The gradient's centre sits above the disc's centre rather than on it, which is
+ * the whole difference between porcelain and a moulded plastic button — real
+ * objects are lit from somewhere.
+ */
+private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
     val radius = size.minDimension / 2f
     drawCircle(
         brush = Brush.radialGradient(
-            // Barely there: enough to lift the face off the page, not so much
-            // that it becomes a moulded plastic button.
-            colors = listOf(face, face, lerp(face, rim, RIM_SHADE)),
-            center = center,
-            radius = radius,
+            colors = listOf(
+                lerp(face, Color.White, GLAZE_HIGHLIGHT),
+                face,
+                lerp(face, sunken, RIM_SHADE),
+            ),
+            center = Offset(center.x, center.y - radius * LIGHT_FROM_ABOVE),
+            radius = radius * GLAZE_SPREAD,
         ),
         radius = radius,
     )
 }
 
+/**
+ * The glass rim the light runs along.
+ *
+ * Two strokes: the edge itself, and a slightly inset highlight that catches a
+ * little more light at the top. Without the second one the ring is a drawn
+ * circle rather than something with thickness.
+ */
+private fun DrawScope.drawGlassEdge(edge: Color, face: Color) {
+    val radius = size.minDimension / 2f - EDGE_INSET.toPx()
+    drawCircle(color = edge, radius = radius, style = Stroke(EDGE_WIDTH.toPx()))
+    drawCircle(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                lerp(face, Color.White, GLASS_CATCH),
+                Color.Transparent,
+            ),
+            startY = center.y - radius,
+            endY = center.y,
+        ),
+        radius = radius,
+        style = Stroke(EDGE_WIDTH.toPx() * 0.5f),
+    )
+}
+
+/** One tick an hour, inside the edge. Midnight at the top, clockwise. */
 private fun DrawScope.drawHourTicks(colour: Color) {
-    val radius = size.minDimension / 2f
+    val outer = size.minDimension / 2f - EDGE_INSET.toPx() - EDGE_WIDTH.toPx() - TICK_GAP.toPx()
     repeat(HOURS_IN_DAY) { hour ->
-        val long = hour % 6 == 0
-        val length = if (long) TICK_LONG else TICK_SHORT
+        val quarter = hour % 6 == 0
+        val length = if (quarter) TICK_LONG else TICK_SHORT
         rotate(degrees = hour * DEGREES_PER_HOUR, pivot = center) {
             drawLine(
                 color = colour,
-                start = Offset(center.x, center.y - radius + RIM_INSET.toPx()),
-                end = Offset(center.x, center.y - radius + RIM_INSET.toPx() + length.toPx()),
-                strokeWidth = if (long) 2f else 1f,
+                start = Offset(center.x, center.y - outer),
+                end = Offset(center.x, center.y - outer + length.toPx()),
+                strokeWidth = if (quarter) 2f else 1f,
             )
         }
     }
 }
 
 /**
- * The lit stretch between sunrise and sunset.
- *
- * Above the arctic circle there is no sunrise to draw from, so the whole ring
- * takes the one tone that is true: lit through a polar day, dark through a polar
- * night.
+ * Where we are in the day: a short radial line, sitting inside the edge rather
+ * than on it, so the rim stays a clean unbroken circle.
  */
-private fun DrawScope.drawDayArc(
-    day: DailyWeather?,
-    now: Instant,
-    zone: ZoneId,
-    dayColour: Color,
-    nightColour: Color,
-) {
-    val radius = size.minDimension / 2f - RIM_INSET.toPx() - ARC_INSET.toPx()
-    val topLeft = Offset(center.x - radius, center.y - radius)
-    val arcSize = Size(radius * 2, radius * 2)
-    val stroke =
-        Stroke(width = ARC_WIDTH.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-
-    val sunrise = day?.sunrise
-    val sunset = day?.sunset
-
-    if (sunrise == null || sunset == null) {
-        // No sunrise means the sun either never set or never rose. Which of the
-        // two is decided by whether it is up right now.
-        val polarDay = day?.let { now.isAfter(it.date.atStartOfDay(zone).toInstant()) } ?: false
-        drawArc(
-            color = if (polarDay) dayColour.copy(alpha = ARC_ALPHA) else nightColour,
-            startAngle = 0f,
-            sweepAngle = 360f,
-            useCenter = false,
-            topLeft = topLeft,
-            size = arcSize,
-            style = stroke,
-        )
-        return
-    }
-
-    val start = angleOf(sunrise, zone)
-    val sweep = ((angleOf(sunset, zone) - start) + 360f) % 360f
-    drawArc(
-        color = dayColour.copy(alpha = ARC_ALPHA),
-        startAngle = start,
-        sweepAngle = sweep,
-        useCenter = false,
-        topLeft = topLeft,
-        size = arcSize,
-        style = stroke,
-    )
-}
-
-private fun DrawScope.drawNowMark(now: Instant, zone: ZoneId, colour: Color) {
-    // A single mark, sitting on the arc like a thermostat's set point. An extra
-    // tick at the rim said the same thing at a different radius, and two marks
-    // for one moment read as two readings.
-    val radius = size.minDimension / 2f - RIM_INSET.toPx() - ARC_INSET.toPx()
-    val radians = Math.toRadians(angleOf(now, zone).toDouble())
-    val at = Offset(
-        center.x + (radius * cos(radians)).toFloat(),
-        center.y + (radius * sin(radians)).toFloat(),
-    )
-    drawCircle(color = colour, radius = NOW_DOT.toPx(), center = at)
-}
-
-/**
- * A short sweep of light, brightest at its leading edge.
- *
- * Deliberately not the accent. Precipitation owns the only saturated hue in this
- * app, and a blue arc travelling the rim of the plate directly above the rain
- * chart read as rain rather than as wind - or, worse, as a rendering fault.
- *
- * It is the day arc's own colour at full strength, so the effect is the ring
- * brightening under the beam rather than a second mark laid over it. Drawn in
- * ink instead it read as a scuff on the dial.
- */
-private fun DrawScope.drawWindBeam(angle: Float, colour: Color) {
-    val radius = size.minDimension / 2f - RIM_INSET.toPx() - ARC_INSET.toPx()
-    val topLeft = Offset(center.x - radius, center.y - radius)
-    val arcSize = Size(radius * 2, radius * 2)
-
-    // Drawn as a few arcs of rising opacity rather than one gradient stroke:
-    // a sweep gradient cannot be aimed along an arc without a shader per frame,
-    // and four segments read as a tail at this size.
-    repeat(BEAM_SEGMENTS) { i ->
-        val fraction = (i + 1f) / BEAM_SEGMENTS
-        drawArc(
-            color = colour.copy(alpha = BEAM_ALPHA * fraction * fraction),
-            startAngle = angle + i * BEAM_SEGMENT_DEGREES,
-            sweepAngle = BEAM_SEGMENT_DEGREES + 0.5f,
-            useCenter = false,
-            topLeft = topLeft,
-            size = arcSize,
-            style = Stroke(width = ARC_WIDTH.toPx()),
+private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
+    val outer = size.minDimension / 2f - EDGE_INSET.toPx() - EDGE_WIDTH.toPx() - TICK_GAP.toPx()
+    rotate(degrees = angleOf(now, zone) + QUARTER_TURN, pivot = center) {
+        drawLine(
+            color = colour,
+            start = Offset(center.x, center.y - outer),
+            end = Offset(center.x, center.y - outer + MARK_LENGTH.toPx()),
+            strokeWidth = MARK_WIDTH.toPx(),
+            cap = StrokeCap.Round,
         )
     }
 }
 
 /**
- * Where an instant sits on the face, in degrees for `drawArc` — which measures
- * from three o'clock, so midnight at the top is minus ninety.
+ * The travelling light: one sweep gradient, rotated whole.
+ *
+ * The stops run from nothing, up to the head, and back to nothing at the wrap,
+ * so the seam where the sweep closes is invisible. Rotating the gradient rather
+ * than redrawing segments is what makes the tail a continuous falloff instead of
+ * a set of bands.
+ */
+private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
+    val radius = size.minDimension / 2f - EDGE_INSET.toPx()
+    rotate(degrees = angle, pivot = center) {
+        drawCircle(
+            brush = Brush.sweepGradient(
+                0.00f to Color.Transparent,
+                0.42f to Color.Transparent,
+                0.62f to colour.copy(alpha = BEAM_ALPHA * 0.06f),
+                0.78f to colour.copy(alpha = BEAM_ALPHA * 0.30f),
+                0.90f to colour.copy(alpha = BEAM_ALPHA * 0.70f),
+                0.97f to colour.copy(alpha = BEAM_ALPHA),
+                // Back to nothing before the wrap, so the join never shows.
+                1.00f to Color.Transparent,
+                center = center,
+            ),
+            radius = radius,
+            style = Stroke(EDGE_WIDTH.toPx()),
+        )
+    }
+}
+
+/**
+ * Where an instant sits on the face, in `drawArc` degrees — which measure from
+ * three o'clock, so midnight at the top is minus ninety.
  */
 private fun angleOf(instant: Instant, zone: ZoneId): Float {
     val local = instant.atZone(zone)
@@ -299,12 +266,13 @@ private fun angleOf(instant: Instant, zone: ZoneId): Float {
 }
 
 private val PLATE_MAX = 240.dp
-private val RIM_INSET = 10.dp
-private val ARC_INSET = 14.dp
-private val ARC_WIDTH = 3.dp
-private val TICK_LONG = 8.dp
-private val TICK_SHORT = 4.dp
-private val NOW_DOT = 4.dp
+private val EDGE_INSET = 8.dp
+private val EDGE_WIDTH = 3.dp
+private val TICK_GAP = 6.dp
+private val TICK_LONG = 7.dp
+private val TICK_SHORT = 3.5.dp
+private val MARK_LENGTH = 12.dp
+private val MARK_WIDTH = 2.5.dp
 
 private const val HOURS_IN_DAY = 24
 private const val DEGREES_PER_HOUR = 360f / HOURS_IN_DAY
@@ -312,18 +280,19 @@ private const val MINUTES_IN_DAY = 24f * 60f
 private const val QUARTER_TURN = 90f
 private const val FULL_TURN = 360f
 
-private const val ARC_ALPHA = 0.3f
+/** How far above centre the glaze highlight sits, as a fraction of the radius. */
+private const val LIGHT_FROM_ABOVE = 0.35f
+private const val GLAZE_SPREAD = 1.25f
+private const val GLAZE_HIGHLIGHT = 0.55f
+private const val GLASS_CATCH = 0.7f
+private const val RIM_SHADE = 0.7f
 
-/** How far the rim is shaded towards the sunken tone. A hint, not a bevel. */
-private const val RIM_SHADE = 0.55f
-private const val BEAM_ALPHA = 0.9f
-private const val BEAM_SEGMENTS = 4
-private const val BEAM_SEGMENT_DEGREES = 7f
+private const val BEAM_ALPHA = 0.5f
 
-/** Below this the air is still, the beam holds, and the animation stops. */
+/** Below this the air is still, the light holds, and the animation stops. */
 private const val STILL_AIR_MS = 0.5
 
-/** Roughly a strong gale. Past it the beam is already as fast as it usefully gets. */
+/** Roughly a strong gale. Past it the light is already as fast as it usefully gets. */
 private const val GALE_MS = 20.0
 
 private const val FASTEST_LAP_S = 2.5
