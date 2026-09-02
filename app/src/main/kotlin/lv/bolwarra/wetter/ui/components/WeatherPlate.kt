@@ -206,7 +206,10 @@ private fun DrawScope.drawWave(y: Float, gap: Float, colour: Color) {
     var x = 0f
     while (x <= size.width) {
         val phase = (x / size.width) * WAVE_CYCLES * TAU
-        path.lineTo(x, y + amplitude * sin(phase))
+        // Minus, not plus: screen y grows downward, so a positive sine dips
+        // first and the wave arrives back to front - down on the left, up on the
+        // right.
+        path.lineTo(x, y - amplitude * sin(phase))
         x += WAVE_RESOLUTION
     }
     drawPath(path, colour, style = Stroke(width = WAVE_STROKE.toPx(), cap = StrokeCap.Round))
