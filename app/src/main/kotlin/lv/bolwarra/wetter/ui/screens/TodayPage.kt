@@ -8,15 +8,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import java.time.Duration
 import java.time.Instant
 import lv.bolwarra.wetter.R
@@ -34,7 +37,6 @@ import lv.bolwarra.wetter.ui.format.formatDuration
 import lv.bolwarra.wetter.ui.format.formatMillimetresWithUnit
 import lv.bolwarra.wetter.ui.format.formatPercent
 import lv.bolwarra.wetter.ui.format.formatPressure
-import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatWeekday
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
@@ -42,10 +44,10 @@ import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * Today: what the rest of this day does.
+ * Today: what the next few hours do.
  *
- * The rain timeline is first and largest because it is the reason the app
- * exists. Everything under it is context for reading it.
+ * The rain curve is first and largest because it is the reason the app exists.
+ * Everything under it is context for reading it.
  */
 @Composable
 fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
@@ -63,106 +65,81 @@ fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modi
                 trailing = formatMillimetresWithUnit(ahead.totalPrecipitation() ?: 0.0),
             ) {
                 RainCurve(hours = ahead, zone = zone)
+                Spacer(Modifier.height(spacing.m))
+                NextRainBar(forecast, now)
             }
         }
 
-        NextRainTile(forecast, now)
-
         DaylightTile(forecast, now)
-
         AirTile(forecast)
     }
 }
 
 /**
- * When it next rains, and for how long.
+ * When it next rains, in one line.
  *
- * The timeline shows today; this looks across the whole forecast, because "not
- * today" is only half an answer and the other half is usually the one somebody
- * wanted.
+ * It sits under the curve because it answers the question the curve cannot: the
+ * chart covers the next six hours, and "nothing in the next six hours" is only
+ * half an answer. The other half is usually the one somebody wanted, and it is
+ * short enough to be a bar rather than a card of its own.
  */
 @Composable
-private fun NextRainTile(forecast: WeatherForecast, now: Instant) {
-    val zone = forecast.location.zone
+private fun NextRainBar(forecast: WeatherForecast, now: Instant) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
+    val zone = forecast.location.zone
     val spell = forecast.hourly.nextPrecipitation(now)
 
-    Tile(
-        label = stringResource(R.string.tile_next_rain),
-        trailing = spell?.let { formatMillimetresWithUnit(it.totalMillimetres) },
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(percent = 50))
+            .background(colors.surfaceSunken)
+            .padding(horizontal = spacing.l, vertical = spacing.m),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (spell == null) {
-            Text(
-                text = stringResource(R.string.next_rain_none),
-                style = WetterTheme.type.headline,
-                color = colors.textPrimary,
-            )
-            Spacer(Modifier.height(spacing.xs))
-            Text(
-                text = stringResource(R.string.next_rain_none_detail),
-                style = WetterTheme.type.meta,
-                color = colors.textTertiary,
-            )
-            return@Tile
-        }
-
-        val falling = !spell.start.isAfter(now)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(spacing.s)
-                    .clip(CircleShape)
-                    .background(colors.precipitation),
-            )
-            Spacer(Modifier.width(spacing.s))
-            Text(
-                text = if (falling) {
-                    stringResource(
-                        R.string.next_rain_falling,
-                        stringResource(spell.kind.labelRes()),
-                    )
-                } else {
-                    stringResource(
-                        R.string.next_rain_at,
-                        stringResource(spell.kind.labelRes()),
-                        whenLabel(spell, now, forecast),
-                        formatTime(spell.start, zone),
-                    )
-                },
-                style = WetterTheme.type.headline,
-                color = colors.textPrimary,
-            )
-        }
-
-        Spacer(Modifier.height(spacing.s))
+        Box(
+            Modifier
+                .size(DOT)
+                .clip(CircleShape)
+                .background(if (spell == null) colors.textTertiary else colors.precipitation),
+        )
+        Spacer(Modifier.width(spacing.m))
         Text(
-            text = if (spell.isOpenEnded) {
-                // The forecast stops here; the shower may not. Saying it ends at
-                // the edge of the data would be inventing an ending.
-                stringResource(R.string.next_rain_continues, formatTime(spell.end, zone))
-            } else {
-                stringResource(
-                    R.string.next_rain_until,
-                    formatTime(spell.end, zone),
-                    formatDuration(spell.duration),
-                )
-            },
+            text = spell.describe(now, forecast),
             style = WetterTheme.type.body,
-            color = colors.textSecondary,
+            color = if (spell == null) colors.textTertiary else colors.textPrimary,
         )
     }
 }
 
+/** One line, in the fewest words that are still true. */
 @Composable
-private fun whenLabel(spell: PrecipitationSpell, now: Instant, forecast: WeatherForecast): String {
+private fun PrecipitationSpell?.describe(now: Instant, forecast: WeatherForecast): String {
     val zone = forecast.location.zone
-    val startDate = spell.start.atZone(zone).toLocalDate()
-    val today = now.atZone(zone).toLocalDate()
-    return when (startDate) {
-        today -> stringResource(R.string.relative_today)
-        today.plusDays(1) -> stringResource(R.string.relative_tomorrow)
-        else -> formatWeekday(startDate)
+    if (this == null) return stringResource(R.string.next_rain_none)
+
+    val kind = stringResource(kind.labelRes())
+    if (!start.isAfter(now)) {
+        // Already falling. When it stops is the only thing left to say, and if
+        // the forecast runs out first, nobody can honestly say.
+        return if (isOpenEnded) {
+            stringResource(R.string.next_rain_falling, kind)
+        } else {
+            stringResource(R.string.next_rain_until, kind, formatTime(end, zone))
+        }
+    }
+
+    val startsToday = start.atZone(zone).toLocalDate() == now.atZone(zone).toLocalDate()
+    return if (startsToday) {
+        stringResource(R.string.next_rain_starts, kind, formatTime(start, zone))
+    } else {
+        stringResource(
+            R.string.next_rain_starts_on,
+            kind,
+            formatWeekday(start.atZone(zone).toLocalDate()),
+            formatTime(start, zone),
+        )
     }
 }
 
@@ -192,7 +169,9 @@ private fun DaylightTile(forecast: WeatherForecast, now: Instant) {
                 ),
                 Metric(
                     stringResource(R.string.metric_feels_like),
-                    formatTemperature(forecast.current.apparentTemperature),
+                    lv.bolwarra.wetter.ui.format.formatTemperature(
+                        forecast.current.apparentTemperature,
+                    ),
                 ),
             ),
         )
@@ -218,12 +197,14 @@ private fun AirTile(forecast: WeatherForecast) {
     }
 }
 
+private val DOT = 7.dp
+
 /**
  * The next six hours, rolling from the current hour.
  *
  * Short on purpose. This is the window in which a forecast is worth acting on
  * and in which it is most likely to be right; a day of it flattened the part
  * anybody was going to use into an eighth of the width. What happens later is
- * the Week page's job, and whether it rains at all is the Next rain tile's.
+ * the Week page's job, and when it next rains at all is the bar underneath.
  */
 private const val TIMELINE_HOURS = 6L

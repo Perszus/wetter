@@ -63,16 +63,28 @@
     <string name="relative_today">today</string>
     <string name="relative_tomorrow">tomorrow</string>
 
-    <string name="next_rain_none">Nothing forecast</string>
-    <string name="next_rain_none_detail">No rain in the rest of the forecast.</string>
+    <string name="next_rain_none">No rain in the forecast</string>
     <string name="next_rain_falling">%1$s, falling now</string>
-    <string name="next_rain_at">%1$s %2$s at %3$s</string>
-    <string name="next_rain_until">Until %1$s · %2$s</string>
-    <string name="next_rain_continues">Still falling at %1$s, where the forecast ends</string>
+    <string name="next_rain_starts">%1$s starts at %2$s</string>
+    <string name="next_rain_starts_on">%1$s starts %2$s at %3$s</string>
+    <string name="next_rain_until">%1$s until %2$s</string>
 
     <string name="curve_rate">%1$s mm/h</string>
     <!-- A tilde marks a point read between the forecast’s own samples. -->
     <string name="curve_rate_about">≈%1$s mm/h</string>
+
+    <!--
+      How hard it is falling, in words. Millimetres per hour is a unit
+      almost nobody has a feel for; these are what people actually mean.
+    -->
+    <string name="intensity_none">Dry</string>
+    <string name="intensity_trace">Barely</string>
+    <string name="intensity_light">Light</string>
+    <string name="intensity_moderate">Moderate</string>
+    <string name="intensity_heavy">Heavy</string>
+    <string name="intensity_violent">Torrential</string>
+
+    <string name="curve_reading">%1$s · %2$s</string>
 
     <!-- Metric labels -->
     <string name="metric_sunrise">Sunrise</string>

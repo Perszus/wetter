@@ -45,9 +45,17 @@ Notable changes to Wetter. The format follows
 - The domain switcher is a pill sized to its words and centred, rather than a
   full-width bar, and the pages slide between one another in the direction they
   sit rather than cutting.
-- The chart states its scale as an axis maximum rather than a sentence. The
-  ceiling still adapts, so it still has to be stated — but as a number in the
-  corner, which is a convention, not prose to parse.
+- **The chart's vertical axis is intensity, not millimetres, and it is fixed.**
+  Nobody reads a number off a rain chart; they read a shape — high is pouring,
+  low is drizzle. That reading is only true if the scale never moves, so the
+  adaptive ceiling is gone, and with it the number that labelled it. The axis is
+  anchored to the conventional intensity bands with each band given a slice of
+  the height wide enough to see, which is linear in how wet you get rather than
+  in millimetres.
+- Scrubbing names the intensity — "3:40 · Light" — alongside the rate, because
+  "light" is the half anybody can act on.
+- Next rain is a pill under the curve rather than a card of its own: "Rain
+  starts at 23:00".
 - **The precipitation timeline (superseded by the curve above).** One bar per hour across the local day, height
   for intensity on an absolute 8 mm/h scale that is never rescaled to the view,
   colour carrying confidence, a night wash behind the small hours, and past

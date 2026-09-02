@@ -11,6 +11,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.roundToInt
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
 
@@ -89,6 +90,22 @@ fun daysBetween(instant: Instant, now: Instant, zone: ZoneId): Long = ChronoUnit
     now.atZone(zone).toLocalDate(),
     instant.atZone(zone).toLocalDate(),
 )
+
+/**
+ * What an intensity is called.
+ *
+ * The reason this exists at all: millimetres per hour is a unit almost nobody
+ * has a feel for, including people who work near meteorology. "Light" lands.
+ */
+@StringRes
+fun PrecipitationIntensity.labelRes(): Int = when (this) {
+    PrecipitationIntensity.NONE -> R.string.intensity_none
+    PrecipitationIntensity.TRACE -> R.string.intensity_trace
+    PrecipitationIntensity.LIGHT -> R.string.intensity_light
+    PrecipitationIntensity.MODERATE -> R.string.intensity_moderate
+    PrecipitationIntensity.HEAVY -> R.string.intensity_heavy
+    PrecipitationIntensity.VIOLENT -> R.string.intensity_violent
+}
 
 @StringRes
 fun PrecipitationKind.labelRes(): Int = when (this) {

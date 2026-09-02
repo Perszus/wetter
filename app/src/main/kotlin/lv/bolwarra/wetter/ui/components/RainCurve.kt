@@ -38,8 +38,10 @@ import java.time.Instant
 import java.time.ZoneId
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.HourlyWeather
+import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.ui.chart.MonotoneCurve
 import lv.bolwarra.wetter.ui.format.formatMillimetres
+import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
@@ -77,7 +79,6 @@ fun RainCurve(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
     val measurer = rememberTextMeasurer()
 
     val points = remember(hours) { resample(hours.sortedBy { it.timestamp }) }
-    val ceiling = remember(points) { ceilingFor(points) }
 
     var scrubbed by remember { mutableStateOf<Int?>(null) }
 
@@ -116,7 +117,7 @@ fun RainCurve(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
                 },
         ) {
             Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
-                val path = curvePath(points, ceiling)
+                val path = curvePath(points)
                 drawPath(
                     path = Path().apply {
                         addPath(path)
@@ -136,17 +137,10 @@ fun RainCurve(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
                     color = colors.precipitation,
                     style = Stroke(width = STROKE.toPx(), cap = StrokeCap.Round),
                 )
-                val ceilingLabel = measurer.measure(formatMillimetres(ceiling), axisStyle)
-                drawText(
-                    ceilingLabel,
-                    topLeft = Offset(size.width - ceilingLabel.size.width, 0f),
-                )
-
                 scrubbed?.let { index ->
                     drawCursor(
                         index = index,
                         points = points,
-                        ceiling = ceiling,
                         lineColour = colors.textPrimary.copy(alpha = CURSOR_ALPHA),
                         dotColour = colors.precipitation,
                         ringColour = colors.surfaceRaised,
@@ -224,7 +218,15 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
         if (point == null) return@Row
 
         Text(
-            text = clockOf(point.at, zone),
+            // The time, and what it will actually feel like. The word is the
+            // part anybody can act on.
+            text = stringResource(
+                R.string.curve_reading,
+                clockOf(point.at, zone),
+                stringResource(
+                    PrecipitationIntensity.ofRate(point.millimetresPerHour.toDouble()).labelRes(),
+                ),
+            ),
             style = WetterTheme.type.meta,
             color = colors.textTertiary,
         )
@@ -286,13 +288,12 @@ private fun DrawScope.drawTimeAxis(
 private fun DrawScope.drawCursor(
     index: Int,
     points: List<CurvePoint>,
-    ceiling: Double,
     lineColour: Color,
     dotColour: Color,
     ringColour: Color,
 ) {
     val x = xOf(index, points.size)
-    val y = yOf(points[index].millimetresPerHour, ceiling, size.height)
+    val y = yOf(points[index].millimetresPerHour, size.height)
 
     drawLine(
         color = lineColour,
@@ -306,11 +307,11 @@ private fun DrawScope.drawCursor(
     drawCircle(dotColour, radius = DOT_RADIUS.toPx(), center = Offset(x, y))
 }
 
-private fun DrawScope.curvePath(points: List<CurvePoint>, ceiling: Double): Path {
+private fun DrawScope.curvePath(points: List<CurvePoint>): Path {
     val path = Path()
     points.forEachIndexed { index, point ->
         val x = xOf(index, points.size)
-        val y = yOf(point.millimetresPerHour, ceiling, size.height)
+        val y = yOf(point.millimetresPerHour, size.height)
         if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
     }
     return path
@@ -326,8 +327,8 @@ private fun DrawScope.curvePath(points: List<CurvePoint>, ceiling: Double): Path
 private fun DrawScope.xOf(index: Int, count: Int): Float =
     if (count <= 1) 0f else size.width * index / (count - 1)
 
-private fun yOf(value: Float, ceiling: Double, height: Float): Float =
-    height - (value / ceiling.toFloat()).coerceIn(0f, 1f) * height
+private fun yOf(value: Float, height: Float): Float =
+    height - heightFraction(value).coerceIn(0f, 1f) * height
 
 private fun indexAt(x: Float, width: Int, count: Int): Int {
     if (width <= 0 || count <= 1) return 0
@@ -342,23 +343,50 @@ private fun clockOf(instant: Instant, zone: ZoneId): String {
 }
 
 /**
- * The ceilings the chart is allowed to use, in millimetres per hour: the tops of
- * the conventional intensity bands, so the scale only ever lands somewhere that
- * means something meteorologically.
+ * Height is intensity, and the scale is fixed.
+ *
+ * This is the most important decision in the chart, and it took getting wrong
+ * twice to find. Millimetres per hour is a unit almost nobody has a feel for -
+ * told there is 3 mm of rain outside, most people, including people who work
+ * near meteorology, cannot picture it. So nobody reads a value off this chart.
+ * They read a shape: high means pouring, low means drizzle.
+ *
+ * For that reading to be true the scale cannot move. An adaptive ceiling - which
+ * this had, and which seemed reasonable while the axis carried a number - draws
+ * a drizzly morning at full height, which under the only mental model anybody
+ * actually uses says "downpour". It was worse than the problem it solved.
+ *
+ * A fixed *linear* scale is no good either: against a ceiling high enough for a
+ * real downpour, drizzle is two percent of the height and reads as nothing at
+ * all, when it is precisely the difference between nothing and take a coat.
+ *
+ * So the axis is anchored to the conventional intensity bands, with each band
+ * given a slice of the height wide enough to see. It is not linear in
+ * millimetres, and it does not pretend to be - there is no number on it. What it
+ * is linear in is how wet you get, which is what the chart is for.
  */
-private val CEILINGS = listOf(0.5, 2.5, 8.0, 50.0)
+private val BAND_HEIGHTS = listOf(
+    0.0 to 0.00f,
+    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.10f,
+    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.32f,
+    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.58f,
+    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.82f,
+    PrecipitationIntensity.VIOLENT_MM_PER_HOUR to 1.00f,
+)
 
-/**
- * A fixed ceiling is honest and, on most days, useless — 0.2 mm of drizzle draws
- * as a flat line and the chart says nothing. Scaling to the peak is the usual
- * fix and is worse, because it makes drizzle and downpour draw identically. So
- * the ceiling steps between fixed values and the chart states which one it is
- * using. The scale can change; it can never change silently.
- */
-private fun ceilingFor(points: List<CurvePoint>): Double {
-    val peak = points.maxOfOrNull { it.millimetresPerHour }?.toDouble() ?: 0.0
-    if (peak <= 0.0) return CEILINGS[1]
-    return CEILINGS.firstOrNull { it >= peak } ?: CEILINGS.last()
+/** Where a rate sits on the track, as a fraction of its height. */
+private fun heightFraction(millimetresPerHour: Float): Float {
+    val mm = millimetresPerHour.toDouble()
+    if (mm <= 0.0) return 0f
+    for (i in 0 until BAND_HEIGHTS.size - 1) {
+        val (lowMm, lowY) = BAND_HEIGHTS[i]
+        val (highMm, highY) = BAND_HEIGHTS[i + 1]
+        if (mm <= highMm) {
+            val t = ((mm - lowMm) / (highMm - lowMm)).toFloat()
+            return lowY + (highY - lowY) * t
+        }
+    }
+    return 1f
 }
 
 /** How finely the curve is walked between the forecast's own samples. */
