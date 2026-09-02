@@ -130,6 +130,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
 
+    // The background refresh worker lives here rather than in :data, because it
+    // needs the object graph and :data cannot see the application.
+    implementation(libs.androidx.work.runtime.ktx)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)

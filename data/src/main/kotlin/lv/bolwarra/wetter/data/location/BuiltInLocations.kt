@@ -1,9 +1,6 @@
 package lv.bolwarra.wetter.data.location
 
 import java.time.ZoneId
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /**
@@ -70,21 +67,4 @@ object BuiltInLocations {
     )
 
     val default: WeatherLocation = all.first()
-}
-
-/**
- * Which place the app is currently showing.
- *
- * In memory, so the choice is forgotten when the process dies. Persisting it
- * belongs with the rest of the location storage rather than here, where it would
- * have to be migrated a phase later.
- */
-class SelectedLocationStore(initial: WeatherLocation = BuiltInLocations.default) {
-
-    private val _selected = MutableStateFlow(initial)
-    val selected: StateFlow<WeatherLocation> = _selected.asStateFlow()
-
-    fun select(location: WeatherLocation) {
-        _selected.value = location
-    }
 }

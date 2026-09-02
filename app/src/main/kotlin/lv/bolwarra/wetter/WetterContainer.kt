@@ -1,7 +1,9 @@
 package lv.bolwarra.wetter
 
+import android.content.Context
 import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.repository.WeatherRepository
 
 /**
  * How Wetter is assembled.
@@ -12,16 +14,16 @@ import lv.bolwarra.wetter.data.location.SelectedLocationStore
  * problem this app does not have (docs/design-principles.md).
  *
  * It is short because it can be. `:data` assembles its own internals, so nothing
- * here knows what an HTTP client is or which weather services exist.
+ * here knows what an HTTP client or a database is.
  */
-class WetterContainer {
+class WetterContainer(context: Context) {
 
-    private val weatherData by lazy { WeatherData(BuildConfig.VERSION_NAME) }
+    private val weatherData by lazy { WeatherData(context, BuildConfig.VERSION_NAME) }
 
-    val repository get() = weatherData.repository
+    val repository: WeatherRepository get() = weatherData.repository
+
+    val selectedLocation: SelectedLocationStore get() = weatherData.selectedLocation
 
     /** Each weather service's required credit, for the About section. */
     val attributions: List<String> get() = weatherData.attributions
-
-    val selectedLocation by lazy { SelectedLocationStore() }
 }
