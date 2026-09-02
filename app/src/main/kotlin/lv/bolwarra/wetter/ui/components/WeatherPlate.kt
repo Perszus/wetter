@@ -8,15 +8,17 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,16 +27,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.sin
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.formatTemperature
@@ -47,24 +54,27 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * A thermostat face: a porcelain disc with the temperature at its centre and a
  * glass edge around it, along which a light travels at the speed of the wind.
  *
- * ### The light is the wind
+ * Two marks sit in the gutter outside the glass, on the lower diagonals. They
+ * are outside on purpose — the face is a reading, and these are advice about
+ * what to do with it.
  *
- * Its speed is the wind speed — a slow drift in still air, a visible rush in a
- * gale. That is the whole reason it is allowed to move at all: "4 m/s" is a
- * number most people cannot picture, and a speed they can watch is the part that
- * lands. Dead calm holds it still, which is itself the reading and also stops
- * the animation rather than spinning it at nobody.
+ * ### The wind is said twice, deliberately
  *
- * Wind *direction* is deliberately not on the ring. The angle around this circle
- * already means time of day — that is what the ticks and the time mark are — and
- * a compass bearing on the same degrees would be two coordinate systems sharing
- * one set of numbers. Direction belongs in the Air tile, in words.
+ * The travelling light gives a *feel* for it: a drift in still air, a rush in a
+ * gale. The three lines at the lower right give a *reading* of it, taken at a
+ * glance. One is continuous and needs watching; the other is discrete and
+ * immediate. Neither is redundant, because they answer at different speeds.
+ *
+ * Wind *direction* is on neither. The angle around this circle already means
+ * time of day, and a compass bearing on the same degrees would be two coordinate
+ * systems sharing one set of numbers. Direction belongs in the Air tile, in
+ * words.
  *
  * ### The light is one gradient, not several arcs
  *
- * It is a sweep gradient rotated as a whole, so the tail is a genuine continuous
- * falloff. Drawing a few arcs of stepped opacity is the easy approximation and
- * it looks like what it is: banding. The seam where the sweep wraps sits at full
+ * A sweep gradient rotated as a whole, so the tail is a genuine continuous
+ * falloff. A few arcs of stepped opacity is the easy approximation and it looks
+ * like what it is: banding. The seam where the sweep wraps sits at full
  * transparency, so it never shows.
  */
 @Composable
@@ -76,25 +86,62 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     val windSpeed = forecast.current.windSpeed ?: 0.0
     val beamAngle = rememberBeamAngle(windSpeed)
 
-    Box(
+    val rainExpectedToday = forecast.rainExpectedToday(now)
+    // Forced on while the placement is being judged. Delete the flag and this
+    // becomes `rainExpectedToday`, which is already correct.
+    val showUmbrella = ALWAYS_SHOW_UMBRELLA || rainExpectedToday
+
+    BoxWithConstraints(
         modifier = modifier
-            // The cap has to come before fillMaxWidth: fillMaxWidth pins the
-            // minimum equal to the maximum, and widthIn cannot pull a maximum
-            // below a minimum that is already fixed.
-            .widthIn(max = PLATE_MAX)
             .fillMaxWidth()
-            .aspectRatio(1f),
+            .height(PLATE_MAX),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
-            drawGlassEdge(colors.hairline, colors.surfaceRaised)
-            drawHourTicks(colors.hairline)
-            drawTimeMark(now, zone, colors.textSecondary)
-            if (windSpeed >= STILL_AIR_MS) {
-                drawWindLight(beamAngle, colors.textPrimary)
+        // The marks sit low and wide: down near the base of the dial, and pushed
+        // out past its sides. Kept on the diagonal they crowded the glass and
+        // looked like they were squeezing it; out here the dial keeps its full
+        // width and they read as things standing beside it.
+        //
+        // The dial gives up whatever room the marks need, so it is measured from
+        // what is left rather than assumed.
+        val lane = MARK_SIZE + MARK_GAP
+        val dial = minOf(maxWidth - lane * 2, PLATE_MAX, maxHeight)
+        val radius = dial / 2
+        val outwards = radius + MARK_GAP + MARK_SIZE / 2
+        val downwards = radius * MARK_BASE
+
+        Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
+                drawGlassEdge(colors.hairline, colors.surfaceRaised)
+                drawHourTicks(colors.hairline)
+                drawTimeMark(now, zone, colors.textSecondary)
+                if (windSpeed >= STILL_AIR_MS) {
+                    drawWindLight(beamAngle, colors.textPrimary)
+                }
             }
         }
+
+        if (showUmbrella) {
+            Icon(
+                painter = painterResource(R.drawable.ic_umbrella),
+                contentDescription = stringResource(R.string.plate_umbrella),
+                // The one coloured thing here, and the only reason that is
+                // allowed: it means rain, rain owns that hue, and this is the
+                // single mark whose job is to catch the eye on the way out.
+                tint = colors.precipitation,
+                modifier = Modifier
+                    .offset(x = -outwards, y = downwards)
+                    .size(MARK_SIZE),
+            )
+        }
+
+        WindLevels(
+            speedMs = windSpeed,
+            modifier = Modifier
+                .offset(x = outwards, y = downwards)
+                .size(MARK_SIZE),
+        )
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -124,6 +171,80 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     }
 }
 
+/**
+ * How windy it is, as three stacked lines that fill like a level.
+ *
+ * All three are always drawn. An indicator that hides its unfilled steps cannot
+ * be read as a level at all: two lines showing would leave you unable to tell
+ * whether that meant two of three or two of two.
+ */
+@Composable
+private fun WindLevels(speedMs: Double, modifier: Modifier = Modifier) {
+    val colour = WetterTheme.colors.textPrimary
+    val level = windLevel(speedMs)
+    val description = stringResource(windLevelLabel(level))
+
+    Canvas(modifier.semantics { contentDescription = description }) {
+        val gap = size.height / (WIND_LINES + 1)
+        repeat(WIND_LINES) { index ->
+            // Filled from the bottom up, the way a level fills.
+            val lit = index >= WIND_LINES - level
+            drawWave(
+                y = gap * (index + 1),
+                gap = gap,
+                colour = colour.copy(alpha = if (lit) WAVE_LIT else WAVE_UNLIT),
+            )
+        }
+    }
+}
+
+/** One wind line: a shallow wave, because a straight line would be a rule. */
+private fun DrawScope.drawWave(y: Float, gap: Float, colour: Color) {
+    val amplitude = gap * WAVE_AMPLITUDE
+    val path = Path()
+    path.moveTo(0f, y)
+    var x = 0f
+    while (x <= size.width) {
+        val phase = (x / size.width) * WAVE_CYCLES * TAU
+        path.lineTo(x, y + amplitude * sin(phase))
+        x += WAVE_RESOLUTION
+    }
+    drawPath(path, colour, style = Stroke(width = WAVE_STROKE.toPx(), cap = StrokeCap.Round))
+}
+
+/**
+ * Three bands, cut near the Beaufort boundaries people already have words for: a
+ * breeze you would not remark on, a wind that moves branches, and one you lean
+ * into.
+ */
+private fun windLevel(speedMs: Double): Int = when {
+    speedMs < MODERATE_WIND_MS -> 1
+    speedMs < STRONG_WIND_MS -> 2
+    else -> 3
+}
+
+private fun windLevelLabel(level: Int) = when (level) {
+    1 -> R.string.wind_light
+    2 -> R.string.wind_moderate
+    else -> R.string.wind_strong
+}
+
+/**
+ * Whether anything is expected to fall today, from now on.
+ *
+ * From now rather than across the whole calendar day: a shower that finished
+ * this morning is not a reason to carry an umbrella this afternoon.
+ */
+private fun WeatherForecast.rainExpectedToday(now: Instant): Boolean {
+    val zone = location.zone
+    val today = now.atZone(zone).toLocalDate()
+    return hourly.any { hour ->
+        !hour.timestamp.isBefore(now) &&
+            hour.timestamp.atZone(zone).toLocalDate() == today &&
+            hour.intensity.isWet
+    }
+}
+
 /** The light's position, turning at the speed of the wind. */
 @Composable
 private fun rememberBeamAngle(windSpeedMs: Double): Float {
@@ -149,7 +270,7 @@ private fun rememberBeamAngle(windSpeedMs: Double): Float {
  * The body of the plate: glazed ceramic, lit from above.
  *
  * The gradient's centre sits above the disc's centre rather than on it, which is
- * the whole difference between porcelain and a moulded plastic button — real
+ * the difference between glazed ceramic and a moulded plastic button — real
  * objects are lit from somewhere.
  */
 private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
@@ -171,19 +292,16 @@ private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
 /**
  * The glass rim the light runs along.
  *
- * Two strokes: the edge itself, and a slightly inset highlight that catches a
- * little more light at the top. Without the second one the ring is a drawn
- * circle rather than something with thickness.
+ * Two strokes: the edge itself, and an inset highlight catching a little more
+ * light at the top. Without the second the ring is a drawn circle rather than
+ * something with thickness.
  */
 private fun DrawScope.drawGlassEdge(edge: Color, face: Color) {
     val radius = ringRadius()
     drawCircle(color = edge, radius = radius, style = Stroke(EDGE_WIDTH.toPx()))
     drawCircle(
         brush = Brush.verticalGradient(
-            colors = listOf(
-                lerp(face, Color.White, GLASS_CATCH),
-                Color.Transparent,
-            ),
+            colors = listOf(lerp(face, Color.White, GLASS_CATCH), Color.Transparent),
             startY = center.y - radius,
             endY = center.y,
         ),
@@ -210,8 +328,8 @@ private fun DrawScope.drawHourTicks(colour: Color) {
 }
 
 /**
- * Where we are in the day: a short radial line, sitting inside the edge rather
- * than on it, so the rim stays a clean unbroken circle.
+ * Where we are in the day: a short radial line inside the edge rather than on
+ * it, so the rim stays a clean unbroken circle.
  */
 private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
     val outer = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
@@ -229,10 +347,10 @@ private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
 /**
  * The travelling light: one sweep gradient, rotated whole.
  *
- * The stops run from nothing, up to the head, and back to nothing at the wrap,
- * so the seam where the sweep closes is invisible. Rotating the gradient rather
- * than redrawing segments is what makes the tail a continuous falloff instead of
- * a set of bands.
+ * Deliberately not the accent. Precipitation owns the only saturated hue in this
+ * app, and a blue arc travelling the rim above a blue rain chart read as rain
+ * rather than wind. Drawn in ink instead it read as a scuff, so it is the face's
+ * own tone brought up — the ring brightening as the light passes.
  */
 private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
     val radius = ringRadius()
@@ -260,8 +378,8 @@ private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
  *
  * The stroke straddles this radius, so half its width falls outside it and the
  * ring's outer face lands flush with the bounds. The porcelain is drawn to the
- * same radius, which is what makes the ring the plate's edge rather than a
- * second circle inside it.
+ * same radius, which makes the ring the plate's edge rather than a second circle
+ * inside it.
  */
 private fun DrawScope.ringRadius(): Float = size.minDimension / 2f - EDGE_WIDTH.toPx() / 2f
 
@@ -275,7 +393,22 @@ private fun angleOf(instant: Instant, zone: ZoneId): Float {
     return -QUARTER_TURN + minutes / MINUTES_IN_DAY * FULL_TURN
 }
 
+/**
+ * Temporary. Shows the umbrella regardless of the forecast so its placement and
+ * weight can be judged against a dry day. Remove with the flag in the composable.
+ */
+private const val ALWAYS_SHOW_UMBRELLA = true
+
 private val PLATE_MAX = 240.dp
+
+private val MARK_SIZE = 26.dp
+
+/** Clear air between the glass and the marks, so they are beside it, not on it. */
+private val MARK_GAP = 10.dp
+
+/** How far down the dial the marks sit, as a fraction of its radius. */
+private const val MARK_BASE = 0.66f
+
 private val EDGE_WIDTH = 3.dp
 private val TICK_GAP = 6.dp
 private val TICK_LONG = 7.dp
@@ -288,6 +421,7 @@ private const val DEGREES_PER_HOUR = 360f / HOURS_IN_DAY
 private const val MINUTES_IN_DAY = 24f * 60f
 private const val QUARTER_TURN = 90f
 private const val FULL_TURN = 360f
+private const val TAU = 6.2831855f
 
 /** How far above centre the glaze highlight sits, as a fraction of the radius. */
 private const val LIGHT_FROM_ABOVE = 0.35f
@@ -297,6 +431,20 @@ private const val GLASS_CATCH = 0.7f
 private const val RIM_SHADE = 0.35f
 
 private const val BEAM_ALPHA = 0.5f
+
+private const val WIND_LINES = 3
+private const val WAVE_LIT = 1f
+private const val WAVE_UNLIT = 0.16f
+private const val WAVE_CYCLES = 2f
+
+/** As a fraction of the gap between lines, so deeper waves cannot collide. */
+private const val WAVE_AMPLITUDE = 0.42f
+private const val WAVE_RESOLUTION = 1f
+private val WAVE_STROKE = 2.dp
+
+/** Beaufort 4 and 6, roughly: branches moving, then leaning into it. */
+private const val MODERATE_WIND_MS = 3.5
+private const val STRONG_WIND_MS = 8.0
 
 /** Below this the air is still, the light holds, and the animation stops. */
 private const val STILL_AIR_MS = 0.5

@@ -14,6 +14,12 @@
 
     <!-- Readings -->
     <string name="unit_celsius">C</string>
+    <!-- Read aloud in place of the umbrella glyph on the dial. -->
+    <string name="plate_umbrella">Rain expected today</string>
+    <!-- Read aloud in place of the wind level lines on the dial. -->
+    <string name="wind_light">Light wind</string>
+    <string name="wind_moderate">Moderate wind</string>
+    <string name="wind_strong">Strong wind</string>
     <string name="current_feels_like">Feels like %1$s</string>
 
     <!--

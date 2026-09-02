@@ -25,6 +25,9 @@ replay_pid*.log
 /providers.md
 /notes.md
 
+# Source artwork dropped in for conversion; the drawable is what ships.
+/*.png
+
 # OS noise
 .DS_Store
 Thumbs.db

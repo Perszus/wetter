@@ -20,6 +20,14 @@ Notable changes to Wetter. The format follows
   and stops the animation rather than spinning it at nobody. It is one sweep
   gradient rotated whole, so the tail is a continuous falloff rather than
   banding, and the seam where the sweep wraps sits at full transparency.
+- Two marks stand beside the dial, low and out to the sides: an umbrella when
+  rain is expected later today, and three stacked sine lines that fill like a
+  level to give the wind as low, moderate or strong. The wind is therefore said
+  twice on purpose — the travelling light gives a feel for it that needs
+  watching, the lines give a reading that can be taken at a glance.
+- All three wind lines are always drawn, the inactive ones faint. An indicator
+  that hides its unfilled steps cannot be read as a level: two lines showing
+  would leave you unable to tell two-of-three from two-of-two.
 - Wind *direction* is deliberately not on the ring: the angle there already
   means time of day, and a compass bearing on the same degrees would make every
   reading ambiguous. Direction belongs in the Air tile, in words.
