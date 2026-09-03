@@ -72,6 +72,7 @@ object OpenMeteoMapper {
             isDay = current?.isDay?.let { it == 1 } ?: fallback?.isDay ?: true,
             precipitation = current?.precipitation,
             windSpeed = current?.windSpeed,
+            windGust = current?.windGust,
             windDirection = current?.windDirection,
             humidity = current?.humidity,
             pressure = current?.pressureMsl,
@@ -92,6 +93,7 @@ object OpenMeteoMapper {
                 snowfall = hourly.snowfall.at(index),
                 condition = weatherConditionFromWmoCode(hourly.weatherCode.at(index)),
                 windSpeed = hourly.windSpeed.at(index),
+                windGust = hourly.windGust.at(index),
                 cloudCover = hourly.cloudCover.at(index),
                 isDay = hourly.isDay.at(index)?.let { it == 1 } ?: true,
             )

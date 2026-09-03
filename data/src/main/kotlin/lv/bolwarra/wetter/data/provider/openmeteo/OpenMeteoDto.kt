@@ -43,6 +43,7 @@ data class OpenMeteoCurrent(
     @SerialName("weather_code") val weatherCode: Int? = null,
     @SerialName("pressure_msl") val pressureMsl: Double? = null,
     @SerialName("wind_speed_10m") val windSpeed: Double? = null,
+    @SerialName("wind_gusts_10m") val windGust: Double? = null,
     @SerialName("wind_direction_10m") val windDirection: Int? = null,
 )
 
@@ -58,6 +59,7 @@ data class OpenMeteoHourly(
     @SerialName("weather_code") val weatherCode: List<Int?> = emptyList(),
     @SerialName("cloud_cover") val cloudCover: List<Int?> = emptyList(),
     @SerialName("wind_speed_10m") val windSpeed: List<Double?> = emptyList(),
+    @SerialName("wind_gusts_10m") val windGust: List<Double?> = emptyList(),
     @SerialName("is_day") val isDay: List<Int?> = emptyList(),
 )
 

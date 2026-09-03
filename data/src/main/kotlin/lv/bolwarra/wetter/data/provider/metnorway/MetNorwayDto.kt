@@ -55,6 +55,7 @@ data class MetNorwayInstantDetails(
     @SerialName("relative_humidity") val humidity: Double? = null,
     @SerialName("cloud_area_fraction") val cloudAreaFraction: Double? = null,
     @SerialName("wind_speed") val windSpeed: Double? = null,
+    @SerialName("wind_speed_of_gust") val windGust: Double? = null,
     @SerialName("wind_from_direction") val windFromDirection: Double? = null,
 )
 

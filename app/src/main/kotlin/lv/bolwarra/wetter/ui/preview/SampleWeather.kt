@@ -47,6 +47,7 @@ object SampleWeather {
         isDay = true,
         precipitation = 0.0,
         windSpeed = 5.4,
+        windGust = 9.8,
         windDirection = 245,
         humidity = 81,
         pressure = 1004.2,
@@ -85,6 +86,7 @@ object SampleWeather {
                 else -> WeatherCondition.OVERCAST
             },
             windSpeed = 4.0 + (index % 5),
+            windGust = 7.5 + (index % 5) * 1.4,
             cloudCover = 70 + (index % 4) * 8,
             isDay = localHour in 7..18,
         )

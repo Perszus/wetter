@@ -28,6 +28,7 @@ class RangedTotalTest {
             snowfall = null,
             condition = WeatherCondition.CLEAR,
             windSpeed = null,
+            windGust = null,
             cloudCover = null,
             isDay = true,
         )

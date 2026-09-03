@@ -28,6 +28,7 @@ class PrecipitationKindTest {
         snowfall = snowfall,
         condition = condition,
         windSpeed = null,
+        windGust = null,
         cloudCover = null,
         isDay = true,
     )

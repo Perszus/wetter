@@ -100,7 +100,10 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     // would end up contradicting the mark beside it.
     val current = forecast.conditionsAt(now)
     val windSpeed = current.windSpeed ?: 0.0
-    val beamAngle = rememberBeamAngle(windSpeed)
+    // Falling back to the mean means a provider without gusts simply gets a
+    // steady light, rather than a broken one.
+    val windGust = (current.windGust ?: windSpeed).coerceAtLeast(windSpeed)
+    val beamAngle = rememberBeamAngle(windSpeed, windGust)
     val showUmbrella = forecast.rainExpectedToday(now)
 
     // Which mark, if any, is currently explaining itself. Not saved across a
@@ -202,6 +205,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
         MarkExplanation(
             mark = explaining,
             windSpeedMs = windSpeed,
+            windGustMs = windGust,
             onDismiss = { explaining = null },
         )
     }
@@ -223,7 +227,12 @@ private enum class PlateMark { UMBRELLA, WIND }
  * reason the app was opened.
  */
 @Composable
-private fun MarkExplanation(mark: PlateMark?, windSpeedMs: Double, onDismiss: () -> Unit) {
+private fun MarkExplanation(
+    mark: PlateMark?,
+    windSpeedMs: Double,
+    windGustMs: Double,
+    onDismiss: () -> Unit,
+) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
 
@@ -251,7 +260,18 @@ private fun MarkExplanation(mark: PlateMark?, windSpeedMs: Double, onDismiss: ()
         // have to take on trust; with it they are two readings of one figure you
         // can see, and either can be checked against it.
         val reading = when (shown) {
-            PlateMark.WIND -> formatWindSpeed(windSpeedMs)
+            // Both figures, because the light is surging between them and the
+            // gap is the point: a mean of five gusting to six is a different
+            // afternoon from a mean of five gusting to twelve.
+            PlateMark.WIND -> if (windGustMs > windSpeedMs + GUST_WORTH_SAYING) {
+                stringResource(
+                    R.string.explain_wind_reading,
+                    formatWindSpeed(windSpeedMs),
+                    formatWindSpeed(windGustMs),
+                )
+            } else {
+                formatWindSpeed(windSpeedMs)
+            }
             PlateMark.UMBRELLA -> null
         }
 
@@ -385,32 +405,59 @@ private fun WeatherForecast.rainExpectedToday(now: Instant): Boolean {
  * wherever it happens to be, and there is no duration to invalidate.
  */
 @Composable
-private fun rememberBeamAngle(windSpeedMs: Double): Float {
+private fun rememberBeamAngle(windSpeedMs: Double, windGustMs: Double): Float {
     // Read inside the frame callback, so the loop always sees the latest wind
     // without being restarted by it.
     val speed by rememberUpdatedState(windSpeedMs)
+    val gust by rememberUpdatedState(windGustMs)
     var angle by remember { mutableFloatStateOf(0f) }
+    var elapsedTotal by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
         var previousFrame = 0L
         while (true) {
             withFrameNanos { frame ->
-                val elapsed = if (previousFrame ==
-                    0L
-                ) {
+                val elapsed = if (previousFrame == 0L) {
                     0f
                 } else {
                     (frame - previousFrame) / NANOS_PER_SECOND
                 }
                 previousFrame = frame
-                val lap = lapSecondsFor(speed)
-                if (lap != null && elapsed > 0f) {
-                    angle = (angle + FULL_TURN * elapsed / lap) % FULL_TURN
+                if (elapsed > 0f) {
+                    elapsedTotal += elapsed
+                    val blowing = speed + (gust - speed) * surgeAt(elapsedTotal)
+                    val lap = lapSecondsFor(blowing)
+                    if (lap != null) {
+                        angle = (angle + FULL_TURN * elapsed / lap) % FULL_TURN
+                    }
                 }
             }
         }
     }
     return angle
+}
+
+/**
+ * How hard it is blowing at this instant, between the mean and the gust, 0 to 1.
+ *
+ * Three waves whose periods share no common factor, so the pattern never settles
+ * into anything recognisable. It spends most of its time near the middle and
+ * reaches the extremes rarely, which is how gusting behaves - a steady wind with
+ * occasional surges, not a metronome.
+ *
+ * This is what finally makes the light worth watching. The hourly wind figure is
+ * a mean, and a mean by construction does not change until the hour does, so
+ * however faithfully the light tracked it there was nothing to see over any
+ * period anybody would actually watch. The gap between mean and gust is real,
+ * published by both providers, and was being discarded; a light that surges
+ * across it shows the one thing about wind you feel rather than read.
+ */
+private fun surgeAt(seconds: Float): Float {
+    val slow = sin(seconds / SURGE_SLOW * TAU)
+    val mid = sin(seconds / SURGE_MID * TAU)
+    val fast = sin(seconds / SURGE_FAST * TAU)
+    val combined = slow * 0.5f + mid * 0.3f + fast * 0.2f
+    return ((combined + 1f) / 2f).coerceIn(0f, 1f)
 }
 
 /**
@@ -441,7 +488,8 @@ private fun rememberBeamAngle(windSpeedMs: Double): Float {
  */
 private fun lapSecondsFor(windSpeedMs: Double): Float? {
     if (windSpeedMs < STILL_AIR_MS) return null
-    return (REFERENCE_MS * REFERENCE_LAP_S / windSpeedMs)
+    val ratio = REFERENCE_MS / windSpeedMs
+    return (REFERENCE_LAP_S * Math.pow(ratio, DRAMA))
         .coerceIn(FASTEST_LAP_S, SLOWEST_LAP_S)
         .toFloat()
 }
@@ -638,6 +686,9 @@ private const val NANOS_PER_SECOND = 1_000_000_000f
 private const val SECONDS_PER_MINUTE = 60f
 
 private val CARD_CORNER = 14.dp
+
+/** Below this a gust is not meaningfully different from the mean. */
+private const val GUST_WORTH_SAYING = 0.6
 private const val TAU = 6.2831855f
 
 /** How far above centre the glaze highlight sits, as a fraction of the radius. */
@@ -695,8 +746,37 @@ private const val STILL_AIR_MS = 0.5
 private const val REFERENCE_MS = 5.0
 private const val REFERENCE_LAP_S = 4.0
 
-/** About forty laps a minute. Fast, which is the point at gale force. */
-private const val FASTEST_LAP_S = 1.5
+/**
+ * How much the speed exaggerates a difference in wind.
+ *
+ * A turbine holds its rate proportional to the wind, and that was the first
+ * version. It was faithful and it was not worth looking at: real wind over a day
+ * here runs 3.4 to 7.0 m/s, so a proportional light varied by barely twice, and
+ * two laps that differ by a factor of two look the same unless you can see them
+ * side by side - which nobody can, because the hourly figure only moves once an
+ * hour.
+ *
+ * Squaring it turns that same day into a fourfold spread, which is legible at a
+ * glance. This is deliberately not physics: the dial is an indicator, and the
+ * job of an indicator is to make a difference visible, not to model a rotor.
+ */
+private const val DRAMA = 2.0
 
-/** Slow enough to read as a drift, quick enough to still read as moving. */
-private const val SLOWEST_LAP_S = 12.0
+/**
+ * Periods of the three waves that make the light surge between the mean wind
+ * and the gust. Deliberately sharing no common factor, so the pattern does not
+ * settle into anything recognisable.
+ */
+private const val SURGE_SLOW = 19.1f
+private const val SURGE_MID = 11.7f
+private const val SURGE_FAST = 7.3f
+
+/**
+ * One lap a second. Fast enough to read as urgent, and reached at about 10 m/s
+ * - which is where the level indicator beside it turns to strong. The two say
+ * the same thing at the same moment, one continuously and one in steps.
+ */
+private const val FASTEST_LAP_S = 1.0
+
+/** A slow crawl. Still air stops the light entirely, so this is a light breeze. */
+private const val SLOWEST_LAP_S = 22.0

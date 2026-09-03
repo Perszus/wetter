@@ -31,6 +31,7 @@ class CorrectedForecastTest {
             isDay = false,
             precipitation = 0.0,
             windSpeed = 2.0,
+            windGust = null,
             windDirection = 220,
             humidity = 80,
             pressure = 1012.0,
@@ -45,6 +46,7 @@ class CorrectedForecastTest {
                 snowfall = null,
                 condition = WeatherCondition.CLEAR,
                 windSpeed = 2.0,
+                windGust = null,
                 cloudCover = 10,
                 isDay = false,
             )

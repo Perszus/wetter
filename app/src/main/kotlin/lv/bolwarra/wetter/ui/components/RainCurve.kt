@@ -103,7 +103,7 @@ fun RainCurve(
                     // rain that exists, and past that they are a prediction.
                     interpolated = it.radarShare < RADAR_BACKED,
                 )
-            }
+            }.smoothed()
         } else {
             resample(hours.sortedBy { it.timestamp })
         }
@@ -203,6 +203,41 @@ fun RainCurve(
  */
 private fun List<CurvePoint>.clipTo(from: Instant, to: Instant): List<CurvePoint> =
     filter { !it.at.isBefore(from) && !it.at.isAfter(to) }
+
+/**
+ * Rounds the corners off a series that is already at its final spacing.
+ *
+ * The hourly path gets its smoothness from [resample], which walks a spline
+ * between the forecast's own samples. The fused timeline arrives already spaced
+ * at ten minutes and so skipped that entirely - and was then drawn as straight
+ * segments between those points, which put a visible corner at every one of
+ * them. Rain does not start and stop on a corner, and a chart that says it does
+ * reads as a series of cuts rather than as weather.
+ *
+ * Same monotone spline as the hourly path, so it still cannot overshoot below
+ * zero approaching a shower or bulge above the peak inside one.
+ */
+private fun List<CurvePoint>.smoothed(): List<CurvePoint> {
+    if (size < 2) return this
+    val values = map { it.millimetresPerHour }
+    val tangents = MonotoneCurve.tangents(values)
+
+    val out = ArrayList<CurvePoint>(size * SMOOTH_STEPS + 1)
+    for (i in 0 until size - 1) {
+        val spanMillis = Duration.between(this[i].at, this[i + 1].at).toMillis()
+        repeat(SMOOTH_STEPS) { step ->
+            val t = step.toFloat() / SMOOTH_STEPS
+            out += CurvePoint(
+                at = this[i].at.plusMillis(spanMillis * step / SMOOTH_STEPS),
+                millimetresPerHour = MonotoneCurve.valueAt(values, tangents, i, t)
+                    .coerceAtLeast(0f),
+                interpolated = this[i].interpolated,
+            )
+        }
+    }
+    out += last()
+    return out
+}
 
 /** One moment on the curve. */
 private data class CurvePoint(
@@ -410,12 +445,26 @@ private fun clockOf(instant: Instant, zone: ZoneId): String {
  * millimetres, and it does not pretend to be - there is no number on it. What it
  * is linear in is how wet you get, which is what the chart is for.
  */
+/**
+ * Where each intensity sits on the track.
+ *
+ * Dry is flat on the floor and torrential fills it, so the reading stays the one
+ * anybody actually uses: high means pouring, low means drizzle.
+ *
+ * The step from dry to a trace is deliberately large - nothing to nearly a
+ * quarter of the height - because the question the chart is most often asked is
+ * not how hard it will rain but *whether* it will. A trace drawn a tenth of the
+ * way up was a bump you could scroll straight past on a track this short, which
+ * meant the chart quietly failed at its main job. Everything above the trace
+ * keeps its spacing, so the difference between light and heavy is as legible as
+ * it was.
+ */
 private val BAND_HEIGHTS = listOf(
     0.0 to 0.00f,
-    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.10f,
-    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.32f,
-    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.58f,
-    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.82f,
+    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.24f,
+    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.44f,
+    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.64f,
+    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.83f,
     PrecipitationIntensity.VIOLENT_MM_PER_HOUR to 1.00f,
 )
 
@@ -437,6 +486,9 @@ private fun heightFraction(millimetresPerHour: Float): Float {
 /** How finely the curve is walked between the forecast's own samples. */
 /** Above this share, the point is carried by radar rather than by the model. */
 private const val RADAR_BACKED = 0.5
+
+/** Sub-steps drawn between two fused points, purely to round the corners. */
+private const val SMOOTH_STEPS = 5
 
 private const val STEP_MINUTES = 10L
 

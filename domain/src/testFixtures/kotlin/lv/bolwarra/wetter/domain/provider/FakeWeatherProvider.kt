@@ -97,6 +97,7 @@ class FakeWeatherProvider(
                 isDay = true,
                 precipitation = 0.0,
                 windSpeed = null,
+                windGust = null,
                 windDirection = null,
                 humidity = null,
                 pressure = null,
@@ -111,6 +112,7 @@ class FakeWeatherProvider(
                     snowfall = null,
                     condition = WeatherCondition.OVERCAST,
                     windSpeed = null,
+                    windGust = null,
                     cloudCover = null,
                     isDay = true,
                 )

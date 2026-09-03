@@ -68,6 +68,7 @@ fun WeatherForecast.conditionsAt(instant: Instant): CurrentWeather {
         isDay = row.isDay,
         precipitation = row.precipitation,
         windSpeed = row.windSpeed,
+        windGust = row.windGust,
         windDirection = null,
         humidity = null,
         pressure = null,

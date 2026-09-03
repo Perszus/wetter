@@ -78,6 +78,7 @@ internal object MetNorwayMapper {
             isDay = SolarTime.isDaylight(at, location.latitude, location.longitude),
             precipitation = nextHour?.details?.precipitationAmount,
             windSpeed = details?.windSpeed,
+            windGust = details?.windGust,
             windDirection = details?.windFromDirection?.roundToInt(),
             humidity = details?.humidity?.roundToInt(),
             pressure = details?.pressure,
@@ -109,6 +110,7 @@ internal object MetNorwayMapper {
                 snowfall = null,
                 condition = weatherConditionFromMetSymbol(nextHour.summary.symbolCode),
                 windSpeed = details.windSpeed,
+                windGust = details.windGust,
                 cloudCover = details.cloudAreaFraction?.roundToInt()?.coerceIn(0, 100),
                 isDay = SolarTime.isDaylight(parsed.at, location.latitude, location.longitude),
             )

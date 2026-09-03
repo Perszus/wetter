@@ -60,6 +60,8 @@ internal data class StoredCurrent(
     val isDay: Boolean,
     val precipitation: Double?,
     val windSpeed: Double?,
+    /** Defaulted, so forecasts cached before gusts existed still read back. */
+    val windGust: Double? = null,
     val windDirection: Int?,
     val humidity: Int?,
     val pressure: Double?,
@@ -75,6 +77,8 @@ internal data class StoredHour(
     val snowfall: Double?,
     val condition: String,
     val windSpeed: Double?,
+    /** Defaulted, so forecasts cached before gusts existed still read back. */
+    val windGust: Double? = null,
     val cloudCover: Int?,
     val isDay: Boolean,
 )
@@ -137,6 +141,7 @@ private fun CurrentWeather.toStored() = StoredCurrent(
     isDay = isDay,
     precipitation = precipitation,
     windSpeed = windSpeed,
+    windGust = windGust,
     windDirection = windDirection,
     humidity = humidity,
     pressure = pressure,
@@ -151,6 +156,7 @@ private fun HourlyWeather.toStored() = StoredHour(
     snowfall = snowfall,
     condition = condition.name,
     windSpeed = windSpeed,
+    windGust = windGust,
     cloudCover = cloudCover,
     isDay = isDay,
 )
@@ -208,6 +214,7 @@ private fun StoredCurrent.toDomain() = CurrentWeather(
     isDay = isDay,
     precipitation = precipitation,
     windSpeed = windSpeed,
+    windGust = windGust,
     windDirection = windDirection,
     humidity = humidity,
     pressure = pressure,
@@ -222,6 +229,7 @@ private fun StoredHour.toDomain() = HourlyWeather(
     snowfall = snowfall,
     condition = condition.toCondition(),
     windSpeed = windSpeed,
+    windGust = windGust,
     cloudCover = cloudCover,
     isDay = isDay,
 )

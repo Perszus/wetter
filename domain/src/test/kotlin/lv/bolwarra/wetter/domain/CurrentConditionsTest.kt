@@ -33,6 +33,7 @@ class CurrentConditionsTest {
         snowfall = null,
         condition = WeatherCondition.CLEAR,
         windSpeed = wind,
+        windGust = null,
         cloudCover = 20,
         isDay = true,
     )
@@ -47,6 +48,7 @@ class CurrentConditionsTest {
             isDay = true,
             precipitation = 0.0,
             windSpeed = 2.0,
+            windGust = null,
             windDirection = 270,
             humidity = 80,
             pressure = 1012.0,

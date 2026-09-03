@@ -55,6 +55,15 @@ data class CurrentWeather(
     val precipitation: Double?,
     /** m/s */
     val windSpeed: Double?,
+    /**
+     * m/s, the strongest gust expected. Null when the provider does not say.
+     *
+     * Carried separately from [windSpeed] because the difference between them is
+     * the information: the mean is what an anemometer averages over an hour, the
+     * gust is what actually takes your hat off, and a place where they are far
+     * apart feels nothing like one where they are close.
+     */
+    val windGust: Double?,
     /** degrees clockwise from north, where the wind is coming from */
     val windDirection: Int?,
     /** percent */
@@ -84,6 +93,8 @@ data class HourlyWeather(
     val condition: WeatherCondition,
     /** m/s */
     val windSpeed: Double?,
+    /** m/s, the strongest gust expected in this hour. */
+    val windGust: Double?,
     /** percent, 0..100 */
     val cloudCover: Int?,
     /** Whether the sun is up during this hour, for the night wash on the timeline. */
