@@ -20,8 +20,7 @@ hs_err_pid*.log
 replay_pid*.log
 
 # Working briefs and notes, kept locally. Their content lives in docs/ in a form meant to
-# be read rather than followed. Root-anchored so docs/providers.md
-/upgrade.md is tracked.
+# be read rather than followed. Root-anchored so docs/providers.md is tracked.
 /philos.md
 /providers.md
 /upgrade.md
