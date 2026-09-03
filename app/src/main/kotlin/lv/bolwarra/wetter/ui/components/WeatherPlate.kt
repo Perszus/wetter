@@ -743,7 +743,14 @@ private const val WAVE_RESOLUTION = 1f
 private val WAVE_STROKE = 2.dp
 
 /**
- * The Beaufort 4 and 6 boundaries.
+ * The Beaufort 4 and 6 boundaries, rounded to whole numbers.
+ *
+ * The scale in the explanation card is written from these constants and speeds
+ * are displayed as whole numbers, so 5.5 and 10.8 were printed as 6 and 11 while
+ * the indicator still switched at the unrounded values - which put a reading of
+ * 6 m/s under a line saying light wind is "under 6". Moving the thresholds a few
+ * tenths costs nothing meteorologically and makes what is shown and what is done
+ * the same thing.
  *
  * Below 5.5 is up to a gentle breeze - present, not worth remarking on. From
  * there to 10.8 is moderate and fresh: dust and paper lift, small trees sway.
@@ -756,8 +763,8 @@ private val WAVE_STROKE = 2.dp
  * The previous values claimed to be these boundaries and were not; they were 3
  * and 5, which put "strong" at a fresh breeze.
  */
-private const val MODERATE_WIND_MS = 5.5
-private const val STRONG_WIND_MS = 10.8
+private const val MODERATE_WIND_MS = 6.0
+private const val STRONG_WIND_MS = 11.0
 
 /** Below this the air is still, the light holds, and the animation stops. */
 private const val STILL_AIR_MS = 0.5
