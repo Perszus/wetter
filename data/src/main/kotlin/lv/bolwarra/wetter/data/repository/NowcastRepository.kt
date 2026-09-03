@@ -13,6 +13,7 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.radar.RadarNowcast
 import lv.bolwarra.wetter.domain.radar.RadarNowcaster
+import lv.bolwarra.wetter.domain.radar.RadarSample
 import lv.bolwarra.wetter.domain.radar.RadarSource
 
 /**
@@ -54,6 +55,11 @@ class NowcastRepository internal constructor(
     private val ensembles: EnsembleSource,
     private val clock: Clock = Clock.systemUTC(),
     private val freshFor: Duration = DEFAULT_FRESH_FOR,
+    /**
+     * Where the last projection is kept between runs. Optional so the cache
+     * behaviour can be tested without a database.
+     */
+    private val seriesStore: RadarSeriesStore? = null,
 ) {
 
     /** Shown wherever radar contributes. Several sources require it. */
@@ -107,14 +113,44 @@ class NowcastRepository internal constructor(
             .getOrNull()
             .orEmpty()
         val nowcast = if (frames.size < 2) null else RadarNowcaster.nowcast(frames, LEADS)
+        val sweepAt = frames.lastOrNull()?.at ?: latest
         cached = Cached(
             location = location,
-            sweepAt = frames.lastOrNull()?.at ?: latest,
+            sweepAt = sweepAt,
             checkedAt = now,
             nowcast = nowcast,
         )
+        // Kept so the next launch starts from something rather than nothing.
+        // Only the samples under this place are stored; the grid they came from
+        // is megabytes and nothing reads it.
+        val store = seriesStore
+        if (nowcast != null && sweepAt != null && store != null) {
+            runCatching {
+                store.write(
+                    cacheKeyOf(location),
+                    sweepAt,
+                    nowcast.seriesAt(location.latitude, location.longitude),
+                )
+            }
+        }
         nowcast
     }
+
+    /** Drop projections too old to contain anything still ahead. */
+    suspend fun prune() {
+        seriesStore?.prune(Instant.now(clock).minus(KEEP_FOR))
+    }
+
+    /**
+     * Two nearby places share a kept projection, matching how the in-memory
+     * cache already treats them.
+     */
+    private fun cacheKeyOf(location: WeatherLocation): String = String.format(
+        java.util.Locale.ROOT,
+        "%.2f,%.2f",
+        location.latitude,
+        location.longitude,
+    )
 
     /**
      * Whether it is worth troubling the source at all.
@@ -157,6 +193,34 @@ class NowcastRepository internal constructor(
     }
 
     /**
+     * What the radar says about a place, from whatever is quickest to hand.
+     *
+     * The first read in a fresh process comes off disk and costs nothing, which
+     * is the point: opening the app used to start from the model's smooth hourly
+     * guess and only sharpen once twenty-odd tiles had been fetched, decoded and
+     * matched. A kept projection is on screen immediately and the fetched one
+     * replaces it on the next tick.
+     *
+     * A kept projection is used only for the part of it still in the future.
+     * One made twenty minutes ago is not wrong, only shorter.
+     */
+    private suspend fun radarSeries(location: WeatherLocation): List<RadarSample> {
+        val now = Instant.now(clock)
+
+        val warm = mutex.withLock { cached?.takeIf { it.location.sameGrid(location) } }
+        val store = seriesStore
+        if (warm == null && store != null) {
+            val kept = store.read(cacheKeyOf(location))
+            val stillAhead = kept?.samples?.filter { it.at.isAfter(now) }.orEmpty()
+            if (stillAhead.isNotEmpty()) return stillAhead
+        }
+
+        return nowcast(location)
+            ?.seriesAt(location.latitude, location.longitude)
+            .orEmpty()
+    }
+
+    /**
      * The fused timeline for a place: radar where it is worth having, model
      * throughout, and each weighted by how much it deserves rather than by which
      * one it is.
@@ -167,9 +231,7 @@ class NowcastRepository internal constructor(
         step: Duration = STEP,
         steps: Int = DEFAULT_STEPS,
     ): List<FusedPrecipitation> {
-        val radar = nowcast(forecast.location)
-            ?.seriesAt(forecast.location.latitude, forecast.location.longitude)
-            .orEmpty()
+        val radar = radarSeries(forecast.location)
         return PrecipitationFusion.fuse(
             hourly = forecast.hourly,
             radar = radar,
@@ -227,6 +289,12 @@ class NowcastRepository internal constructor(
          * all. Everything that succeeds keys on the sweep itself instead.
          */
         val DEFAULT_FRESH_FOR: Duration = Duration.ofMinutes(5)
+
+        /**
+         * Past this a kept projection has nothing left in the future worth
+         * drawing, so there is no reason to carry it.
+         */
+        val KEEP_FOR: Duration = Duration.ofHours(3)
 
         /** Model runs publish hourly, so anything fresher gets the same numbers. */
         val ENSEMBLE_FRESH_FOR: Duration = Duration.ofHours(1)

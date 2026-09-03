@@ -96,8 +96,30 @@ class NowcastCacheTest {
             Result.success(ModelEnsemble(emptyList()))
     }
 
-    private fun repository(radar: FakeRadar, clock: TestClock) =
-        NowcastRepository(radar, NoEnsemble, clock)
+    /** An in-memory stand-in for the table the projection is kept in. */
+    private class FakeSeriesDao : lv.bolwarra.wetter.data.db.RadarSeriesDao {
+        var row: lv.bolwarra.wetter.data.db.RadarSeriesEntity? = null
+        override suspend fun read(cacheKey: String) = row?.takeIf { it.cacheKey == cacheKey }
+        override suspend fun write(series: lv.bolwarra.wetter.data.db.RadarSeriesEntity) {
+            row = series
+        }
+        override suspend fun deleteOlderThan(cutoffEpochSecond: Long) {
+            if ((row?.sweepAtEpochSecond ?: Long.MAX_VALUE) < cutoffEpochSecond) row = null
+        }
+    }
+
+    private fun repository(radar: FakeRadar, clock: TestClock, dao: FakeSeriesDao? = null) =
+        NowcastRepository(
+            source = radar,
+            ensembles = NoEnsemble,
+            clock = clock,
+            seriesStore = dao?.let {
+                RadarSeriesStore(it, kotlinx.serialization.json.Json { ignoreUnknownKeys = true })
+            },
+        )
+
+    private fun forecastAt(location: WeatherLocation, at: Instant) =
+        lv.bolwarra.wetter.data.repository.testForecast(location, at)
 
     @Test
     fun `nothing is asked while the sweep in hand is still the newest there is`() = runBlocking {
@@ -240,5 +262,78 @@ class NowcastCacheTest {
 
         repository.nowcast(riga.copy(latitude = riga.latitude + 0.001))
         assertEquals(1, radar.tileCalls)
+    }
+
+    @Test
+    fun `a projection is kept, so the next launch starts from something`() = runBlocking {
+        val sweep = Instant.parse("2026-09-04T12:00:00Z")
+        val clock = TestClock(sweep.plus(Duration.ofSeconds(30)))
+        val dao = FakeSeriesDao()
+        val radar = FakeRadar(latest = sweep)
+
+        // One run fetches and keeps what it found.
+        repository(radar, clock, dao).timeline(forecastAt(riga, clock.now), clock.now)
+        assertEquals(1, radar.tileCalls)
+        assertNotNull("nothing was kept for the next launch", dao.row)
+
+        // A brand new repository - a fresh process - must not have to fetch to
+        // put radar on screen.
+        val coldRadar = FakeRadar(latest = sweep)
+        val cold = repository(coldRadar, TestClock(clock.now), dao)
+        val timeline = cold.timeline(forecastAt(riga, clock.now), clock.now)
+
+        assertEquals("a cold start went to the network before drawing", 0, coldRadar.tileCalls)
+        assertEquals(0, coldRadar.indexCalls)
+        assertTrue(
+            "nothing radar-backed reached the timeline",
+            timeline.any {
+                it.radarShare > 0.0
+            },
+        )
+    }
+
+    @Test
+    fun `a kept projection is used only for the part still ahead`() = runBlocking {
+        val sweep = Instant.parse("2026-09-04T12:00:00Z")
+        val clock = TestClock(sweep.plus(Duration.ofSeconds(30)))
+        val dao = FakeSeriesDao()
+        repository(FakeRadar(latest = sweep), clock, dao).timeline(
+            forecastAt(riga, clock.now),
+            clock.now,
+        )
+
+        // Ninety minutes on, the early half of that projection describes weather
+        // that has already happened and must not be drawn as forecast.
+        val later = TestClock(sweep.plus(Duration.ofMinutes(90)))
+        val coldRadar = FakeRadar(latest = sweep)
+        val timeline = repository(coldRadar, later, dao)
+            .timeline(forecastAt(riga, later.now), later.now)
+
+        assertEquals(0, coldRadar.tileCalls)
+        assertTrue(timeline.all { !it.at.isBefore(later.now) })
+        // The tail of it is still ahead, so radar still contributes something.
+        assertTrue(timeline.any { it.radarShare > 0.0 })
+    }
+
+    @Test
+    fun `a projection with nothing left ahead is not used at all`() = runBlocking {
+        val sweep = Instant.parse("2026-09-04T12:00:00Z")
+        val clock = TestClock(sweep.plus(Duration.ofSeconds(30)))
+        val dao = FakeSeriesDao()
+        repository(FakeRadar(latest = sweep), clock, dao).timeline(
+            forecastAt(riga, clock.now),
+            clock.now,
+        )
+
+        // Four hours on, every sample is in the past. Rather than draw stale
+        // weather the repository goes and asks.
+        val muchLater = TestClock(sweep.plus(Duration.ofHours(4)))
+        val coldRadar = FakeRadar(latest = sweep.plus(Duration.ofHours(4)))
+        repository(coldRadar, muchLater, dao).timeline(
+            forecastAt(riga, muchLater.now),
+            muchLater.now,
+        )
+
+        assertTrue("should have fetched rather than drawn the past", coldRadar.tileCalls > 0)
     }
 }

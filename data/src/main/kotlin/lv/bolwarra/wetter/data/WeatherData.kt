@@ -17,6 +17,7 @@ import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.NowcastRepository
+import lv.bolwarra.wetter.data.repository.RadarSeriesStore
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
@@ -97,7 +98,11 @@ class WeatherData(
     }
 
     val nowcasts: NowcastRepository by lazy {
-        NowcastRepository(radarSource, OpenMeteoEnsemble(httpClient))
+        NowcastRepository(
+            source = radarSource,
+            ensembles = OpenMeteoEnsemble(httpClient),
+            seriesStore = RadarSeriesStore(database.radarSeries(), WetterHttpClient.json),
+        )
     }
 
     /** Every required credit, for the About section. */

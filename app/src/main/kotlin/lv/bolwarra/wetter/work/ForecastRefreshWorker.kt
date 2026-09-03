@@ -46,6 +46,13 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
             // network - and a second periodic job competing for the same
             // wake-ups would cost battery to do the same work less often.
             runCatching {
+                // Warm the radar while there is already a wake-up and a network.
+                // Without this the projection kept on disk is only ever as fresh
+                // as the last time somebody opened the app, which is exactly the
+                // moment it is least useful.
+                container.nowcasts.timeline(forecast, java.time.Instant.now())
+                container.nowcasts.prune()
+
                 container.verification.record(forecast)
                 val settled = container.verification.verify(location)
                 container.verification.prune()

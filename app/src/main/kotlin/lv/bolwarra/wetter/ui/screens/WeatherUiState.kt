@@ -47,6 +47,15 @@ data class WeatherUiState(
      * improvement over an uncorrected one.
      */
     val bias: LearnedBias? = null,
+    /**
+     * Whether the cache has answered yet, in either direction.
+     *
+     * Without it a null forecast means two different things - the store has not
+     * spoken, or it has nothing - and the screen was treating both as the second.
+     * For the first second of every launch it told people the app needed a
+     * location, over a cached forecast that was about to appear.
+     */
+    val loaded: Boolean = false,
 ) {
     val hasForecast: Boolean get() = forecast != null
 

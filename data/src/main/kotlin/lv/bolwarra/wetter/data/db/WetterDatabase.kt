@@ -114,6 +114,41 @@ internal data class SavedLocationEntity(
     val addedAtEpochSecond: Long,
 )
 
+/**
+ * The last radar projection for a place, so opening the app does not start from
+ * nothing.
+ *
+ * Only the sampled series is kept, not the field it came from. The projection
+ * covers a 768 by 768 grid of rates, which is megabytes and none of which the
+ * screen ever reads: the chart consumes the dozen values under the user's own
+ * coordinates. Storing those is a few hundred bytes and loses nothing.
+ *
+ * The samples carry absolute times rather than lead offsets, which is what makes
+ * a stale row still worth having - the parts of it that are still in the future
+ * remain true, and the rest simply falls outside the window.
+ */
+@Entity(tableName = "radar_series")
+internal data class RadarSeriesEntity(
+    @PrimaryKey val cacheKey: String,
+    /** The sweep this was projected from, for deciding whether it has been overtaken. */
+    val sweepAtEpochSecond: Long,
+    val payload: String,
+)
+
+@Dao
+internal interface RadarSeriesDao {
+
+    @Query("SELECT * FROM radar_series WHERE cacheKey = :cacheKey")
+    suspend fun read(cacheKey: String): RadarSeriesEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(series: RadarSeriesEntity)
+
+    /** Nothing here is worth keeping for long; a projection is spent within hours. */
+    @Query("DELETE FROM radar_series WHERE sweepAtEpochSecond < :cutoffEpochSecond")
+    suspend fun deleteOlderThan(cutoffEpochSecond: Long)
+}
+
 @Dao
 internal interface SavedLocationDao {
 
@@ -215,8 +250,9 @@ internal interface SelectedLocationDao {
         SelectedLocationEntity::class,
         ForecastRecordEntity::class,
         SavedLocationEntity::class,
+        RadarSeriesEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -228,6 +264,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
     abstract fun forecastRecords(): ForecastRecordDao
 
     abstract fun savedLocations(): SavedLocationDao
+
+    abstract fun radarSeries(): RadarSeriesDao
 
     companion object {
 
@@ -295,6 +333,19 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the kept radar projection. Additive, like the two before it. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `radar_series` (" +
+                        "`cacheKey` TEXT NOT NULL, " +
+                        "`sweepAtEpochSecond` INTEGER NOT NULL, " +
+                        "`payload` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`cacheKey`))",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -310,7 +361,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
             // it would silently throw away everything the app had learned
             // about this location. Every schema change from here needs a
             // migration.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
     }
 }

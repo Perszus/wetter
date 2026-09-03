@@ -144,6 +144,12 @@ fun WeatherScreen(
         )
 
         val forecast = state.forecast
+        if (forecast == null && !state.loaded) {
+            // The store has not answered yet. Saying anything here would be
+            // guessing, and the guess that used to be made - that there is no
+            // location - was both alarming and usually wrong.
+            return@Column
+        }
         if (forecast == null) {
             // With no forecast and no error there is simply nowhere selected, so
             // the useful action is to choose one; with an error, it is to retry.

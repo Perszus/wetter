@@ -60,9 +60,17 @@ class WeatherViewModel(
      * The forecast for the selected place, shared so the three things derived
      * from it do not each open their own query.
      */
-    private val forecasts: StateFlow<WeatherForecast?> = selectedLocation.selected
+    private val forecasts: StateFlow<Loaded<WeatherForecast?>> = selectedLocation.selected
         .flatMapLatest { repository.observe(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+        .map { Loaded(it, loaded = true) }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            Loaded(null, loaded = false),
+        )
+
+    /** A value together with whether it has actually been produced yet. */
+    private data class Loaded<T>(val value: T, val loaded: Boolean)
 
     /**
      * The fused timeline, rebuilt on a clock rather than only when a new
@@ -87,6 +95,7 @@ class WeatherViewModel(
      * only re-anchor what is already held.
      */
     private val timelines: Flow<List<FusedPrecipitation>> = forecasts
+        .map { it.value }
         .flatMapLatest { forecast ->
             if (forecast == null) {
                 flowOf(emptyList())
@@ -109,8 +118,8 @@ class WeatherViewModel(
      * rather than on the timeline's cadence: it is a database query whose answer
      * moves over weeks, not minutes.
      */
-    private val biases: Flow<LearnedBias?> = forecasts.map { forecast ->
-        forecast?.let { runCatching { verification.learnedBias(it.location) }.getOrNull() }
+    private val biases: Flow<LearnedBias?> = forecasts.map { held ->
+        held.value?.let { runCatching { verification.learnedBias(it.location) }.getOrNull() }
     }
 
     private val derived: Flow<Derived> = combine(timelines, biases) { timeline, bias ->
@@ -123,8 +132,10 @@ class WeatherViewModel(
         refreshing,
         error,
         derived,
-    ) { location, forecast, isRefreshing, failure, extra ->
+    ) { location, held, isRefreshing, failure, extra ->
+        val forecast = held.value
         WeatherUiState(
+            loaded = held.loaded,
             location = location,
             // Corrected here, once, rather than at each place a temperature is
             // drawn. A corrected dial above an uncorrected week would contradict
