@@ -1,4 +1,4 @@
-package lv.bolwarra.wetter.ui.chart
+package lv.bolwarra.wetter.domain.chart
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -37,10 +37,10 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.chart.MonotoneCurve
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
-import lv.bolwarra.wetter.ui.chart.MonotoneCurve
 import lv.bolwarra.wetter.ui.format.formatMillimetres
 import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.WetterTheme
@@ -477,10 +477,27 @@ private fun heightFraction(millimetresPerHour: Float): Float {
         val (highMm, highY) = BAND_HEIGHTS[i + 1]
         if (mm <= highMm) {
             val t = ((mm - lowMm) / (highMm - lowMm)).toFloat()
-            return lowY + (highY - lowY) * t
+            // Eased across each band rather than run straight through it. The
+            // anchors are what carry the meaning - trace here, heavy there - but
+            // joining them with straight segments puts a slope change at every
+            // boundary, so a perfectly smooth rate still drew a visibly kinked
+            // line wherever it crossed from one intensity into the next.
+            return lowY + (highY - lowY) * smoothStep(t)
         }
     }
     return 1f
+}
+
+/**
+ * Smoothstep: flat at both ends, steepest in the middle.
+ *
+ * Chosen over a spline through the anchors because it is local. A spline would
+ * let a change to one band's height shift the curve inside its neighbours,
+ * which would make the bands stop meaning exactly what they say.
+ */
+private fun smoothStep(t: Float): Float {
+    val x = t.coerceIn(0f, 1f)
+    return x * x * (3f - 2f * x)
 }
 
 /** How finely the curve is walked between the forecast's own samples. */

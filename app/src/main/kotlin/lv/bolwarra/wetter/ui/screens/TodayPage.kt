@@ -147,6 +147,7 @@ private fun AdvancedTile(forecast: WeatherForecast, now: Instant, bias: LearnedB
                 Metric(stringResource(R.string.metric_humidity), formatPercent(current.humidity)),
                 Metric(stringResource(R.string.metric_pressure), formatPressure(current.pressure)),
                 Metric(stringResource(R.string.metric_wind), formatWindSpeed(current.windSpeed)),
+                Metric(stringResource(R.string.metric_gust), formatWindSpeed(current.windGust)),
                 Metric(
                     stringResource(R.string.metric_wind_direction),
                     current.windDirection

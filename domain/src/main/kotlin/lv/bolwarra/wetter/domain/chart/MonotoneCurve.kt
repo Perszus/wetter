@@ -1,4 +1,4 @@
-package lv.bolwarra.wetter.ui.chart
+package lv.bolwarra.wetter.domain.chart
 
 /**
  * Smooth interpolation through a series that never invents a value the series
@@ -20,7 +20,7 @@ package lv.bolwarra.wetter.ui.chart
  * rather than left to a library whose overshoot behaviour would be somebody
  * else's decision.
  */
-internal object MonotoneCurve {
+object MonotoneCurve {
 
     /**
      * Tangents for a monotone cubic Hermite spline through [values], assumed to

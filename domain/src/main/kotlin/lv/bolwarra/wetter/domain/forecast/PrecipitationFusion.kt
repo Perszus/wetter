@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Duration
 import java.time.Instant
+import lv.bolwarra.wetter.domain.chart.MonotoneCurve
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.radar.RadarSample
 
@@ -159,7 +160,19 @@ object PrecipitationFusion {
         return (1.0 - kotlin.math.abs(a - b) / scale).coerceIn(0.0, 1.0)
     }
 
-    /** The model's rate at an instant, interpolated between the rows either side. */
+    /**
+     * The model's rate at an instant, along a curve rather than a straight line.
+     *
+     * Straight lines between hourly rows put a corner at every hour, and no
+     * amount of smoothing downstream can remove it: a spline drawn through
+     * points that are already collinear reproduces the straight line exactly,
+     * corner and all. The bend has to be introduced here, where the only real
+     * samples are.
+     *
+     * The same monotone spline the chart uses, so an hour of nothing between two
+     * wet hours still reads as nothing - it cannot invent a shower in a dry gap
+     * or dip below zero on the way into one.
+     */
     private fun interpolate(rows: List<HourlyWeather>, at: Instant): Double? {
         if (rows.isEmpty()) return null
         val after = rows.indexOfFirst { it.timestamp.isAfter(at) }
@@ -180,7 +193,14 @@ object PrecipitationFusion {
         val span = Duration.between(before.timestamp, next.timestamp).toMillis().toDouble()
         if (span <= 0) return a
         val into = Duration.between(before.timestamp, at).toMillis().toDouble()
-        return a + (b - a) * (into / span)
+
+        // Tangents need the neighbours either side, so the curve leaving one
+        // hour matches the curve arriving at the next.
+        val values = rows.map { (it.precipitation ?: 0.0).toFloat() }
+        val tangents = MonotoneCurve.tangents(values)
+        return MonotoneCurve.valueAt(values, tangents, after - 1, (into / span).toFloat())
+            .toDouble()
+            .coerceAtLeast(0.0)
     }
 
     /** The radar sample describing an instant, if one is close enough to. */

@@ -8,6 +8,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -47,6 +48,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.Instant
@@ -100,10 +102,10 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     // would end up contradicting the mark beside it.
     val current = forecast.conditionsAt(now)
     val windSpeed = current.windSpeed ?: 0.0
-    // Falling back to the mean means a provider without gusts simply gets a
-    // steady light, rather than a broken one.
+    // Falling back to the mean means a provider that does not publish gusts
+    // simply reports one figure rather than a nonsensical one.
     val windGust = (current.windGust ?: windSpeed).coerceAtLeast(windSpeed)
-    val beamAngle = rememberBeamAngle(windSpeed, windGust)
+    val beamAngle = rememberBeamAngle(windSpeed)
     val showUmbrella = forecast.rainExpectedToday(now)
 
     // Which mark, if any, is currently explaining itself. Not saved across a
@@ -260,9 +262,10 @@ private fun MarkExplanation(
         // have to take on trust; with it they are two readings of one figure you
         // can see, and either can be checked against it.
         val reading = when (shown) {
-            // Both figures, because the light is surging between them and the
-            // gap is the point: a mean of five gusting to six is a different
-            // afternoon from a mean of five gusting to twelve.
+            // The gust is a reading, not something the dial acts out. A mean of
+            // five gusting to six is a different afternoon from a mean of five
+            // gusting to twelve, and that is worth saying in a number even
+            // though the light itself holds a steady pace.
             PlateMark.WIND -> if (windGustMs > windSpeedMs + GUST_WORTH_SAYING) {
                 stringResource(
                     R.string.explain_wind_reading,
@@ -303,7 +306,48 @@ private fun MarkExplanation(
                 }
             }
             Spacer(Modifier.height(spacing.xs))
+            if (shown == PlateMark.WIND) {
+                // The three bands as a scale, with the one you are in picked out.
+                // A reader wants to know what the lines mean and where they
+                // currently stand, and both are easier to take from a short list
+                // than from a paragraph describing them.
+                val level = windLevel(windSpeedMs)
+                WindBands(level)
+                Spacer(Modifier.height(spacing.m))
+            }
             Text(text = body, style = WetterTheme.type.body, color = colors.textSecondary)
+        }
+    }
+}
+
+/**
+ * The three wind bands, as a scale.
+ *
+ * The thresholds are formatted from the same constants the indicator switches
+ * on, so the numbers a reader is given cannot drift away from the ones the dial
+ * is actually using.
+ */
+@Composable
+private fun WindBands(currentLevel: Int) {
+    val colors = WetterTheme.colors
+    val moderate = formatWindSpeed(MODERATE_WIND_MS)
+    val strong = formatWindSpeed(STRONG_WIND_MS)
+
+    val bands = listOf(
+        1 to stringResource(R.string.explain_wind_band_light, moderate),
+        2 to stringResource(R.string.explain_wind_band_moderate, moderate, strong),
+        3 to stringResource(R.string.explain_wind_band_strong, strong),
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(WetterTheme.spacing.xs)) {
+        bands.forEach { (level, text) ->
+            val here = level == currentLevel
+            Text(
+                text = text,
+                style = WetterTheme.type.body,
+                color = if (here) colors.textPrimary else colors.textTertiary,
+                fontWeight = if (here) FontWeight.Medium else FontWeight.Normal,
+            )
         }
     }
 }
@@ -405,13 +449,11 @@ private fun WeatherForecast.rainExpectedToday(now: Instant): Boolean {
  * wherever it happens to be, and there is no duration to invalidate.
  */
 @Composable
-private fun rememberBeamAngle(windSpeedMs: Double, windGustMs: Double): Float {
+private fun rememberBeamAngle(windSpeedMs: Double): Float {
     // Read inside the frame callback, so the loop always sees the latest wind
     // without being restarted by it.
     val speed by rememberUpdatedState(windSpeedMs)
-    val gust by rememberUpdatedState(windGustMs)
     var angle by remember { mutableFloatStateOf(0f) }
-    var elapsedTotal by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
         var previousFrame = 0L
@@ -423,41 +465,14 @@ private fun rememberBeamAngle(windSpeedMs: Double, windGustMs: Double): Float {
                     (frame - previousFrame) / NANOS_PER_SECOND
                 }
                 previousFrame = frame
-                if (elapsed > 0f) {
-                    elapsedTotal += elapsed
-                    val blowing = speed + (gust - speed) * surgeAt(elapsedTotal)
-                    val lap = lapSecondsFor(blowing)
-                    if (lap != null) {
-                        angle = (angle + FULL_TURN * elapsed / lap) % FULL_TURN
-                    }
+                val lap = lapSecondsFor(speed)
+                if (lap != null && elapsed > 0f) {
+                    angle = (angle + FULL_TURN * elapsed / lap) % FULL_TURN
                 }
             }
         }
     }
     return angle
-}
-
-/**
- * How hard it is blowing at this instant, between the mean and the gust, 0 to 1.
- *
- * Three waves whose periods share no common factor, so the pattern never settles
- * into anything recognisable. It spends most of its time near the middle and
- * reaches the extremes rarely, which is how gusting behaves - a steady wind with
- * occasional surges, not a metronome.
- *
- * This is what finally makes the light worth watching. The hourly wind figure is
- * a mean, and a mean by construction does not change until the hour does, so
- * however faithfully the light tracked it there was nothing to see over any
- * period anybody would actually watch. The gap between mean and gust is real,
- * published by both providers, and was being discarded; a light that surges
- * across it shows the one thing about wind you feel rather than read.
- */
-private fun surgeAt(seconds: Float): Float {
-    val slow = sin(seconds / SURGE_SLOW * TAU)
-    val mid = sin(seconds / SURGE_MID * TAU)
-    val fast = sin(seconds / SURGE_FAST * TAU)
-    val combined = slow * 0.5f + mid * 0.3f + fast * 0.2f
-    return ((combined + 1f) / 2f).coerceIn(0f, 1f)
 }
 
 /**
@@ -689,6 +704,7 @@ private val CARD_CORNER = 14.dp
 
 /** Below this a gust is not meaningfully different from the mean. */
 private const val GUST_WORTH_SAYING = 0.6
+
 private const val TAU = 6.2831855f
 
 /** How far above centre the glaze highlight sits, as a fraction of the radius. */
@@ -761,15 +777,6 @@ private const val REFERENCE_LAP_S = 4.0
  * job of an indicator is to make a difference visible, not to model a rotor.
  */
 private const val DRAMA = 2.0
-
-/**
- * Periods of the three waves that make the light surge between the mean wind
- * and the gust. Deliberately sharing no common factor, so the pattern does not
- * settle into anything recognisable.
- */
-private const val SURGE_SLOW = 19.1f
-private const val SURGE_MID = 11.7f
-private const val SURGE_FAST = 7.3f
 
 /**
  * One lap a second. Fast enough to read as urgent, and reached at about 10 m/s
