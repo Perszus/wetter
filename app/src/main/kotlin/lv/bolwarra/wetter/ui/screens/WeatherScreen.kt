@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.Lifecycle
@@ -39,6 +42,7 @@ import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.DomainSwitcher
 import lv.bolwarra.wetter.ui.components.EmptyState
+import lv.bolwarra.wetter.ui.components.PlateMark
 import lv.bolwarra.wetter.ui.components.WeatherHeader
 import lv.bolwarra.wetter.ui.components.WeatherPlate
 import lv.bolwarra.wetter.ui.preview.SampleWeather
@@ -121,10 +125,17 @@ fun WeatherScreen(
         }
     }
 
+    // Which mark beside the dial is explaining itself. Held here rather than in
+    // the dial because putting it away is a screen-wide gesture - a tap on the
+    // chart, the switcher or bare background should dismiss it, and none of
+    // those are things the dial can see.
+    var explaining by remember { mutableStateOf<PlateMark?>(null) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = spacing.screen),
+            .padding(horizontal = spacing.screen)
+            .dismissOnOutsideTap(active = explaining != null) { explaining = null },
     ) {
         WeatherHeader(
             locationName = state.location?.name,
@@ -153,6 +164,8 @@ fun WeatherScreen(
                 forecast = forecast,
                 now = now,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
+                explaining = explaining,
+                onExplain = { explaining = it },
             )
             Spacer(Modifier.height(spacing.xl))
             DomainSwitcher(selected = domain, onSelect = onSelectDomain)
@@ -277,3 +290,35 @@ private fun EmptyPreview() {
         )
     }
 }
+
+/**
+ * Puts an open panel away when a press lands anywhere it does not own.
+ *
+ * Only unconsumed presses count, and that is the whole mechanism: the card and
+ * the marks beside the dial take their own taps, so a press that is still
+ * unclaimed by the time it reaches here is by definition a press on something
+ * else. That covers the chart, the switcher, the header and bare background
+ * without any of them having to know a panel exists.
+ *
+ * It watches the *final* pass, after children have taken what is theirs, which
+ * is the whole trick. Watching the initial pass sees every press including the
+ * ones landing on the card and the marks, so tapping a mark would dismiss the
+ * card and then immediately reopen it - the marks would never close. By the
+ * final pass a press on anything that handles presses is already consumed.
+ *
+ * It never consumes anything itself: dismissing must not also swallow the tap a
+ * scroll or a button was about to receive.
+ *
+ * Inert while nothing is open, so the common case adds no gesture handling at all.
+ */
+private fun Modifier.dismissOnOutsideTap(active: Boolean, onDismiss: () -> Unit): Modifier =
+    if (!active) {
+        this
+    } else {
+        pointerInput(Unit) {
+            awaitEachGesture {
+                val press = awaitPointerEvent(PointerEventPass.Final)
+                if (press.changes.any { it.pressed && !it.isConsumed }) onDismiss()
+            }
+        }
+    }

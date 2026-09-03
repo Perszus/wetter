@@ -90,7 +90,20 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * transparency, so it never shows.
  */
 @Composable
-fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
+fun WeatherPlate(
+    forecast: WeatherForecast,
+    now: Instant,
+    modifier: Modifier = Modifier,
+    /**
+     * Which mark is currently explaining itself, held by the caller.
+     *
+     * Hoisted because dismissing it is a screen-wide gesture: tapping anywhere
+     * that is not the card should put it away, and the dial cannot see taps that
+     * land on the chart below it.
+     */
+    explaining: PlateMark? = null,
+    onExplain: (PlateMark?) -> Unit = {},
+) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
@@ -106,12 +119,8 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     val beamAngle = rememberBeamAngle(windSpeed)
     val showUmbrella = forecast.rainExpectedToday(now)
 
-    // Which mark, if any, is currently explaining itself. Not saved across a
-    // relaunch: it is an answer to a question just asked, not a setting.
-    var explaining by remember { mutableStateOf<PlateMark?>(null) }
-
     fun toggle(mark: PlateMark) {
-        explaining = if (explaining == mark) null else mark
+        onExplain(if (explaining == mark) null else mark)
     }
 
     Column(
@@ -206,7 +215,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
             mark = explaining,
             windSpeedMs = windSpeed,
             windGustMs = windGust,
-            onDismiss = { explaining = null },
+            onDismiss = { onExplain(null) },
         )
     }
 }
@@ -230,7 +239,7 @@ private fun Modifier.quietlyClickable(onClick: () -> Unit): Modifier = composed 
 }
 
 /** The two marks standing beside the dial, each of which can explain itself. */
-private enum class PlateMark { UMBRELLA, WIND }
+enum class PlateMark { UMBRELLA, WIND }
 
 /**
  * What the mark you just tapped actually means.
