@@ -5,7 +5,9 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
+import lv.bolwarra.wetter.domain.forecast.ModelEnsemble
 import lv.bolwarra.wetter.domain.forecast.PrecipitationFusion
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
@@ -30,6 +32,7 @@ import lv.bolwarra.wetter.domain.radar.RadarSource
  */
 class NowcastRepository internal constructor(
     private val source: RadarSource,
+    private val ensembles: OpenMeteoEnsemble,
     private val clock: Clock = Clock.systemUTC(),
     private val freshFor: Duration = DEFAULT_FRESH_FOR,
 ) {
@@ -39,6 +42,15 @@ class NowcastRepository internal constructor(
 
     private val mutex = Mutex()
     private var cached: Cached? = null
+
+    private val ensembleMutex = Mutex()
+    private var cachedEnsemble: CachedEnsemble? = null
+
+    private data class CachedEnsemble(
+        val location: WeatherLocation,
+        val at: Instant,
+        val ensemble: ModelEnsemble?,
+    )
 
     private data class Cached(
         val location: WeatherLocation,
@@ -72,8 +84,28 @@ class NowcastRepository internal constructor(
     }
 
     /**
+     * Several models over the same hours, for measuring how hard each one is to
+     * forecast. Cached for an hour, which is how often the runs it summarises
+     * are published.
+     */
+    suspend fun ensemble(location: WeatherLocation): ModelEnsemble? = ensembleMutex.withLock {
+        val now = Instant.now(clock)
+        val held = cachedEnsemble
+        if (held != null &&
+            held.location.sameGrid(location) &&
+            Duration.between(held.at, now) < ENSEMBLE_FRESH_FOR
+        ) {
+            return@withLock held.ensemble
+        }
+        val fetched = ensembles.ensemble(location).getOrNull()?.takeUnless { it.isEmpty }
+        cachedEnsemble = CachedEnsemble(location, now, fetched)
+        fetched
+    }
+
+    /**
      * The fused timeline for a place: radar where it is worth having, model
-     * throughout, weighted by how much the radar estimate deserves.
+     * throughout, and each weighted by how much it deserves rather than by which
+     * one it is.
      */
     suspend fun timeline(
         forecast: WeatherForecast,
@@ -90,6 +122,7 @@ class NowcastRepository internal constructor(
             from = from,
             step = step,
             steps = steps,
+            ensemble = ensemble(forecast.location),
         )
     }
 
@@ -121,6 +154,9 @@ class NowcastRepository internal constructor(
 
         /** The composites publish every ten minutes; asking more often gets the same sweep. */
         val DEFAULT_FRESH_FOR: Duration = Duration.ofMinutes(5)
+
+        /** Model runs publish hourly, so anything fresher gets the same numbers. */
+        val ENSEMBLE_FRESH_FOR: Duration = Duration.ofHours(1)
 
         /** About a kilometre, the scale a radar pixel already averages over. */
         private const val GRID_TOLERANCE_DEGREES = 0.01

@@ -67,7 +67,10 @@ object PrecipitationFusion {
      */
     const val MAX_RADAR_WEIGHT = 0.95
 
-    /** Confidence attributed to the model alone, absent anything to check it against. */
+    /**
+     * Confidence attributed to the model when there is nothing to check it
+     * against - no ensemble, so no measurement of how hard the hour is.
+     */
     const val MODEL_CONFIDENCE = 0.6
 
     /** Radar samples further than this from a step are not about that step. */
@@ -82,6 +85,11 @@ object PrecipitationFusion {
      * @param from first step, inclusive.
      * @param step spacing between steps.
      * @param steps how many to produce.
+     * @param ensemble several models over the same hours, when available. Where
+     *   it reaches, the model's confidence is *measured* from how far the models
+     *   are apart rather than assumed: an hour they all agree on deserves more
+     *   weight against the radar than one they are split over, and a flat
+     *   constant cannot express the difference.
      */
     fun fuse(
         hourly: List<HourlyWeather>,
@@ -89,6 +97,7 @@ object PrecipitationFusion {
         from: Instant,
         step: Duration,
         steps: Int,
+        ensemble: ModelEnsemble? = null,
     ): List<FusedPrecipitation> {
         if (steps <= 0 || step.isZero || step.isNegative) return emptyList()
         val rows = hourly.sortedBy { it.timestamp }
@@ -98,15 +107,16 @@ object PrecipitationFusion {
             val at = from.plus(step.multipliedBy(index.toLong()))
             val modelRate = interpolate(rows, at)
             val sample = nearest(samples, at)
+            val modelConfidence = ensemble?.precipitationAgreement(at) ?: MODEL_CONFIDENCE
 
             when {
                 sample == null && modelRate == null -> FusedPrecipitation(at, 0.0, 0.0, 0.0, 0)
                 sample == null -> FusedPrecipitation(
                     at = at,
                     millimetresPerHour = modelRate!!,
-                    confidence = MODEL_CONFIDENCE,
+                    confidence = modelConfidence,
                     radarShare = 0.0,
-                    sources = 1,
+                    sources = ensemble?.at(at)?.precipitation?.models ?: 1,
                 )
                 modelRate == null -> FusedPrecipitation(
                     at = at,
@@ -127,12 +137,12 @@ object PrecipitationFusion {
                         confidence = agreement(sample.millimetresPerHour.toDouble(), modelRate)
                             .let { agree ->
                                 val base =
-                                    share * sample.confidence + (1 - share) * MODEL_CONFIDENCE
+                                    share * sample.confidence + (1 - share) * modelConfidence
                                 (base * (AGREEMENT_FLOOR + (1 - AGREEMENT_FLOOR) * agree))
                                     .coerceIn(0.0, 1.0)
                             },
                         radarShare = share,
-                        sources = 2,
+                        sources = 1 + (ensemble?.at(at)?.precipitation?.models ?: 1),
                     )
                 }
             }

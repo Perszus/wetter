@@ -9,6 +9,7 @@ import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.network.WetterHttpClient
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
 import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
+import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
@@ -74,7 +75,9 @@ class WeatherData(
         RainViewerRadarSource(httpClient, AndroidTileDecoder())
     }
 
-    val nowcasts: NowcastRepository by lazy { NowcastRepository(radarSource) }
+    val nowcasts: NowcastRepository by lazy {
+        NowcastRepository(radarSource, OpenMeteoEnsemble(httpClient))
+    }
 
     /** Every required credit, for the About section. Radar included. */
     val attributions: List<String> by lazy {
