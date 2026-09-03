@@ -29,6 +29,7 @@ import lv.bolwarra.wetter.domain.MoonPhase
 import lv.bolwarra.wetter.domain.Psychrometrics
 import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
+import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
@@ -61,7 +62,12 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * Everything under it is context for reading it.
  */
 @Composable
-fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
+fun TodayPage(
+    forecast: WeatherForecast,
+    now: Instant,
+    timeline: List<FusedPrecipitation> = emptyList(),
+    modifier: Modifier = Modifier,
+) {
     val zone = forecast.location.zone
     val spacing = WetterTheme.spacing
     val span = Duration.ofHours(TIMELINE_HOURS)
@@ -81,7 +87,13 @@ fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modi
                     ahead.totalPrecipitation(now, now.plus(span)) ?: 0.0,
                 ),
             ) {
-                RainCurve(hours = ahead, zone = zone, from = now, span = span)
+                RainCurve(
+                    hours = ahead,
+                    zone = zone,
+                    from = now,
+                    span = span,
+                    fused = timeline,
+                )
                 Spacer(Modifier.height(spacing.m))
                 NextRainBar(forecast, now)
             }

@@ -1,0 +1,187 @@
+package lv.bolwarra.wetter.domain.forecast
+
+import java.time.Duration
+import java.time.Instant
+import lv.bolwarra.wetter.domain.model.HourlyWeather
+import lv.bolwarra.wetter.domain.radar.RadarSample
+
+/**
+ * One moment of the fused precipitation timeline.
+ *
+ * [radarShare] is carried because the two sources fail differently and a reader
+ * of this timeline may need to know which one it is looking at. Radar is nearly
+ * always right about the next twenty minutes and says nothing useful about
+ * tonight; the model is the reverse.
+ */
+data class FusedPrecipitation(
+    val at: Instant,
+    val millimetresPerHour: Double,
+    /** 0..1, how much this value deserves to be believed. */
+    val confidence: Double,
+    /** 0..1, the weight radar carried here. Zero means this is the model alone. */
+    val radarShare: Double,
+    /** How many independent sources contributed. */
+    val sources: Int,
+)
+
+/**
+ * Combines what the radar sees with what the models predict.
+ *
+ * The two are not alternatives. Radar observes precipitation that exists and
+ * extrapolates it, which works superbly for twenty minutes and decays to nothing
+ * by two hours because storms grow, die and turn. A model predicts the
+ * atmosphere's evolution, which is poor about the next twenty minutes - it does
+ * not know what is currently overhead - and is the only thing worth having by
+ * tonight. Choosing between them throws away whichever one is right.
+ *
+ * ### The weight comes from the radar's own confidence
+ *
+ * docs/providers.md sketches a table: radar 80-95% for half an hour, tailing to
+ * nothing by six. That table is a reasonable average and it is blind to the one
+ * thing that matters most, which is whether *this* radar estimate is any good.
+ * The nowcaster already measures that - how sharply the sweeps matched, decayed
+ * by how far ahead it is being asked to see - so the weight is taken from there
+ * instead. It reproduces the table's shape on a confident match and, unlike the
+ * table, backs off on a poor one.
+ *
+ * That difference is not hypothetical. Checked against the 700 hPa steering
+ * flow, motion over the Baltic, Berlin, Copenhagen and Reykjavik came out within
+ * twelve degrees; over Dublin, which had a fraction of the echo, it was fifty
+ * degrees wrong. A fixed table would have given that estimate 90% of the weight
+ * for the next half hour.
+ *
+ * ### The model is never switched off
+ *
+ * Radar sees precipitation, not the sky. It misses snow it cannot detect, misses
+ * what falls below the beam, and cannot see beyond its own coverage - and this
+ * source in particular cannot even say where its coverage ends. Leaving the
+ * model a share at every lead means those gaps degrade the answer rather than
+ * emptying it.
+ */
+object PrecipitationFusion {
+
+    /**
+     * The most the radar is ever allowed, even at zero lead with a perfect
+     * match. The remainder is the model's standing share, for everything radar
+     * structurally cannot see.
+     */
+    const val MAX_RADAR_WEIGHT = 0.95
+
+    /** Confidence attributed to the model alone, absent anything to check it against. */
+    const val MODEL_CONFIDENCE = 0.6
+
+    /** Radar samples further than this from a step are not about that step. */
+    private val MATCH_TOLERANCE: Duration = Duration.ofMinutes(7)
+
+    /**
+     * Build the fused timeline.
+     *
+     * @param hourly the model's rows, ascending. Interpolated linearly between,
+     *   which claims no more resolution than an hourly series has.
+     * @param radar the nowcast sampled at this location, possibly empty.
+     * @param from first step, inclusive.
+     * @param step spacing between steps.
+     * @param steps how many to produce.
+     */
+    fun fuse(
+        hourly: List<HourlyWeather>,
+        radar: List<RadarSample>,
+        from: Instant,
+        step: Duration,
+        steps: Int,
+    ): List<FusedPrecipitation> {
+        if (steps <= 0 || step.isZero || step.isNegative) return emptyList()
+        val rows = hourly.sortedBy { it.timestamp }
+        val samples = radar.sortedBy { it.at }
+
+        return (0 until steps).map { index ->
+            val at = from.plus(step.multipliedBy(index.toLong()))
+            val modelRate = interpolate(rows, at)
+            val sample = nearest(samples, at)
+
+            when {
+                sample == null && modelRate == null -> FusedPrecipitation(at, 0.0, 0.0, 0.0, 0)
+                sample == null -> FusedPrecipitation(
+                    at = at,
+                    millimetresPerHour = modelRate!!,
+                    confidence = MODEL_CONFIDENCE,
+                    radarShare = 0.0,
+                    sources = 1,
+                )
+                modelRate == null -> FusedPrecipitation(
+                    at = at,
+                    millimetresPerHour = sample.millimetresPerHour.toDouble(),
+                    confidence = sample.confidence.toDouble(),
+                    radarShare = 1.0,
+                    sources = 1,
+                )
+                else -> {
+                    val share = sample.confidence.toDouble().coerceIn(0.0, 1.0) * MAX_RADAR_WEIGHT
+                    FusedPrecipitation(
+                        at = at,
+                        millimetresPerHour =
+                        share * sample.millimetresPerHour + (1 - share) * modelRate,
+                        // Two sources that agree deserve more belief than either
+                        // alone; two that disagree deserve less. The gap between
+                        // them is the only evidence available about which.
+                        confidence = agreement(sample.millimetresPerHour.toDouble(), modelRate)
+                            .let { agree ->
+                                val base =
+                                    share * sample.confidence + (1 - share) * MODEL_CONFIDENCE
+                                (base * (AGREEMENT_FLOOR + (1 - AGREEMENT_FLOOR) * agree))
+                                    .coerceIn(0.0, 1.0)
+                            },
+                        radarShare = share,
+                        sources = 2,
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * How closely two rates agree, 0 to 1.
+     *
+     * Relative to their own size, because half a millimetre apart is close
+     * agreement in a downpour and complete disagreement in a drizzle.
+     */
+    fun agreement(a: Double, b: Double): Double {
+        val scale = maxOf(a, b, AGREEMENT_SCALE_FLOOR)
+        return (1.0 - kotlin.math.abs(a - b) / scale).coerceIn(0.0, 1.0)
+    }
+
+    /** The model's rate at an instant, interpolated between the rows either side. */
+    private fun interpolate(rows: List<HourlyWeather>, at: Instant): Double? {
+        if (rows.isEmpty()) return null
+        val after = rows.indexOfFirst { it.timestamp.isAfter(at) }
+        if (after == 0) return null
+        if (after < 0) {
+            val last = rows.last()
+            // Only just past the end counts; hours beyond it are not covered.
+            return if (Duration.between(last.timestamp, at) <= Duration.ofHours(1)) {
+                last.precipitation
+            } else {
+                null
+            }
+        }
+        val before = rows[after - 1]
+        val next = rows[after]
+        val a = before.precipitation ?: return null
+        val b = next.precipitation ?: return a
+        val span = Duration.between(before.timestamp, next.timestamp).toMillis().toDouble()
+        if (span <= 0) return a
+        val into = Duration.between(before.timestamp, at).toMillis().toDouble()
+        return a + (b - a) * (into / span)
+    }
+
+    /** The radar sample describing an instant, if one is close enough to. */
+    private fun nearest(samples: List<RadarSample>, at: Instant): RadarSample? =
+        samples.minByOrNull { Duration.between(it.at, at).abs() }
+            ?.takeIf { Duration.between(it.at, at).abs() <= MATCH_TOLERANCE }
+
+    /** Even total disagreement leaves some confidence: one of them is probably right. */
+    private const val AGREEMENT_FLOOR = 0.5
+
+    /** Below this rate, differences are noise rather than disagreement. */
+    private const val AGREEMENT_SCALE_FLOOR = 0.5
+}

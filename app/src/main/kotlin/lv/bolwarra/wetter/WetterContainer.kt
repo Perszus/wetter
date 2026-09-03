@@ -3,6 +3,7 @@ package lv.bolwarra.wetter
 import android.content.Context
 import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 
 /**
@@ -21,6 +22,9 @@ class WetterContainer(context: Context) {
     private val weatherData by lazy { WeatherData(context, BuildConfig.VERSION_NAME) }
 
     val repository: WeatherRepository get() = weatherData.repository
+
+    /** Radar, folded into the near-term precipitation timeline. */
+    val nowcasts: NowcastRepository get() = weatherData.nowcasts
 
     val selectedLocation: SelectedLocationStore get() = weatherData.selectedLocation
 

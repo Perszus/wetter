@@ -37,6 +37,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.ui.chart.MonotoneCurve
@@ -77,15 +78,36 @@ fun RainCurve(
     from: Instant,
     span: Duration,
     modifier: Modifier = Modifier,
+    /**
+     * The fused radar-and-model timeline, when there is one. It supersedes the
+     * hourly rows entirely: it already carries them, blended with whatever the
+     * radar could add, at the ten-minute spacing this chart draws at.
+     */
+    fused: List<FusedPrecipitation> = emptyList(),
 ) {
-    if (hours.size < 2) return
+    if (hours.size < 2 && fused.size < 2) return
 
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     val measurer = rememberTextMeasurer()
 
-    val points = remember(hours, from, span) {
-        resample(hours.sortedBy { it.timestamp }).clipTo(from, from.plus(span))
+    val points = remember(hours, fused, from, span) {
+        val built = if (fused.size >= 2) {
+            fused.map {
+                CurvePoint(
+                    at = it.at,
+                    millimetresPerHour = it.millimetresPerHour.toFloat().coerceAtLeast(0f),
+                    // Here the mark means "modelled rather than observed", which
+                    // is a more useful thing for it to say than "between two
+                    // samples": within radar range the near hours are read off
+                    // rain that exists, and past that they are a prediction.
+                    interpolated = it.radarShare < RADAR_BACKED,
+                )
+            }
+        } else {
+            resample(hours.sortedBy { it.timestamp })
+        }
+        built.clipTo(from, from.plus(span))
     }
     if (points.size < 2) return
 
@@ -413,6 +435,9 @@ private fun heightFraction(millimetresPerHour: Float): Float {
 }
 
 /** How finely the curve is walked between the forecast's own samples. */
+/** Above this share, the point is carried by radar rather than by the model. */
+private const val RADAR_BACKED = 0.5
+
 private const val STEP_MINUTES = 10L
 
 /** How often the axis is labelled. */

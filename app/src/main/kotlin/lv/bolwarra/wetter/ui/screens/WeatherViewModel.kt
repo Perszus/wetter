@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,7 +12,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
+import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.provider.asWeatherError
 
@@ -25,23 +28,30 @@ import lv.bolwarra.wetter.domain.provider.asWeatherError
 @OptIn(ExperimentalCoroutinesApi::class)
 class WeatherViewModel(
     private val repository: WeatherRepository,
+    private val nowcasts: NowcastRepository,
     private val selectedLocation: SelectedLocationStore,
 ) : ViewModel() {
 
     private val refreshing = MutableStateFlow(false)
     private val error = MutableStateFlow<WeatherError?>(null)
+    private val timeline = MutableStateFlow<List<FusedPrecipitation>>(emptyList())
 
     val state: StateFlow<WeatherUiState> = combine(
         selectedLocation.selected,
         selectedLocation.selected.flatMapLatest { repository.observe(it) },
         refreshing,
         error,
-    ) { location, forecast, isRefreshing, failure ->
+        timeline,
+    ) { location, forecast, isRefreshing, failure, fused ->
         WeatherUiState(
             location = location,
             forecast = forecast,
             isRefreshing = isRefreshing,
             error = failure,
+            // Only offer the timeline while it still belongs to the forecast on
+            // screen. Changing place clears it rather than briefly drawing the
+            // last city's rain over the new one's name.
+            timeline = if (forecast != null) fused else emptyList(),
         )
     }.stateIn(
         scope = viewModelScope,
@@ -59,8 +69,27 @@ class WeatherViewModel(
                 // A failure belongs to the place it happened in. Carrying it to
                 // the next one would tell somebody their new location is broken.
                 error.value = null
+                timeline.value = emptyList()
                 if (repository.needsRefresh(repository.cached(location))) refresh()
             }
+        }
+
+        // Radar follows the forecast rather than being fetched alongside it. It
+        // is a second network call that fails independently and often has
+        // nothing to say, so the screen must never be waiting on it: the model
+        // draws immediately and radar sharpens the near term when it arrives.
+        viewModelScope.launch {
+            selectedLocation.selected
+                .flatMapLatest { repository.observe(it) }
+                .collect { forecast ->
+                    timeline.value = if (forecast == null) {
+                        emptyList()
+                    } else {
+                        runCatching {
+                            nowcasts.timeline(forecast, Instant.now())
+                        }.getOrDefault(emptyList())
+                    }
+                }
         }
     }
 

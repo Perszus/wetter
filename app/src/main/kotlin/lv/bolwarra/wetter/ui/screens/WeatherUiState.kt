@@ -1,6 +1,7 @@
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.compose.runtime.Immutable
+import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
@@ -26,6 +27,18 @@ data class WeatherUiState(
     val isRefreshing: Boolean = false,
     /** The most recent failure, cleared by a successful refresh. */
     val error: WeatherError? = null,
+    /**
+     * The precipitation timeline with radar folded in, at ten-minute steps.
+     *
+     * Separate from [forecast] because it arrives later and can fail on its own:
+     * radar is a second network call that is often unavailable, and a screen
+     * that waited for it would be blank for the many places it has nothing to
+     * say about. Empty simply means the model is on its own.
+     */
+    val timeline: List<FusedPrecipitation> = emptyList(),
 ) {
     val hasForecast: Boolean get() = forecast != null
+
+    /** Whether radar is actually carrying any of the near-term timeline. */
+    val hasRadar: Boolean get() = timeline.any { it.radarShare > 0.0 }
 }

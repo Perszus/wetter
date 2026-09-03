@@ -10,6 +10,9 @@ import lv.bolwarra.wetter.data.network.WetterHttpClient
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
 import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
+import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
+import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
+import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.provider.WeatherProvider
@@ -62,8 +65,21 @@ class WeatherData(
         )
     }
 
-    /** Each provider's required credit, for the About section. */
-    val attributions: List<String> by lazy { providers.map { it.attribution } }
+    /**
+     * Radar observations, which answer a different question from the forecast
+     * providers and so are registered separately (docs/providers.md). A model
+     * says what should happen; radar says what is happening.
+     */
+    private val radarSource by lazy {
+        RainViewerRadarSource(httpClient, AndroidTileDecoder())
+    }
+
+    val nowcasts: NowcastRepository by lazy { NowcastRepository(radarSource) }
+
+    /** Every required credit, for the About section. Radar included. */
+    val attributions: List<String> by lazy {
+        providers.map { it.attribution } + radarSource.attribution
+    }
 
     private val router by lazy { WeatherProviderRouter(providers) }
 

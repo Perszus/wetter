@@ -19,7 +19,7 @@ object WetterViewModels {
     val Factory = viewModelFactory {
         initializer {
             val container = application().container
-            WeatherViewModel(container.repository, container.selectedLocation)
+            WeatherViewModel(container.repository, container.nowcasts, container.selectedLocation)
         }
         initializer {
             LocationsViewModel(application().container.selectedLocation)
