@@ -59,6 +59,7 @@ private fun SelectedLocationEntity.toDomain() = WeatherLocation(
     zone = ZoneId.of(zoneId),
     region = region,
     country = country,
+    elevationMetres = elevationMetres,
 )
 
 private fun WeatherLocation.toEntity() = SelectedLocationEntity(
@@ -68,4 +69,5 @@ private fun WeatherLocation.toEntity() = SelectedLocationEntity(
     zoneId = zone.id,
     region = region,
     country = country,
+    elevationMetres = elevationMetres,
 )

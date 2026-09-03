@@ -17,6 +17,16 @@ data class WeatherLocation(
     /** Admin area — disambiguates the many places that share a name. */
     val region: String? = null,
     val country: String? = null,
+    /**
+     * Metres above sea level, when the place came from somewhere that knows.
+     *
+     * Not decoration: the observation layer corrects a station's temperature to
+     * the target's height, and without this it cannot, so a city in a valley
+     * gets read off a hilltop aerodrome uncorrected. Nullable because a place
+     * chosen from the built-in list has no elevation attached and inventing one
+     * would be worse than going without.
+     */
+    val elevationMetres: Double? = null,
 ) {
     init {
         require(latitude in -90.0..90.0) { "latitude out of range: $latitude" }

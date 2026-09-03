@@ -5,6 +5,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import lv.bolwarra.wetter.data.db.WetterDatabase
+import lv.bolwarra.wetter.data.location.OpenMeteoGeocoder
+import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.network.WetterHttpClient
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
@@ -18,6 +20,7 @@ import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
+import lv.bolwarra.wetter.domain.location.PlaceSearch
 import lv.bolwarra.wetter.domain.provider.WeatherProvider
 
 /**
@@ -99,7 +102,10 @@ class WeatherData(
 
     /** Every required credit, for the About section. */
     val attributions: List<String> by lazy {
-        providers.map { it.attribution } + radarSource.attribution + observationSource.attribution
+        providers.map { it.attribution } +
+            radarSource.attribution +
+            observationSource.attribution +
+            placeSearch.attribution
     }
 
     private val router by lazy { WeatherProviderRouter(providers) }
@@ -113,5 +119,13 @@ class WeatherData(
 
     val selectedLocation: SelectedLocationStore by lazy {
         SelectedLocationStore(database.selectedLocation(), scope)
+    }
+
+    /** Finding a place by name. */
+    val placeSearch: PlaceSearch by lazy { OpenMeteoGeocoder(httpClient) }
+
+    /** The places somebody has kept, so search is used once rather than daily. */
+    val savedLocations: SavedLocationStore by lazy {
+        SavedLocationStore(database.savedLocations())
     }
 }

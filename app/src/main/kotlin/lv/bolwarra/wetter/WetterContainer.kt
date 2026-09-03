@@ -2,10 +2,12 @@ package lv.bolwarra.wetter
 
 import android.content.Context
 import lv.bolwarra.wetter.data.WeatherData
+import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
+import lv.bolwarra.wetter.domain.location.PlaceSearch
 
 /**
  * How Wetter is assembled.
@@ -31,6 +33,11 @@ class WetterContainer(context: Context) {
     val verification: VerificationRepository get() = weatherData.verification
 
     val selectedLocation: SelectedLocationStore get() = weatherData.selectedLocation
+
+    /** Finding a place by name, and the places already kept. */
+    val placeSearch: PlaceSearch get() = weatherData.placeSearch
+
+    val savedLocations: SavedLocationStore get() = weatherData.savedLocations
 
     /** Each weather service's required credit, for the About section. */
     val attributions: List<String> get() = weatherData.attributions

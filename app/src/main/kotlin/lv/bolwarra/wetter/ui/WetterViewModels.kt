@@ -27,7 +27,12 @@ object WetterViewModels {
             )
         }
         initializer {
-            LocationsViewModel(application().container.selectedLocation)
+            val container = application().container
+            LocationsViewModel(
+                container.selectedLocation,
+                container.placeSearch,
+                container.savedLocations,
+            )
         }
     }
 }

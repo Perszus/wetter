@@ -47,6 +47,14 @@ internal data class SelectedLocationEntity(
     val zoneId: String,
     val region: String?,
     val country: String?,
+    /**
+     * Defaulted, so a row written before the column existed still reads back.
+     *
+     * Dropped on the way through, the observation layer would silently stop
+     * correcting for height at the one place it matters most - the one being
+     * looked at.
+     */
+    val elevationMetres: Double? = null,
 ) {
     companion object {
         /** There is exactly one selected location, so it always occupies row 1. */
@@ -84,6 +92,40 @@ internal data class ForecastRecordEntity(
     /** Null until the hour has passed and an observation has been found. */
     val observed: Double?,
 )
+
+/**
+ * A place somebody chose to keep.
+ *
+ * Keyed by rounded coordinates rather than by the service's own id, so the same
+ * place found twice through different spellings is stored once, and so the table
+ * does not depend on a gazetteer's identifiers staying stable.
+ */
+@Entity(tableName = "saved_locations")
+internal data class SavedLocationEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val zoneId: String,
+    val region: String?,
+    val country: String?,
+    val elevationMetres: Double?,
+    /** Newest first in the list, so a place just added is where it is expected. */
+    val addedAtEpochSecond: Long,
+)
+
+@Dao
+internal interface SavedLocationDao {
+
+    @Query("SELECT * FROM saved_locations ORDER BY addedAtEpochSecond DESC")
+    fun observe(): Flow<List<SavedLocationEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun save(location: SavedLocationEntity)
+
+    @Query("DELETE FROM saved_locations WHERE id = :id")
+    suspend fun delete(id: String)
+}
 
 @Dao
 internal interface ForecastRecordDao {
@@ -172,8 +214,9 @@ internal interface SelectedLocationDao {
         ForecastEntity::class,
         SelectedLocationEntity::class,
         ForecastRecordEntity::class,
+        SavedLocationEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -183,6 +226,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
     abstract fun selectedLocation(): SelectedLocationDao
 
     abstract fun forecastRecords(): ForecastRecordDao
+
+    abstract fun savedLocations(): SavedLocationDao
 
     companion object {
 
@@ -220,6 +265,36 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the places somebody has kept.
+         *
+         * Additive like the one before it: a new table, nothing existing
+         * touched, so an upgrade cannot lose a saved place, the selected
+         * location or the verification history.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(connection: SQLiteConnection) {
+                // The selected place gains a height too, or picking a searched
+                // one would quietly discard the elevation it arrived with.
+                connection.execSQL(
+                    "ALTER TABLE `selected_location` ADD COLUMN `elevationMetres` REAL",
+                )
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `saved_locations` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`name` TEXT NOT NULL, " +
+                        "`latitude` REAL NOT NULL, " +
+                        "`longitude` REAL NOT NULL, " +
+                        "`zoneId` TEXT NOT NULL, " +
+                        "`region` TEXT, " +
+                        "`country` TEXT, " +
+                        "`elevationMetres` REAL, " +
+                        "`addedAtEpochSecond` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -235,7 +310,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
             // it would silently throw away everything the app had learned
             // about this location. Every schema change from here needs a
             // migration.
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 }
