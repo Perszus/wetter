@@ -38,8 +38,24 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
         val location = container.selectedLocation.current()
 
         val outcome = container.repository.refresh(location)
-        outcome.onSuccess {
+        outcome.onSuccess { forecast ->
             log("refreshed ${location.name}")
+            // The verification loop rides along on the refresh rather than
+            // having a schedule of its own. It needs exactly what this job
+            // already has - a fresh forecast to write down, and a wake-up with
+            // network - and a second periodic job competing for the same
+            // wake-ups would cost battery to do the same work less often.
+            runCatching {
+                container.verification.record(forecast)
+                val settled = container.verification.verify(location)
+                container.verification.prune()
+                if (settled > 0) log("verified $settled past predictions")
+            }.onFailure {
+                // Never fail a refresh over bookkeeping. The forecast is on
+                // disk and the screen is correct; an unverified record simply
+                // waits for the next run.
+                log("verification pass did not complete: ${it.message}")
+            }
             return Result.success()
         }
 

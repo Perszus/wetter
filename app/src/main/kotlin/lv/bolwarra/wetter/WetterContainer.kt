@@ -4,6 +4,7 @@ import android.content.Context
 import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
+import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 
 /**
@@ -25,6 +26,9 @@ class WetterContainer(context: Context) {
 
     /** Radar, folded into the near-term precipitation timeline. */
     val nowcasts: NowcastRepository get() = weatherData.nowcasts
+
+    /** The record of what was forecast against what actually happened. */
+    val verification: VerificationRepository get() = weatherData.verification
 
     val selectedLocation: SelectedLocationStore get() = weatherData.selectedLocation
 

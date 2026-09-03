@@ -8,6 +8,7 @@ import lv.bolwarra.wetter.data.db.WetterDatabase
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.network.WetterHttpClient
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
+import lv.bolwarra.wetter.data.provider.metar.MetarObservationSource
 import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
@@ -15,6 +16,7 @@ import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
+import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.provider.WeatherProvider
 
@@ -75,13 +77,29 @@ class WeatherData(
         RainViewerRadarSource(httpClient, AndroidTileDecoder())
     }
 
+    /**
+     * Aerodrome reports: the only measurements of what the weather actually was
+     * that this app can reach. Not shown anywhere - they exist so predictions
+     * can be checked against something that was not itself a prediction.
+     */
+    private val observationSource by lazy { MetarObservationSource(httpClient) }
+
+    /**
+     * The record of what was forecast and what happened. The one part of this
+     * app that gets better on its own, and the one thing in the database that
+     * cannot be fetched again if it is lost.
+     */
+    val verification: VerificationRepository by lazy {
+        VerificationRepository(database.forecastRecords(), observationSource)
+    }
+
     val nowcasts: NowcastRepository by lazy {
         NowcastRepository(radarSource, OpenMeteoEnsemble(httpClient))
     }
 
-    /** Every required credit, for the About section. Radar included. */
+    /** Every required credit, for the About section. */
     val attributions: List<String> by lazy {
-        providers.map { it.attribution } + radarSource.attribution
+        providers.map { it.attribution } + radarSource.attribution + observationSource.attribution
     }
 
     private val router by lazy { WeatherProviderRouter(providers) }
