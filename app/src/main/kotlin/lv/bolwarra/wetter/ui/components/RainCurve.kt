@@ -116,6 +116,20 @@ fun RainCurve(
 
     val axisStyle = WetterTheme.type.axis.copy(color = colors.textTertiary)
 
+    // Resolved here rather than in the draw scope, which has no way to reach a
+    // string resource. Only the three levels anybody distinguishes by eye:
+    // "barely" sits too close to the floor to have room for a word, and nothing
+    // useful is added by naming the difference between heavy and torrential
+    // when both mean stay indoors.
+    val guides = listOf(
+        heightFraction(PrecipitationIntensity.LIGHT_MM_PER_HOUR.toFloat()) to
+            stringResource(PrecipitationIntensity.LIGHT.labelRes()),
+        heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat()) to
+            stringResource(PrecipitationIntensity.MODERATE.labelRes()),
+        heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat()) to
+            stringResource(PrecipitationIntensity.HEAVY.labelRes()),
+    )
+
     Column(modifier.fillMaxWidth()) {
         Readout(point = scrubbed?.let(points::getOrNull), zone = zone)
         Spacer(Modifier.height(spacing.s))
@@ -149,6 +163,13 @@ fun RainCurve(
                 },
         ) {
             Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
+                drawIntensityGuides(
+                    points = points,
+                    guides = guides,
+                    measurer = measurer,
+                    style = axisStyle,
+                    rule = colors.hairline,
+                )
                 val path = curvePath(points)
                 drawPath(
                     path = Path().apply {
@@ -334,6 +355,56 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
  * their neighbours. A tick carries the half hour perfectly well: its position is
  * the information, and the hour either side of it says what it is.
  */
+/**
+ * Faint marks saying what the height means.
+ *
+ * The line's height carries the whole reading and, without this, says nothing on
+ * its own - the only way to find out whether a rise was drizzle or a downpour
+ * was to press and hold it, which nobody does at a glance. A rule and a word at
+ * each threshold turn the track back into a scale.
+ *
+ * Drawn first, so everything here sits behind the curve, and drawn faintly. It
+ * is a nudge, not a grid: the shape of the line is still the thing being read
+ * and a chart ruled into slabs would fight it.
+ *
+ * Only the bands the weather reaches are drawn, plus the first one above it. On
+ * a dry afternoon three labelled rules across an empty track would be noise
+ * about rain that is not coming; the one above the peak is worth its space
+ * because it is what says the line is not about to get worse - a curve sitting
+ * under "Moderate" is a different afternoon from one pressing against it.
+ */
+private fun DrawScope.drawIntensityGuides(
+    points: List<CurvePoint>,
+    guides: List<Pair<Float, String>>,
+    measurer: TextMeasurer,
+    style: TextStyle,
+    rule: Color,
+) {
+    val peak = points.maxOfOrNull { heightFraction(it.millimetresPerHour) } ?: return
+    if (peak < GUIDE_FLOOR) return
+
+    // Everything the line reaches, and the next one up for scale.
+    val topmost = guides.indexOfFirst { it.first > peak }
+    val shown = if (topmost < 0) guides else guides.take(topmost + 1)
+
+    shown.forEach { (fraction, label) ->
+        val y = size.height * (1f - fraction)
+
+        drawLine(
+            color = rule.copy(alpha = GUIDE_RULE_ALPHA),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1f,
+        )
+        val measured = measurer.measure(
+            label,
+            style.copy(color = style.color.copy(alpha = GUIDE_TEXT_ALPHA)),
+        )
+        // Sat just above its own rule, inside the band it names.
+        drawText(measured, topLeft = Offset(0f, y - measured.size.height - GUIDE_LABEL_GAP.toPx()))
+    }
+}
+
 /**
  * The hour marks under the chart.
  *
@@ -533,6 +604,14 @@ private fun smoothStep(t: Float): Float {
 /** How finely the curve is walked between the forecast's own samples. */
 /** Above this share, the point is carried by radar rather than by the model. */
 private const val RADAR_BACKED = 0.5
+
+/** Below this the window is dry enough that naming intensities is noise. */
+private const val GUIDE_FLOOR = 0.10f
+
+private const val GUIDE_RULE_ALPHA = 0.55f
+private const val GUIDE_TEXT_ALPHA = 0.55f
+private val GUIDE_LABEL_GAP = 1.dp
+private val GUIDE_LABEL_INSET = 2.dp
 
 /** Sub-steps drawn between two fused points, purely to round the corners. */
 private const val SMOOTH_STEPS = 5
