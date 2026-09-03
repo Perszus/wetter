@@ -5,7 +5,7 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
+import lv.bolwarra.wetter.domain.forecast.EnsembleSource
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.forecast.ModelEnsemble
 import lv.bolwarra.wetter.domain.forecast.PrecipitationFusion
@@ -22,17 +22,36 @@ import lv.bolwarra.wetter.domain.radar.RadarSource
  * because every part of that is expensive or slow and none of it should happen
  * again because a list scrolled.
  *
- * ### Why the cache is short and in memory
+ * ### The cache is keyed on the sweep, not on the clock
  *
- * The composites update every ten minutes, so anything fresher than that would
- * be refetching the same sweep. It is not written to disk: a radar nowcast is
- * worthless within the hour and there is no point keeping one across a restart -
- * unlike a forecast, which is still worth showing a day later. Twenty tiles of
- * PNG in the database would buy nothing and cost a migration.
+ * An elapsed-time cache is the obvious approach and it wastes most of what it
+ * saves. Hold a sweep for five minutes against a product published every ten and
+ * it re-downloads roughly three times for every two genuinely new images; hold
+ * it for ten and it misses the new one for up to ten minutes, which defeats the
+ * point of carrying radar at all. Either way it is guessing at something the
+ * source will simply say.
+ *
+ * So it asks. The index naming the available frames is a fraction of the size of
+ * the imagery, so the expensive half of the transaction happens only when the
+ * cheap half reports something new. Tiles are then fetched exactly once per
+ * sweep.
+ *
+ * The index is not polled either. Having taken a sweep, the next is not due for
+ * [RadarSource.sweepInterval], and nothing is asked in that window at all -
+ * otherwise a per-minute index check would quietly cost more over an hour than
+ * the tiles it was saving. Only once a sweep is overdue does it start looking,
+ * and then it finds it within a minute of publication.
+ *
+ * ### Why it is in memory
+ *
+ * A radar nowcast is worthless within the hour, so there is nothing to keep
+ * across a restart - unlike a forecast, which is still worth showing a day
+ * later. Twenty tiles of PNG in the database would buy nothing and cost a
+ * migration.
  */
 class NowcastRepository internal constructor(
     private val source: RadarSource,
-    private val ensembles: OpenMeteoEnsemble,
+    private val ensembles: EnsembleSource,
     private val clock: Clock = Clock.systemUTC(),
     private val freshFor: Duration = DEFAULT_FRESH_FOR,
 ) {
@@ -54,7 +73,10 @@ class NowcastRepository internal constructor(
 
     private data class Cached(
         val location: WeatherLocation,
-        val at: Instant,
+        /** The sweep this was built from - the cache key that matters. */
+        val sweepAt: Instant?,
+        /** When the source was last asked, so a fruitless ask is not repeated. */
+        val checkedAt: Instant,
         val nowcast: RadarNowcast?,
     )
 
@@ -67,11 +89,17 @@ class NowcastRepository internal constructor(
      */
     suspend fun nowcast(location: WeatherLocation): RadarNowcast? = mutex.withLock {
         val now = Instant.now(clock)
-        val held = cached
-        if (held != null &&
-            held.location.sameGrid(location) &&
-            Duration.between(held.at, now) < freshFor
-        ) {
+        val held = cached?.takeIf { it.location.sameGrid(location) }
+
+        if (held != null && !worthAsking(held, now)) return@withLock held.nowcast
+
+        // The cheap half: has anything new been published? A failure here is not
+        // an error worth surfacing - it just means falling back to the elapsed
+        // clock, so a source with a sick index degrades to the old behaviour
+        // rather than to no radar at all.
+        val latest = source.latestSweep().getOrNull()
+        if (held != null && latest != null && latest == held.sweepAt) {
+            cached = held.copy(checkedAt = now)
             return@withLock held.nowcast
         }
 
@@ -79,8 +107,34 @@ class NowcastRepository internal constructor(
             .getOrNull()
             .orEmpty()
         val nowcast = if (frames.size < 2) null else RadarNowcaster.nowcast(frames, LEADS)
-        cached = Cached(location, now, nowcast)
+        cached = Cached(
+            location = location,
+            sweepAt = frames.lastOrNull()?.at ?: latest,
+            checkedAt = now,
+            nowcast = nowcast,
+        )
         nowcast
+    }
+
+    /**
+     * Whether it is worth troubling the source at all.
+     *
+     * No, while the sweep in hand is younger than the interval - nothing else
+     * exists yet, so any request would return what is already held. After that,
+     * yes, but no more often than [RECHECK_INTERVAL], so an overdue sweep is
+     * found promptly without the waiting itself becoming the expense.
+     *
+     * Holding no sweep at all means the last attempt failed outright, and that
+     * backs off much further. Retrying a broken source every minute is how an
+     * app ends up spending more battery when a service is down than when it is
+     * up.
+     */
+    private fun worthAsking(held: Cached, now: Instant): Boolean {
+        val sweepAt = held.sweepAt
+            ?: return Duration.between(held.checkedAt, now) >= freshFor
+        val due = sweepAt.plus(source.sweepInterval)
+        if (now.isBefore(due)) return false
+        return Duration.between(held.checkedAt, now) >= RECHECK_INTERVAL
     }
 
     /**
@@ -158,7 +212,20 @@ class NowcastRepository internal constructor(
         /** Six hours, which is what the Today page draws. */
         const val DEFAULT_STEPS = 36
 
-        /** The composites publish every ten minutes; asking more often gets the same sweep. */
+        /**
+         * How long to wait between asks once a sweep is overdue.
+         *
+         * A minute, matching how often the screen rebuilds its timeline, so a
+         * newly published sweep is on screen within a minute of existing. This
+         * only applies in the short window after one is due; for the ten minutes
+         * before that, nothing is asked.
+         */
+        val RECHECK_INTERVAL: Duration = Duration.ofMinutes(1)
+
+        /**
+         * How long to leave a source alone after it failed to give anything at
+         * all. Everything that succeeds keys on the sweep itself instead.
+         */
         val DEFAULT_FRESH_FOR: Duration = Duration.ofMinutes(5)
 
         /** Model runs publish hourly, so anything fresher gets the same numbers. */

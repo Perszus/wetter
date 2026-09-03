@@ -14,6 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import lv.bolwarra.wetter.data.provider.toWeatherError
+import lv.bolwarra.wetter.domain.forecast.EnsembleSource
 import lv.bolwarra.wetter.domain.forecast.ModelAgreement
 import lv.bolwarra.wetter.domain.forecast.ModelEnsemble
 import lv.bolwarra.wetter.domain.forecast.ModelReading
@@ -44,9 +45,9 @@ import lv.bolwarra.wetter.domain.provider.WeatherFailure
 internal class OpenMeteoEnsemble(
     private val client: HttpClient,
     private val baseUrl: String = DEFAULT_BASE_URL,
-) {
+) : EnsembleSource {
 
-    suspend fun ensemble(location: WeatherLocation): Result<ModelEnsemble> = try {
+    override suspend fun ensemble(location: WeatherLocation): Result<ModelEnsemble> = try {
         val payload: JsonObject = client.get(baseUrl) {
             parameter("latitude", location.latitude)
             parameter("longitude", location.longitude)

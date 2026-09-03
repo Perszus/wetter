@@ -1,5 +1,8 @@
 package lv.bolwarra.wetter.domain.radar
 
+import java.time.Duration
+import java.time.Instant
+
 /**
  * Somewhere recent radar sweeps come from.
  *
@@ -22,6 +25,27 @@ interface RadarSource {
 
     /** Shown verbatim wherever the radar is used. Several sources require it. */
     val attribution: String
+
+    /**
+     * How often this source publishes a new sweep.
+     *
+     * Lets a caller work out when one is next due rather than polling to find
+     * out, which is the difference between a request every ten minutes and a
+     * request every minute for the same information.
+     */
+    val sweepInterval: Duration
+
+    /**
+     * When the newest available sweep was taken, without fetching it.
+     *
+     * The cheap half of the transaction. Radar imagery is expensive - a usable
+     * block of tiles is tens of kilobytes - while the index saying what exists
+     * is a fraction of that, so asking "is there anything new" separately from
+     * "give me it" is what keeps a phone from re-downloading the same sweep.
+     *
+     * Null when the source has nothing at all.
+     */
+    suspend fun latestSweep(): Result<Instant?>
 
     /**
      * The most recent sweeps covering a place, oldest first.

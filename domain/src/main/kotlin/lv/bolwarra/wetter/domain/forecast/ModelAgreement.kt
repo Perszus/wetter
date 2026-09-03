@@ -163,3 +163,18 @@ data class ModelEnsemble(val readings: List<ModelReading>) {
      */
     fun precipitationAgreement(instant: Instant): Double? = at(instant)?.precipitation?.agreement
 }
+
+/**
+ * Somewhere several models' forecasts come from at once.
+ *
+ * Behind an interface for the same reason every other source is: what the fusion
+ * needs is an ensemble, not Open-Meteo. It is also the difference between a
+ * repository that can be tested and one that can only be run.
+ */
+interface EnsembleSource {
+
+    /** Several models over the same hours, or a failure if none could be had. */
+    suspend fun ensemble(
+        location: lv.bolwarra.wetter.domain.model.WeatherLocation,
+    ): Result<ModelEnsemble>
+}

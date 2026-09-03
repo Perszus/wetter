@@ -5,6 +5,7 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.readRawBytes
+import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +79,17 @@ internal class RainViewerRadarSource(
 
     /** Required by their terms, and shown wherever the radar is used. */
     override val attribution: String = ATTRIBUTION
+
+    override val sweepInterval: Duration = SWEEP_INTERVAL
+
+    override suspend fun latestSweep(): Result<Instant?> = try {
+        val index: RainViewerIndex = client.get(indexUrl).body()
+        Result.success(index.radar.past.lastOrNull()?.let { Instant.ofEpochSecond(it.time) })
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Throwable) {
+        Result.failure(WeatherFailure(failure.toWeatherError()))
+    }
 
     override suspend fun recentFrames(
         latitude: Double,
@@ -204,5 +216,8 @@ internal class RainViewerRadarSource(
          */
         const val COLOUR_SCHEME = 0
         const val OPTIONS = "0_0"
+
+        /** The composite is rebuilt every ten minutes. Measured, and stated in their API. */
+        val SWEEP_INTERVAL: Duration = Duration.ofMinutes(10)
     }
 }
