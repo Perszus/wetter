@@ -478,20 +478,23 @@ private fun clockOf(instant: Instant, zone: ZoneId): String {
  * Dry is flat on the floor and torrential fills it, so the reading stays the one
  * anybody actually uses: high means pouring, low means drizzle.
  *
- * The step from dry to a trace is deliberately large - nothing to nearly a
- * quarter of the height - because the question the chart is most often asked is
- * not how hard it will rain but *whether* it will. A trace drawn a tenth of the
- * way up was a bump you could scroll straight past on a track this short, which
- * meant the chart quietly failed at its main job. Everything above the trace
- * keeps its spacing, so the difference between light and heavy is as legible as
- * it was.
+ * The step from dry to a trace is deliberately large, because the question the
+ * chart is most often asked is not how hard it will rain but *whether* it will,
+ * and a trace drawn a tenth of the way up was a bump you could scroll straight
+ * past on a track this short.
+ *
+ * But it was overdone. Lifting the trace to a quarter of the height carried
+ * light rain up with it to nearly half, which reads as a serious afternoon when
+ * it is a shower you would walk through. The floor is still well clear of dry -
+ * a trace is unmistakable - while light rain now sits under a third, leaving the
+ * top half of the track to mean what its name says.
  */
 private val BAND_HEIGHTS = listOf(
     0.0 to 0.00f,
-    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.24f,
-    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.44f,
-    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.64f,
-    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.83f,
+    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.17f,
+    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.31f,
+    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.56f,
+    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.79f,
     PrecipitationIntensity.VIOLENT_MM_PER_HOUR to 1.00f,
 )
 
