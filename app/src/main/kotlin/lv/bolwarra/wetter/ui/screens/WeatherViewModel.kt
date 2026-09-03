@@ -13,10 +13,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
+import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.provider.asWeatherError
+import lv.bolwarra.wetter.domain.verification.LearnedBias
+import lv.bolwarra.wetter.domain.verification.withLocalCorrection
 
 /**
  * Holds the weather screen's state.
@@ -29,29 +32,46 @@ import lv.bolwarra.wetter.domain.provider.asWeatherError
 class WeatherViewModel(
     private val repository: WeatherRepository,
     private val nowcasts: NowcastRepository,
+    private val verification: VerificationRepository,
     private val selectedLocation: SelectedLocationStore,
 ) : ViewModel() {
 
     private val refreshing = MutableStateFlow(false)
     private val error = MutableStateFlow<WeatherError?>(null)
-    private val timeline = MutableStateFlow<List<FusedPrecipitation>>(emptyList())
+
+    /**
+     * The things derived from a forecast after it lands: radar, and whatever has
+     * been learned about this place. Held together because they are produced by
+     * the same background pass, and because five is as many flows as combine
+     * takes before it starts handing back untyped arrays.
+     */
+    private data class Derived(
+        val timeline: List<FusedPrecipitation> = emptyList(),
+        val bias: LearnedBias? = null,
+    )
+
+    private val derived = MutableStateFlow(Derived())
 
     val state: StateFlow<WeatherUiState> = combine(
         selectedLocation.selected,
         selectedLocation.selected.flatMapLatest { repository.observe(it) },
         refreshing,
         error,
-        timeline,
-    ) { location, forecast, isRefreshing, failure, fused ->
+        derived,
+    ) { location, forecast, isRefreshing, failure, extra ->
         WeatherUiState(
             location = location,
-            forecast = forecast,
+            // Corrected here, once, rather than at each place a temperature is
+            // drawn. A corrected dial above an uncorrected week would contradict
+            // itself, and invisibly.
+            forecast = forecast?.withLocalCorrection(extra.bias),
             isRefreshing = isRefreshing,
             error = failure,
             // Only offer the timeline while it still belongs to the forecast on
             // screen. Changing place clears it rather than briefly drawing the
             // last city's rain over the new one's name.
-            timeline = if (forecast != null) fused else emptyList(),
+            timeline = if (forecast != null) extra.timeline else emptyList(),
+            bias = if (forecast != null) extra.bias else null,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -69,7 +89,7 @@ class WeatherViewModel(
                 // A failure belongs to the place it happened in. Carrying it to
                 // the next one would tell somebody their new location is broken.
                 error.value = null
-                timeline.value = emptyList()
+                derived.value = Derived()
                 if (repository.needsRefresh(repository.cached(location))) refresh()
             }
         }
@@ -82,13 +102,21 @@ class WeatherViewModel(
             selectedLocation.selected
                 .flatMapLatest { repository.observe(it) }
                 .collect { forecast ->
-                    timeline.value = if (forecast == null) {
-                        emptyList()
-                    } else {
-                        runCatching {
-                            nowcasts.timeline(forecast, Instant.now())
-                        }.getOrDefault(emptyList())
+                    if (forecast == null) {
+                        derived.value = Derived()
+                        return@collect
                     }
+                    val fused = runCatching {
+                        nowcasts.timeline(forecast, Instant.now())
+                    }.getOrDefault(emptyList())
+                    // Null until this place has enough verified records to show a
+                    // pattern, which is the normal state for the first weeks. It
+                    // needs no switch: the correction appears when the evidence
+                    // does, and strengthens as more arrives.
+                    val bias = runCatching {
+                        verification.learnedBias(forecast.location)
+                    }.getOrNull()
+                    derived.value = Derived(timeline = fused, bias = bias)
                 }
         }
     }

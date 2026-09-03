@@ -5,6 +5,7 @@ import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
+import lv.bolwarra.wetter.domain.verification.LearnedBias
 
 /**
  * Everything the weather screen renders from.
@@ -36,6 +37,16 @@ data class WeatherUiState(
      * say about. Empty simply means the model is on its own.
      */
     val timeline: List<FusedPrecipitation> = emptyList(),
+    /**
+     * What this place's forecasts have been found to get wrong, once enough
+     * records exist to tell. Null for a new location and for the first weeks of
+     * an old one.
+     *
+     * [forecast] already has it applied - this is carried so the screen can say
+     * that it did. A number quietly adjusted behind the reader's back is not an
+     * improvement over an uncorrected one.
+     */
+    val bias: LearnedBias? = null,
 ) {
     val hasForecast: Boolean get() = forecast != null
 

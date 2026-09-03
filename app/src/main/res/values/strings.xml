@@ -31,6 +31,8 @@
     <string name="metric_wind_direction">Direction</string>
     <string name="metric_moon_phase">Moon</string>
     <string name="metric_moon_illumination">Moonlight</string>
+    <string name="metric_local_correction">Local fix</string>
+    <string name="advanced_correction_note">Forecasts here have run %1$s on average against nearby airport readings, so temperatures are adjusted to match. Learned from %2$d checked predictions, and applied more strongly as more accumulate.</string>
     <string name="moon_new">New</string>
     <string name="moon_waxing_crescent">Waxing crescent</string>
     <string name="moon_first_quarter">First quarter</string>

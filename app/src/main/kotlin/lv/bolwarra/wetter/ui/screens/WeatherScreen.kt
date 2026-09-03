@@ -180,7 +180,7 @@ fun WeatherScreen(
                 label = "domain",
             ) { page ->
                 when (page) {
-                    WeatherDomain.Today -> TodayPage(forecast, now, state.timeline)
+                    WeatherDomain.Today -> TodayPage(forecast, now, state.timeline, state.bias)
                     WeatherDomain.Week -> WeekPage(forecast, now)
                     WeatherDomain.Month -> MonthPage(forecast, now)
                 }

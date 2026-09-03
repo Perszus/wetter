@@ -40,6 +40,19 @@ const val NO_READING: String = "\u2014"
 fun formatTemperature(celsius: Double?): String =
     if (celsius == null) NO_READING else "${celsius.roundToInt()}\u00b0"
 
+/**
+ * A temperature adjustment, signed and to one decimal.
+ *
+ * Signed on purpose, and to a finer resolution than a temperature: the whole
+ * point of showing it is that it is a small correction with a direction, and
+ * rounding it the way a reading is rounded would turn most corrections into
+ * "0" or hide which way they went.
+ */
+fun formatTemperatureDelta(celsius: Double): String {
+    val sign = if (celsius > 0) "+" else "−"
+    return "$sign${String.format(Locale.getDefault(), "%.1f", kotlin.math.abs(celsius))}°"
+}
+
 /** Millimetres, to one decimal below 10 and whole above it. */
 fun formatMillimetres(mm: Double?): String = when {
     mm == null -> NO_READING

@@ -34,6 +34,7 @@ import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
 import lv.bolwarra.wetter.domain.totalPrecipitation
+import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.window
 import lv.bolwarra.wetter.ui.components.ExpandableTile
 import lv.bolwarra.wetter.ui.components.Metric
@@ -49,6 +50,7 @@ import lv.bolwarra.wetter.ui.format.formatMillimetresWithUnit
 import lv.bolwarra.wetter.ui.format.formatPercent
 import lv.bolwarra.wetter.ui.format.formatPressure
 import lv.bolwarra.wetter.ui.format.formatTemperature
+import lv.bolwarra.wetter.ui.format.formatTemperatureDelta
 import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatWeekday
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
@@ -66,6 +68,7 @@ fun TodayPage(
     forecast: WeatherForecast,
     now: Instant,
     timeline: List<FusedPrecipitation> = emptyList(),
+    bias: LearnedBias? = null,
     modifier: Modifier = Modifier,
 ) {
     val zone = forecast.location.zone
@@ -99,7 +102,7 @@ fun TodayPage(
             }
         }
 
-        AdvancedTile(forecast, now)
+        AdvancedTile(forecast, now, bias)
     }
 }
 
@@ -117,7 +120,7 @@ fun TodayPage(
  * rain chart any more, only against the other things already in the drawer.
  */
 @Composable
-private fun AdvancedTile(forecast: WeatherForecast, now: Instant) {
+private fun AdvancedTile(forecast: WeatherForecast, now: Instant, bias: LearnedBias?) {
     val zone = forecast.location.zone
     val current = forecast.conditionsAt(now)
     val today = now.atZone(zone).toLocalDate()
@@ -174,8 +177,32 @@ private fun AdvancedTile(forecast: WeatherForecast, now: Instant) {
                     stringResource(R.string.metric_moon_illumination),
                     formatPercent((MoonPhase.illuminationAt(now) * PERCENT).roundToInt()),
                 ),
+                // Absent entirely until this place has enough checked
+                // predictions to show a pattern, so the row appears when the
+                // correction does rather than sitting there as a dash.
+                Metric(
+                    stringResource(R.string.metric_local_correction),
+                    bias?.let { formatTemperatureDelta(-it.effectiveOffset) } ?: NO_READING,
+                ),
             ),
         )
+
+        // Said in words as well as shown as a number, because a temperature that
+        // has been quietly adjusted is not an improvement on one that has not.
+        // Anybody comparing this screen against another app deserves to know why
+        // they differ.
+        if (bias != null) {
+            Spacer(Modifier.height(WetterTheme.spacing.l))
+            Text(
+                text = stringResource(
+                    R.string.advanced_correction_note,
+                    formatTemperatureDelta(bias.offset),
+                    bias.samples,
+                ),
+                style = WetterTheme.type.meta,
+                color = WetterTheme.colors.textTertiary,
+            )
+        }
     }
 }
 
