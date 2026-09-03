@@ -22,7 +22,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.time.Duration
 import java.time.Instant
+import kotlin.math.roundToInt
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.CompassPoint
+import lv.bolwarra.wetter.domain.MoonPhase
+import lv.bolwarra.wetter.domain.Psychrometrics
 import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
@@ -30,6 +34,7 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
 import lv.bolwarra.wetter.domain.totalPrecipitation
 import lv.bolwarra.wetter.domain.window
+import lv.bolwarra.wetter.ui.components.ExpandableTile
 import lv.bolwarra.wetter.ui.components.Metric
 import lv.bolwarra.wetter.ui.components.MetricGrid
 import lv.bolwarra.wetter.ui.components.RainCurve
@@ -82,10 +87,87 @@ fun TodayPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modi
             }
         }
 
-        DaylightTile(forecast, now)
-        AirTile(forecast, now)
+        AdvancedTile(forecast, now)
     }
 }
+
+/**
+ * Everything else that is known, behind one tap.
+ *
+ * The Sun and Air tiles used to sit open on this page. They were accurate and
+ * almost nobody needed them: sunrise is the same to within minutes as yesterday,
+ * and pressure means nothing to most readers on any given morning. Two tiles of
+ * that under the one chart this app exists for was the wrong ratio, so they are
+ * one shut drawer now.
+ *
+ * Being shut is also what makes it safe to be generous with what goes in. Dew
+ * point, the moon, wind bearing - none of them has to earn its place against the
+ * rain chart any more, only against the other things already in the drawer.
+ */
+@Composable
+private fun AdvancedTile(forecast: WeatherForecast, now: Instant) {
+    val zone = forecast.location.zone
+    val current = forecast.conditionsAt(now)
+    val today = now.atZone(zone).toLocalDate()
+    val day = forecast.daily.firstOrNull { it.date == today }
+    val sunrise = day?.sunrise
+    val sunset = day?.sunset
+
+    ExpandableTile(
+        label = stringResource(R.string.tile_advanced),
+        summary = stringResource(R.string.advanced_summary),
+    ) {
+        MetricGrid(
+            listOf(
+                Metric(
+                    stringResource(R.string.metric_feels_like),
+                    formatTemperature(current.apparentTemperature),
+                ),
+                Metric(
+                    stringResource(R.string.metric_dew_point),
+                    formatTemperature(
+                        Psychrometrics.dewPoint(current.temperature, current.humidity),
+                    ),
+                ),
+                Metric(stringResource(R.string.metric_humidity), formatPercent(current.humidity)),
+                Metric(stringResource(R.string.metric_pressure), formatPressure(current.pressure)),
+                Metric(stringResource(R.string.metric_wind), formatWindSpeed(current.windSpeed)),
+                Metric(
+                    stringResource(R.string.metric_wind_direction),
+                    current.windDirection
+                        ?.let { stringResource(CompassPoint.of(it).labelRes()) }
+                        ?: NO_READING,
+                ),
+                Metric(
+                    stringResource(R.string.metric_cloud),
+                    formatPercent(forecast.hourly.at(now)?.cloudCover),
+                ),
+                Metric(stringResource(R.string.metric_sunrise), formatTime(sunrise, zone)),
+                Metric(stringResource(R.string.metric_sunset), formatTime(sunset, zone)),
+                Metric(
+                    stringResource(R.string.metric_day_length),
+                    if (sunrise != null && sunset != null) {
+                        formatDuration(Duration.between(sunrise, sunset))
+                    } else {
+                        // Above the arctic circle there is no sunrise to report,
+                        // and a zero would be the wrong kind of wrong.
+                        NO_READING
+                    },
+                ),
+                Metric(
+                    stringResource(R.string.metric_moon_phase),
+                    stringResource(MoonPhase.nameAt(now).labelRes()),
+                ),
+                Metric(
+                    stringResource(R.string.metric_moon_illumination),
+                    formatPercent((MoonPhase.illuminationAt(now) * PERCENT).roundToInt()),
+                ),
+            ),
+        )
+    }
+}
+
+private const val PERCENT = 100
 
 /**
  * When it next rains, in one line.
@@ -155,65 +237,6 @@ private fun PrecipitationSpell?.describe(now: Instant, forecast: WeatherForecast
         stringResource(R.string.next_rain_starts, kind, formatTime(start, zone))
     } else {
         stringResource(R.string.next_rain_starts_on, kind, day, formatTime(start, zone))
-    }
-}
-
-/** Sunrise, sunset, and how much day there is between them. */
-@Composable
-private fun DaylightTile(forecast: WeatherForecast, now: Instant) {
-    val zone = forecast.location.zone
-    val today = now.atZone(zone).toLocalDate()
-    val day = forecast.daily.firstOrNull { it.date == today } ?: return
-    val sunrise = day.sunrise
-    val sunset = day.sunset
-
-    Tile(label = stringResource(R.string.tile_daylight)) {
-        MetricGrid(
-            listOf(
-                Metric(stringResource(R.string.metric_sunrise), formatTime(sunrise, zone)),
-                Metric(stringResource(R.string.metric_sunset), formatTime(sunset, zone)),
-                Metric(
-                    stringResource(R.string.metric_day_length),
-                    if (sunrise != null && sunset != null) {
-                        formatDuration(Duration.between(sunrise, sunset))
-                    } else {
-                        // Above the arctic circle there is no sunrise to report,
-                        // and a zero would be the wrong kind of wrong.
-                        NO_READING
-                    },
-                ),
-                Metric(
-                    stringResource(R.string.metric_feels_like),
-                    formatTemperature(forecast.conditionsAt(now).apparentTemperature),
-                ),
-            ),
-        )
-    }
-}
-
-/**
- * The secondary readings — true, occasionally useful, never the headline.
- *
- * Every one of them is resolved against [now]. Cloud cover used to come from the
- * first row of the series, which is only this hour on a forecast fetched this
- * hour; on anything older it was reporting a cloud cover from the past under a
- * heading that says nothing about the past.
- */
-@Composable
-private fun AirTile(forecast: WeatherForecast, now: Instant) {
-    val current = forecast.conditionsAt(now)
-    Tile(label = stringResource(R.string.tile_air)) {
-        MetricGrid(
-            listOf(
-                Metric(stringResource(R.string.metric_wind), formatWindSpeed(current.windSpeed)),
-                Metric(stringResource(R.string.metric_humidity), formatPercent(current.humidity)),
-                Metric(stringResource(R.string.metric_pressure), formatPressure(current.pressure)),
-                Metric(
-                    stringResource(R.string.metric_cloud),
-                    formatPercent(forecast.hourly.at(now)?.cloudCover),
-                ),
-            ),
-        )
     }
 }
 

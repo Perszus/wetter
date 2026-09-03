@@ -12,6 +12,8 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.roundToInt
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.CompassPoint
+import lv.bolwarra.wetter.domain.MoonPhaseName
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
@@ -173,3 +175,26 @@ fun WeatherCondition.labelRes(): Int = when (this) {
 }
 
 private val HOUR_MINUTE: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+/** The compass point a wind bearing falls in, as a short cardinal name. */
+fun CompassPoint.labelRes(): Int = when (this) {
+    CompassPoint.NORTH -> R.string.compass_n
+    CompassPoint.NORTH_EAST -> R.string.compass_ne
+    CompassPoint.EAST -> R.string.compass_e
+    CompassPoint.SOUTH_EAST -> R.string.compass_se
+    CompassPoint.SOUTH -> R.string.compass_s
+    CompassPoint.SOUTH_WEST -> R.string.compass_sw
+    CompassPoint.WEST -> R.string.compass_w
+    CompassPoint.NORTH_WEST -> R.string.compass_nw
+}
+
+fun MoonPhaseName.labelRes(): Int = when (this) {
+    MoonPhaseName.NEW -> R.string.moon_new
+    MoonPhaseName.WAXING_CRESCENT -> R.string.moon_waxing_crescent
+    MoonPhaseName.FIRST_QUARTER -> R.string.moon_first_quarter
+    MoonPhaseName.WAXING_GIBBOUS -> R.string.moon_waxing_gibbous
+    MoonPhaseName.FULL -> R.string.moon_full
+    MoonPhaseName.WANING_GIBBOUS -> R.string.moon_waning_gibbous
+    MoonPhaseName.LAST_QUARTER -> R.string.moon_last_quarter
+    MoonPhaseName.WANING_CRESCENT -> R.string.moon_waning_crescent
+}

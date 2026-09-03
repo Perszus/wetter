@@ -20,6 +20,33 @@
     <string name="wind_light">Light wind</string>
     <string name="wind_moderate">Moderate wind</string>
     <string name="wind_strong">Strong wind</string>
+
+    <string name="explain_umbrella_title">Take an umbrella</string>
+    <string name="explain_umbrella_body">Rain is forecast here before the day is out. The umbrella appears whenever anything is expected to fall between now and midnight, so you can catch it on the way out the door. It goes once the last of it has passed.</string>
+    <string name="explain_wind_body">Three lines, filling from the bottom. Light is a breeze you would not remark on. Moderate lifts dust and loose paper and sways small trees. Strong starts around 11 m/s — the wind that turns an umbrella inside out and takes a hat off.\n\nThe light travelling around the dial turns at the speed of the wind: a slow drift in still air, a fast lap in a gale.</string>
+
+    <string name="tile_advanced">Advanced</string>
+    <string name="advanced_summary">Sun, pressure, humidity and the rest</string>
+    <string name="metric_dew_point">Dew point</string>
+    <string name="metric_wind_direction">Direction</string>
+    <string name="metric_moon_phase">Moon</string>
+    <string name="metric_moon_illumination">Moonlight</string>
+    <string name="moon_new">New</string>
+    <string name="moon_waxing_crescent">Waxing crescent</string>
+    <string name="moon_first_quarter">First quarter</string>
+    <string name="moon_waxing_gibbous">Waxing gibbous</string>
+    <string name="moon_full">Full</string>
+    <string name="moon_waning_gibbous">Waning gibbous</string>
+    <string name="moon_last_quarter">Last quarter</string>
+    <string name="moon_waning_crescent">Waning crescent</string>
+    <string name="compass_n">N</string>
+    <string name="compass_ne">NE</string>
+    <string name="compass_e">E</string>
+    <string name="compass_se">SE</string>
+    <string name="compass_s">S</string>
+    <string name="compass_sw">SW</string>
+    <string name="compass_w">W</string>
+    <string name="compass_nw">NW</string>
     <string name="current_feels_like">Feels like %1$s</string>
 
     <!--

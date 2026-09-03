@@ -1,12 +1,13 @@
 package lv.bolwarra.wetter.ui.components
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -18,12 +19,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -92,82 +102,159 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     val beamAngle = rememberBeamAngle(windSpeed)
     val showUmbrella = forecast.rainExpectedToday(now)
 
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(PLATE_MAX + MARK_SIZE),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Picture a line drawn across the bottom of the dial: the marks stand on
-        // it, and move out along it to either side. Kept on the diagonal they
-        // crowded the glass and looked like they were squeezing it; out here the
-        // dial keeps its full width and they read as things standing beside it.
-        //
-        // The dial gives up whatever room the marks need, so it is measured from
-        // what is left rather than assumed.
-        val lane = MARK_SIZE + MARK_GAP
-        val dial = minOf(maxWidth - lane * 2, PLATE_MAX, maxHeight)
-        val radius = dial / 2
-        val outwards = radius + MARK_GAP + MARK_SIZE / 2
-        val downwards = radius * MARK_BASE_OF_CIRCLE
+    // Which mark, if any, is currently explaining itself. Not saved across a
+    // relaunch: it is an answer to a question just asked, not a setting.
+    var explaining by remember { mutableStateOf<PlateMark?>(null) }
 
-        Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) {
-                drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
-                drawGlassEdge(colors.hairline, colors.surfaceRaised)
-                drawHourTicks(colors.hairline)
-                drawTimeMark(now, zone, colors.textSecondary)
-                if (windSpeed >= STILL_AIR_MS) {
-                    drawWindLight(beamAngle, colors.textPrimary)
+    fun toggle(mark: PlateMark) {
+        explaining = if (explaining == mark) null else mark
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PLATE_MAX + MARK_SIZE),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Picture a line drawn across the bottom of the dial: the marks stand on
+            // it, and move out along it to either side. Kept on the diagonal they
+            // crowded the glass and looked like they were squeezing it; out here the
+            // dial keeps its full width and they read as things standing beside it.
+            //
+            // The dial gives up whatever room the marks need, so it is measured from
+            // what is left rather than assumed.
+            val lane = MARK_SIZE + MARK_GAP
+            val dial = minOf(maxWidth - lane * 2, PLATE_MAX, maxHeight)
+            val radius = dial / 2
+            val outwards = radius + MARK_GAP + MARK_SIZE / 2
+            val downwards = radius * MARK_BASE_OF_CIRCLE
+
+            Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
+                Canvas(Modifier.fillMaxSize()) {
+                    drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
+                    drawGlassEdge(colors.hairline, colors.surfaceRaised)
+                    drawHourTicks(colors.hairline)
+                    drawTimeMark(now, zone, colors.textSecondary)
+                    if (windSpeed >= STILL_AIR_MS) {
+                        drawWindLight(beamAngle, colors.textPrimary)
+                    }
                 }
             }
-        }
 
-        if (showUmbrella) {
-            Icon(
-                painter = painterResource(R.drawable.ic_umbrella),
-                contentDescription = stringResource(R.string.plate_umbrella),
-                // The one coloured thing here, and the only reason that is
-                // allowed: it means rain, rain owns that hue, and this is the
-                // single mark whose job is to catch the eye on the way out.
-                tint = colors.precipitation,
-                modifier = Modifier
-                    .offset(x = -outwards, y = downwards)
-                    .size(MARK_SIZE),
-            )
-        }
-
-        WindLevels(
-            speedMs = windSpeed,
-            modifier = Modifier
-                .offset(x = outwards, y = downwards)
-                .size(MARK_SIZE),
-        )
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = spacing.xxl),
-        ) {
-            Row(verticalAlignment = Alignment.Top) {
-                Text(
-                    text = formatTemperature(current.temperature),
-                    style = WetterTheme.type.reading,
-                    color = colors.textPrimary,
-                )
-                Text(
-                    text = stringResource(R.string.unit_celsius),
-                    style = WetterTheme.type.readingUnit,
-                    color = colors.textTertiary,
-                    modifier = Modifier.padding(start = 3.dp, top = 16.dp),
+            if (showUmbrella) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_umbrella),
+                    contentDescription = stringResource(R.string.plate_umbrella),
+                    // The one coloured thing here, and the only reason that is
+                    // allowed: it means rain, rain owns that hue, and this is the
+                    // single mark whose job is to catch the eye on the way out.
+                    tint = colors.precipitation,
+                    modifier = Modifier
+                        .offset(x = -outwards, y = downwards)
+                        .size(MARK_SIZE)
+                        .clickable { toggle(PlateMark.UMBRELLA) },
                 )
             }
-            Spacer(Modifier.height(spacing.xs))
-            Text(
-                text = stringResource(current.condition.labelRes()),
-                style = WetterTheme.type.title,
-                color = colors.textSecondary,
-                textAlign = TextAlign.Center,
+
+            WindLevels(
+                speedMs = windSpeed,
+                modifier = Modifier
+                    .offset(x = outwards, y = downwards)
+                    .size(MARK_SIZE)
+                    .clickable { toggle(PlateMark.WIND) },
             )
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = spacing.xxl),
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        text = formatTemperature(current.temperature),
+                        style = WetterTheme.type.reading,
+                        color = colors.textPrimary,
+                    )
+                    Text(
+                        text = stringResource(R.string.unit_celsius),
+                        style = WetterTheme.type.readingUnit,
+                        color = colors.textTertiary,
+                        modifier = Modifier.padding(start = 3.dp, top = 16.dp),
+                    )
+                }
+                Spacer(Modifier.height(spacing.xs))
+                Text(
+                    text = stringResource(current.condition.labelRes()),
+                    style = WetterTheme.type.title,
+                    color = colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+
+        MarkExplanation(
+            mark = explaining,
+            windSpeedMs = windSpeed,
+            onDismiss = { explaining = null },
+        )
+    }
+}
+
+/** The two marks standing beside the dial, each of which can explain itself. */
+private enum class PlateMark { UMBRELLA, WIND }
+
+/**
+ * What the mark you just tapped actually means.
+ *
+ * These symbols carry real information and no label, which is the right trade
+ * for something read at a glance every day but leaves nowhere to say what they
+ * mean the first time. A tap is the least intrusive place to put that: absent
+ * until asked for, and gone again on the next tap.
+ *
+ * It appears beneath the dial rather than over it. Floating it on top would
+ * cover the temperature - the one thing on this screen most likely to be the
+ * reason the app was opened.
+ */
+@Composable
+private fun MarkExplanation(mark: PlateMark?, windSpeedMs: Double, onDismiss: () -> Unit) {
+    val colors = WetterTheme.colors
+    val spacing = WetterTheme.spacing
+
+    // The card outlives the selection by the length of the collapse animation, so
+    // it needs its own copy of what to say. Reading `mark` directly would blank
+    // the text the instant it cleared and animate an empty box shut.
+    var shown by remember { mutableStateOf(PlateMark.WIND) }
+    LaunchedEffect(mark) { if (mark != null) shown = mark }
+
+    AnimatedVisibility(
+        visible = mark != null,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+    ) {
+        val title = when (shown) {
+            PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_title)
+            PlateMark.WIND -> stringResource(windLevelLabel(windLevel(windSpeedMs)))
+        }
+        val body = when (shown) {
+            PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_body)
+            PlateMark.WIND -> stringResource(R.string.explain_wind_body)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = spacing.s)
+                .clip(RoundedCornerShape(CARD_CORNER))
+                .background(colors.surfaceSunken)
+                .clickable(onClick = onDismiss)
+                .padding(horizontal = spacing.l, vertical = spacing.m),
+        ) {
+            Text(text = title, style = WetterTheme.type.title, color = colors.textPrimary)
+            Spacer(Modifier.height(spacing.xs))
+            Text(text = body, style = WetterTheme.type.body, color = colors.textSecondary)
         }
     }
 }
@@ -249,30 +336,69 @@ private fun WeatherForecast.rainExpectedToday(now: Instant): Boolean {
     }
 }
 
-/** The light's position, turning at the speed of the wind. */
+/**
+ * The light's position, turning at the speed of the wind.
+ *
+ * The angle is integrated frame by frame rather than handed to a repeating
+ * animation, and both halves of that matter.
+ *
+ * A repeating tween has to be told a duration up front, so a change in wind
+ * speed can only take effect by replacing the animation - which restarts it, and
+ * the light jumps back to the top of the dial. Worse, the old version worked out
+ * the duration *after* an early return for still air, which put a `remember`
+ * behind a condition. Compose matches remembered state by position, so on the
+ * frame the wind crossed that threshold the slots moved and the animation was
+ * rebuilt from nothing. Between them, that is why the level indicator could
+ * climb to two while the light carried on at its original speed.
+ *
+ * Accumulating an angle has neither problem. Each frame advances it by however
+ * far the current wind justifies, so a gust speeds the light up smoothly from
+ * wherever it happens to be, and there is no duration to invalidate.
+ */
 @Composable
 private fun rememberBeamAngle(windSpeedMs: Double): Float {
-    if (windSpeedMs < STILL_AIR_MS) return 0f
+    // Read inside the frame callback, so the loop always sees the latest wind
+    // without being restarted by it.
+    val speed by rememberUpdatedState(windSpeedMs)
+    var angle by remember { mutableFloatStateOf(0f) }
 
-    // Inversely proportional, not linear between two endpoints. Linear against a
-    // 20 m/s ceiling squashed every wind anyone actually sees into the slow end:
-    // 2 m/s and 5 m/s came out 31 and 36 seconds apart, which is no difference at
-    // all to watch. This way doubling the wind halves the lap, which is what
-    // "representative of the speed" has to mean.
-    val seconds = (REFERENCE_MS * REFERENCE_LAP_S / windSpeedMs)
-        .coerceIn(FASTEST_LAP_S, SLOWEST_LAP_S)
-
-    val transition = rememberInfiniteTransition(label = "wind")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween((seconds * 1000).toInt(), easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "beam",
-    )
+    LaunchedEffect(Unit) {
+        var previousFrame = 0L
+        while (true) {
+            withFrameNanos { frame ->
+                val elapsed = if (previousFrame ==
+                    0L
+                ) {
+                    0f
+                } else {
+                    (frame - previousFrame) / NANOS_PER_SECOND
+                }
+                previousFrame = frame
+                val lap = lapSecondsFor(speed)
+                if (lap != null && elapsed > 0f) {
+                    angle = (angle + FULL_TURN * elapsed / lap) % FULL_TURN
+                }
+            }
+        }
+    }
     return angle
+}
+
+/**
+ * How long one lap takes at a given wind speed, or null when the air is still
+ * and the light should hold.
+ *
+ * Inversely proportional, not linear between two endpoints. Linear against a
+ * 20 m/s ceiling squashed every wind anyone actually sees into the slow end:
+ * 2 m/s and 5 m/s came out 31 and 36 seconds apart, which is no difference at
+ * all to watch. This way doubling the wind halves the lap, which is what
+ * "representative of the speed" has to mean.
+ */
+private fun lapSecondsFor(windSpeedMs: Double): Float? {
+    if (windSpeedMs < STILL_AIR_MS) return null
+    return (REFERENCE_MS * REFERENCE_LAP_S / windSpeedMs)
+        .coerceIn(FASTEST_LAP_S, SLOWEST_LAP_S)
+        .toFloat()
 }
 
 /**
@@ -428,6 +554,9 @@ private const val DEGREES_PER_HOUR = 360f / HOURS_IN_DAY
 private const val MINUTES_IN_DAY = 24f * 60f
 private const val QUARTER_TURN = 90f
 private const val FULL_TURN = 360f
+private const val NANOS_PER_SECOND = 1_000_000_000f
+
+private val CARD_CORNER = 14.dp
 private const val TAU = 6.2831855f
 
 /** How far above centre the glaze highlight sits, as a fraction of the radius. */
