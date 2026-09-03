@@ -56,10 +56,22 @@ class RadarField(
         val fx = point.x - x0
         val fy = point.y - y0
 
+        // Only the corners carrying weight are consulted. Landing exactly on a
+        // column gives the one to its right a weight of zero, and demanding it
+        // anyway made the last row and column of every field unsamplable - a
+        // coverage hole reported around the whole rim of a fully observed grid.
+        val needsRight = fx > 0f
+        val needsBelow = fy > 0f
+
         val topLeft = get(x0, y0)
-        val topRight = get(x0 + 1, y0)
-        val bottomLeft = get(x0, y0 + 1)
-        val bottomRight = get(x0 + 1, y0 + 1)
+        val topRight = if (needsRight) get(x0 + 1, y0) else topLeft
+        val bottomLeft = if (needsBelow) get(x0, y0 + 1) else topLeft
+        val bottomRight = when {
+            needsRight && needsBelow -> get(x0 + 1, y0 + 1)
+            needsRight -> topRight
+            needsBelow -> bottomLeft
+            else -> topLeft
+        }
         if (topLeft.isNoEcho() ||
             topRight.isNoEcho() ||
             bottomLeft.isNoEcho() ||

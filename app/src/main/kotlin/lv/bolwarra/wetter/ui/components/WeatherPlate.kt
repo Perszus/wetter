@@ -56,6 +56,7 @@ import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.formatTemperature
+import lv.bolwarra.wetter.ui.format.formatWindSpeed
 import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
@@ -242,6 +243,14 @@ private fun MarkExplanation(mark: PlateMark?, windSpeedMs: Double, onDismiss: ()
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_body)
             PlateMark.WIND -> stringResource(R.string.explain_wind_body)
         }
+        // The wind card carries the number the whole indicator is derived from.
+        // Without it the levels and the speed of the light are two things you
+        // have to take on trust; with it they are two readings of one figure you
+        // can see, and either can be checked against it.
+        val reading = when (shown) {
+            PlateMark.WIND -> formatWindSpeed(windSpeedMs)
+            PlateMark.UMBRELLA -> null
+        }
 
         Column(
             modifier = Modifier
@@ -252,7 +261,24 @@ private fun MarkExplanation(mark: PlateMark?, windSpeedMs: Double, onDismiss: ()
                 .clickable(onClick = onDismiss)
                 .padding(horizontal = spacing.l, vertical = spacing.m),
         ) {
-            Text(text = title, style = WetterTheme.type.title, color = colors.textPrimary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = WetterTheme.type.title,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f),
+                )
+                if (reading != null) {
+                    Text(
+                        text = reading,
+                        style = WetterTheme.type.figure,
+                        color = colors.textSecondary,
+                    )
+                }
+            }
             Spacer(Modifier.height(spacing.xs))
             Text(text = body, style = WetterTheme.type.body, color = colors.textSecondary)
         }
@@ -388,11 +414,27 @@ private fun rememberBeamAngle(windSpeedMs: Double): Float {
  * How long one lap takes at a given wind speed, or null when the air is still
  * and the light should hold.
  *
- * Inversely proportional, not linear between two endpoints. Linear against a
- * 20 m/s ceiling squashed every wind anyone actually sees into the slow end:
- * 2 m/s and 5 m/s came out 31 and 36 seconds apart, which is no difference at
- * all to watch. This way doubling the wind halves the lap, which is what
- * "representative of the speed" has to mean.
+ * The light behaves like a wind turbine. A turbine holds a roughly constant
+ * tip-speed ratio, so its rotation rate rises in proportion to the wind and its
+ * period is inversely proportional to it - which is all this is:
+ *
+ *     laps per minute = 3 x wind speed in m/s
+ *
+ * So 2 m/s turns at 6 rpm, 4 m/s at 12, 8 m/s at 24. Doubling the wind doubles
+ * the rate, and the number above is worth checking against if this is ever
+ * retuned.
+ *
+ * The two clamps are the turbine's cut-in and rated speeds. Below [STILL_AIR_MS]
+ * nothing turns, because a turbine in dead air does not either and a light
+ * creeping round in still conditions would be claiming wind that is not there.
+ * Above about 13 m/s it holds at its fastest, because past that the eye cannot
+ * tell one blur from another anyway. Between them - which is very nearly every
+ * wind anyone ever stands in - it is honestly proportional.
+ *
+ * An earlier version interpolated linearly between a slowest and a fastest lap
+ * against a 20 m/s ceiling. That is not proportionality and it did not look like
+ * anything: a light breeze and a moderate one came out four seconds apart on a
+ * forty-second lap.
  */
 private fun lapSecondsFor(windSpeedMs: Double): Float? {
     if (windSpeedMs < STILL_AIR_MS) return null
@@ -445,11 +487,11 @@ private fun DrawScope.drawGlassEdge(edge: Color, face: Color) {
     )
 }
 
-/** One tick an hour, inside the edge. Midnight at the top, clockwise. */
+/** One tick an hour, inside the edge. Twelve at the top, clockwise. */
 private fun DrawScope.drawHourTicks(colour: Color) {
     val outer = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
-    repeat(HOURS_IN_DAY) { hour ->
-        val quarter = hour % 6 == 0
+    repeat(HOURS_ON_FACE) { hour ->
+        val quarter = hour % QUARTERS == 0
         val length = if (quarter) TICK_LONG else TICK_SHORT
         rotate(degrees = hour * DEGREES_PER_HOUR, pivot = center) {
             drawLine(
@@ -519,13 +561,19 @@ private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
 private fun DrawScope.ringRadius(): Float = size.minDimension / 2f - EDGE_WIDTH.toPx() / 2f
 
 /**
- * Where an instant sits on the face, in `drawArc` degrees — which measure from
- * three o'clock, so midnight at the top is minus ninety.
+ * Where an instant sits on the face, in `drawArc` degrees - which measure from
+ * three o'clock, so twelve at the top is minus ninety.
+ *
+ * Twelve hours to a turn, not twenty-four. A full day around the face put the
+ * mark at a quarter of a degree a minute, which is about half a point on this
+ * dial and simply cannot be seen moving; people reasonably read a hand that
+ * never visibly moves as a broken one. Half a day doubles that, and matches the
+ * clock face everyone already knows how to read.
  */
 private fun angleOf(instant: Instant, zone: ZoneId): Float {
     val local = instant.atZone(zone)
-    val minutes = local.hour * 60 + local.minute
-    return -QUARTER_TURN + minutes / MINUTES_IN_DAY * FULL_TURN
+    val minutes = (local.hour % HOURS_ON_FACE) * 60 + local.minute
+    return -QUARTER_TURN + minutes / MINUTES_ON_FACE * FULL_TURN
 }
 
 private val PLATE_MAX = 240.dp
@@ -549,9 +597,12 @@ private val TICK_SHORT = 3.5.dp
 private val MARK_LENGTH = 12.dp
 private val MARK_WIDTH = 2.5.dp
 
-private const val HOURS_IN_DAY = 24
-private const val DEGREES_PER_HOUR = 360f / HOURS_IN_DAY
-private const val MINUTES_IN_DAY = 24f * 60f
+private const val HOURS_ON_FACE = 12
+private const val DEGREES_PER_HOUR = 360f / HOURS_ON_FACE
+private const val MINUTES_ON_FACE = HOURS_ON_FACE * 60f
+
+/** Long ticks at twelve, three, six and nine, as a clock face has. */
+private const val QUARTERS = 3
 private const val QUARTER_TURN = 90f
 private const val FULL_TURN = 360f
 private const val NANOS_PER_SECOND = 1_000_000_000f
@@ -599,13 +650,23 @@ private const val STRONG_WIND_MS = 10.8
 private const val STILL_AIR_MS = 0.5
 
 /**
- * The anchor for the rotation: an ordinary breeze takes twelve seconds to go
- * round. Everything else falls out of that inversely - 2 m/s is thirty seconds,
- * 11 m/s is five and a half, and a gale is at the floor.
+ * The anchor for the rotation: an ordinary 5 m/s breeze takes four seconds to go
+ * round. Everything else falls out of that inversely, so 2 m/s is ten seconds,
+ * 8 m/s is two and a half, and a gale is at the floor.
+ *
+ * The first calibration of this was anchored at twelve seconds and floored at
+ * forty-five, which was arithmetically adaptive and useless to look at: a light
+ * breeze crawled round in half a minute, which does not read as movement at all,
+ * so nothing below a gale looked different from anything else. The speed only
+ * carries information if the difference between two ordinary winds is visible,
+ * which means the whole usable range has to sit where the eye can tell laps
+ * apart - a few seconds, not tens of them.
  */
 private const val REFERENCE_MS = 5.0
-private const val REFERENCE_LAP_S = 12.0
+private const val REFERENCE_LAP_S = 4.0
 
-/** Faster than this reads as a spinner; slower is indistinguishable from still. */
-private const val FASTEST_LAP_S = 3.0
-private const val SLOWEST_LAP_S = 45.0
+/** About forty laps a minute. Fast, which is the point at gale force. */
+private const val FASTEST_LAP_S = 1.5
+
+/** Slow enough to read as a drift, quick enough to still read as moving. */
+private const val SLOWEST_LAP_S = 12.0

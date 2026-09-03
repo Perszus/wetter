@@ -183,7 +183,17 @@ object MotionEstimator {
         return Global(bestOffset ?: coarse, sharpness.coerceIn(0f, 1f))
     }
 
-    /** One block, searched on a short leash around the global vector. */
+    /**
+     * One block, searched on a short leash around the global vector.
+     *
+     * The global vector is measured first and holds the block unless something
+     * strictly beats it. That tie-break is not a detail: a block of uniform rain
+     * - or of nothing at all - costs the same at every displacement, so with
+     * ties resolved by scan order the winner is simply whichever candidate the
+     * loops reach first, which is the most negative one. Across a whole field of
+     * such blocks that bias does not cancel, and a perfectly stationary rain
+     * field came out drifting steadily north-west.
+     */
     private fun searchBlock(
         previous: RadarField,
         current: RadarField,
@@ -197,11 +207,15 @@ object MotionEstimator {
         val right = minOf(left + BLOCK_SIZE, current.width)
         val bottom = minOf(top + BLOCK_SIZE, current.height)
 
-        var best = Double.MAX_VALUE
-        var bestOffset: Pair<Int, Int>? = null
+        var bestOffset = global
+        var best = costOf(
+            previous, current, global.first, global.second,
+            left, top, right, bottom, BLOCK_STEP,
+        ) ?: return null
 
         for (ddy in -REFINE_RADIUS..REFINE_RADIUS) {
             for (ddx in -REFINE_RADIUS..REFINE_RADIUS) {
+                if (ddx == 0 && ddy == 0) continue
                 val dx = global.first + ddx
                 val dy = global.second + ddy
                 // The leash must not carry a block past what physics allows.
