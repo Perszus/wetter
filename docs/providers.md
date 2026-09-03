@@ -251,6 +251,99 @@ MET Norway is **not** presented as globally better than Open-Meteo. It is
 preferred where its fine grid runs, and treated as an ordinary global source
 everywhere else.
 
+## Radar, and who does the nowcasting
+
+Radar is not another forecast provider and is deliberately not routed as one. It
+answers a different question.
+
+A numerical model predicts how the atmosphere will evolve. It has to be *told*
+what is currently overhead, and by the time a run reaches a phone that state is
+already an hour or two old — which is why models are weakest about the next
+twenty minutes and why "is it about to rain on me" is the question they answer
+worst. Radar is the opposite: it observes precipitation that exists, right now,
+at roughly a kilometre. It cannot tell you about tonight at all.
+
+So Wetter does its own nowcasting rather than asking anyone for one. The
+observed field is projected forward — motion estimated by block matching,
+carried on backward trajectories, with growth and decay on a saturating leash —
+and the result is blended with the models by lead time. This became the only
+option available as well as the right one: RainViewer withdrew their own
+forecast frames at the start of 2026, so past the present moment there is
+nothing to fetch.
+
+### Where the handover happens
+
+| Lead | Radar | Why |
+|---|---|---|
+| now | ~95% | An observation. Needs no motion estimate at all. |
+| 30 min | ~88% | Advection is reliable this far on a decent match. |
+| 1 h | ~73% | Still better than a model that has not seen the current field. |
+| 2 h | ~43% | Storms have grown, died and turned; the model is catching up. |
+| 3 h+ | <25% | Extrapolation is spent. The model is all there is. |
+
+The weight is **not** read off that table at runtime. It is derived from the
+nowcast's own confidence, which is the product of two independent things: how far
+radar can usefully see at all, and how well *this* sweep matched the last one.
+A fixed table is right on average and blind to the second — and the second is
+what separates a good estimate from the one over Dublin that came out fifty
+degrees wrong on a thin, structureless field.
+
+Two properties of that split are worth keeping:
+
+- **The present moment does not depend on the motion estimate.** A flat rain
+  field gives a poor match, but the sweep still shows rain that is falling. Only
+  the projection needs the motion, so a featureless field is trusted completely
+  about now and discounted quickly for anything beyond it.
+- **The model is never switched off.** Radar sees precipitation, not the sky. It
+  misses what falls below the beam, misses snow it cannot detect, and cannot see
+  past its own coverage. A standing model share means those gaps degrade the
+  answer rather than emptying it.
+
+### Current radar source
+
+#### RainViewer — global composite
+
+- <https://www.rainviewer.com/api.html>
+- No key, no registration.
+- **Attribution is mandatory** under their free terms: *"Weather data by
+  RainViewer"* with a link back. Shown in About.
+- **Their free tier is described as personal and educational use.** Commercial or
+  high-volume integration is arranged case by case, and they explicitly disclaim
+  rights in the underlying national radar data. This is the least settled licence
+  position of any source here and is a deliberate, recorded decision rather than
+  an oversight — see the [terms-of-service
+  checklist](#terms-of-service-checklist).
+- Composites national networks worldwide, refreshed every ten minutes, thirteen
+  frames of history. Coverage over the Baltic is real and continuous; MET
+  Norway's nowcast reports *no coverage* for Rīga because that is its own Nordic
+  composite, not this one.
+- Responses are cached hard and a block of nine tiles is about 45 KB per cycle.
+
+### What the tiles cannot tell us
+
+The API serves **pictures, not numbers**. There is no numeric endpoint, so the
+rain field is read back out of the colour scale, and two things follow.
+
+The *ordering* of the scale is established: translucent tan at the faint end,
+then opaque cool colours, then warm, with magenta above. Storms are stratified,
+so intensity should fall with distance from a core and each family should be
+enclosed by the one below it — both hold across a large sample of central
+Europe, which is what pins the order down.
+
+The *absolute calibration* is not established. Fitting the scale against
+Open-Meteo's precipitation gave a correlation of only 0.37 and implied half a
+millimetre an hour at full scale, which is nonsense for a saturated echo: an
+11 km forecast quantised to tenths is too coarse a ruler for kilometre
+observations. The span used is therefore the conventional one for a radar
+composite, capped at 55 dBZ where the echo stops being rain — read literally,
+the top of the scale came out at 1300 mm/h, a rain relation applied to hail.
+
+**So radar rates here are reliable in shape and approximate in magnitude.**
+Where the rain is, which way it is going and whether it is growing are all
+trustworthy; the exact millimetres are not. The fusion weights them accordingly,
+and the two constants to revisit are `MIN_DBZ` and `MAX_DBZ`, once the
+verification store holds enough observed rain to fit against something measured.
+
 ## Debugging a decision
 
 In debug builds the router logs its ranking and the reason each provider scored

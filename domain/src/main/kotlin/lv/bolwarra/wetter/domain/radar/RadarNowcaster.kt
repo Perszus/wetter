@@ -77,12 +77,62 @@ object RadarNowcaster {
     const val TREND_SATURATION_MINUTES = 20.0
 
     /**
-     * Extrapolation skill roughly halves every half hour or so. At two hours
-     * this leaves single-digit confidence, which is the honest answer: radar
-     * extrapolation alone is nearly worthless that far out, and the fusion
-     * layer should be leaning on the models by then.
+     * The lead at which radar skill has halved, and the model is about to take
+     * the answer over.
+     *
+     * Radar and a model are good at opposite ends. Radar is looking at rain that
+     * exists, so for the next hour it is simply better; a model has to be told
+     * what is currently overhead and is not. Past a couple of hours the
+     * extrapolation has lost the plot - storms grow, die and turn - and the
+     * model is the only thing left worth having. Just under two hours is where
+     * those two curves cross.
      */
-    const val SKILL_DECAY_MINUTES = 45.0
+    const val CROSSOVER_MINUTES = 110.0
+
+    /**
+     * How sharply skill falls away either side of the crossover.
+     *
+     * Two, which makes this a sigmoid rather than an exponential, and that shape
+     * matters. An exponential decays fastest at zero lead - precisely where
+     * radar is at its best and should be losing nothing at all. This holds near
+     * the top for the first half hour, then gives way.
+     */
+    private const val SKILL_STEEPNESS = 2.0
+
+    /**
+     * The match sharpness a genuinely good estimate reads, measured rather than
+     * assumed.
+     *
+     * This is the correction to a units error that had been quietly gutting the
+     * radar. Sharpness is a peak-contrast measure - how much better the best
+     * displacement fits than the average one - and on real precipitation fields
+     * a good match reads about 0.3. It never approaches 1. Feeding it straight
+     * in as though it were a probability therefore capped radar at roughly a
+     * third of the answer even for the current minute: measured across ten
+     * European sites, sharpness ran 0.16 to 0.38, so radar was being given
+     * 15-36% weight at zero lead while the model carried the rest. For an app
+     * whose whole purpose is that radar knows what is happening now, that was
+     * backwards.
+     */
+    const val GOOD_MATCH_SHARPNESS = 0.30f
+
+    /** Below this there is no trackable structure and the motion is a guess. */
+    const val MINIMUM_MATCH_SHARPNESS = 0.10f
+
+    /**
+     * How quickly the answer comes to depend on the motion estimate.
+     *
+     * At zero lead it does not depend on it at all: that is the sweep itself, an
+     * observation of rain that is currently falling, and it is worth believing
+     * whether or not anything could be tracked between frames. Only the
+     * projection needs the motion, and the further ahead it reaches the more
+     * entirely it rests on it. Around twenty minutes the two have swapped over.
+     *
+     * This is why a flat, featureless rain field - London, at 0.16 - is still
+     * trusted completely about the present moment and discounted quickly for
+     * anything beyond it.
+     */
+    const val MOTION_RELEVANCE_MINUTES = 20.0
 
     /** Rain cannot be negative, and a trend extrapolated downward will try. */
     private const val MIN_RATE = 0f
@@ -102,7 +152,10 @@ object RadarNowcaster {
 
         val trend = estimateTrend(frames, motion)
 
-        val steps = leads.filter { !it.isNegative && !it.isZero }.map { lead ->
+        // Zero is kept, unlike before: that step is the latest sweep itself -
+        // what is falling right now, observed rather than predicted - and it is
+        // the single most reliable thing this whole package produces.
+        val steps = leads.filter { !it.isNegative }.map { lead ->
             val minutes = lead.toMillis() / MILLIS_PER_MINUTE
             RadarNowcastStep(
                 at = latest.at.plus(lead),
@@ -114,9 +167,39 @@ object RadarNowcaster {
         return RadarNowcast(issuedAt = latest.at, motion = motion, steps = steps)
     }
 
-    /** Skill falls off exponentially with lead, scaled by how good the match was. */
-    fun confidenceAt(minutes: Double, motionConfidence: Float): Float =
-        (motionConfidence * exp(-minutes / SKILL_DECAY_MINUTES)).toFloat().coerceIn(0f, 1f)
+    /**
+     * How much a projected step deserves to be believed.
+     *
+     * Two independent things multiplied: how well radar can see this far ahead
+     * at all, and how much this particular estimate can be trusted to get it
+     * there. Keeping them apart is the point - the first is a property of radar,
+     * the second of tonight's rain field, and collapsing them into one number is
+     * what made the near term unreliable.
+     */
+    fun confidenceAt(minutes: Double, motionSharpness: Float): Float {
+        val quality = matchQualityOf(motionSharpness)
+        // Near zero lead the sweep stands on its own; further out it leans
+        // entirely on the motion estimate.
+        val leaning = exp(-minutes / MOTION_RELEVANCE_MINUTES)
+        val effective = quality + (1.0 - quality) * leaning
+        return (skillAtLead(minutes) * effective).toFloat().coerceIn(0f, 1f)
+    }
+
+    /** How far radar can usefully see, as a share of its best, 0..1. */
+    fun skillAtLead(minutes: Double): Double =
+        1.0 / (1.0 + Math.pow(minutes.coerceAtLeast(0.0) / CROSSOVER_MINUTES, SKILL_STEEPNESS))
+
+    /**
+     * A raw sharpness reading turned into a 0..1 quality.
+     *
+     * Normalised against what a good match actually measures, so an ordinary
+     * good one scores full marks and only a genuinely structureless field is
+     * marked down.
+     */
+    fun matchQualityOf(sharpness: Float): Double {
+        val span = (GOOD_MATCH_SHARPNESS - MINIMUM_MATCH_SHARPNESS).toDouble()
+        return ((sharpness - MINIMUM_MATCH_SHARPNESS) / span).coerceIn(0.0, 1.0)
+    }
 
     /**
      * One projected field.

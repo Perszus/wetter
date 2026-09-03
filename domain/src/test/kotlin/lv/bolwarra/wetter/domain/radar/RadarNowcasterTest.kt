@@ -90,9 +90,86 @@ class RadarNowcasterTest {
         confidences.zipWithNext { near, far ->
             assertTrue("confidence rose with lead: $near then $far", far < near)
         }
-        // Two hours out, radar extrapolation alone is nearly worthless and has
-        // to say so, or the fusion layer will keep leaning on it.
-        assertTrue("two hours out was ${confidences.last()}", confidences.last() < 0.15f)
+    }
+
+    @Test
+    fun `radar holds the near term and gives way around two hours`() {
+        // The shape the whole design turns on. Radar is looking at rain that
+        // exists, so for the first hour it should be carrying nearly the whole
+        // answer; by two hours the extrapolation has lost the plot and the model
+        // has to be taking over.
+        //
+        // An earlier version decayed exponentially from a raw sharpness reading
+        // and gave radar about a third of the answer for the current minute,
+        // falling to two percent by two hours. That is the opposite of what
+        // radar is for.
+        val good = RadarNowcaster.GOOD_MATCH_SHARPNESS
+
+        assertTrue(
+            "now: ${RadarNowcaster.confidenceAt(0.0, good)}",
+            RadarNowcaster.confidenceAt(0.0, good) > 0.95f,
+        )
+        assertTrue(RadarNowcaster.confidenceAt(30.0, good) > 0.85f)
+        assertTrue(RadarNowcaster.confidenceAt(60.0, good) > 0.70f)
+
+        // Crossing over just under two hours: still leading at ninety minutes,
+        // beaten by the model past that.
+        assertTrue(RadarNowcaster.confidenceAt(90.0, good) > 0.5f)
+        assertTrue(RadarNowcaster.confidenceAt(150.0, good) < 0.5f)
+
+        // And genuinely spent by the time the model is all there is.
+        assertTrue(RadarNowcaster.confidenceAt(360.0, good) < 0.1f)
+    }
+
+    @Test
+    fun `the present moment is trusted even when nothing can be tracked`() {
+        // The distinction that makes the near term work. A flat, featureless
+        // rain field gives a poor motion estimate - measured at 0.16 over London
+        // - but the sweep still shows rain that is falling. The reading needs no
+        // motion estimate at all; only the projection does.
+        val featureless = 0.16f
+
+        assertTrue(
+            "now: ${RadarNowcaster.confidenceAt(0.0, featureless)}",
+            RadarNowcaster.confidenceAt(0.0, featureless) > 0.95f,
+        )
+        // But it must be discounted quickly for anything beyond the present.
+        assertTrue(RadarNowcaster.confidenceAt(60.0, featureless) < 0.4f)
+    }
+
+    @Test
+    fun `sharpness is normalised against what a good match really measures`() {
+        // Sharpness is peak contrast, not a probability: a good match on real
+        // precipitation reads about 0.3 and never approaches 1. Using it raw was
+        // a units error that capped radar at a third of the answer.
+        assertEquals(1.0, RadarNowcaster.matchQualityOf(0.30f), 0.001)
+        assertEquals(1.0, RadarNowcaster.matchQualityOf(0.38f), 0.001)
+        assertEquals(0.0, RadarNowcaster.matchQualityOf(0.10f), 0.001)
+        assertEquals(0.0, RadarNowcaster.matchQualityOf(0.0f), 0.001)
+        // Dublin's, the case that came out fifty degrees wrong.
+        assertEquals(0.725, RadarNowcaster.matchQualityOf(0.245f), 0.01)
+    }
+
+    @Test
+    fun `a poorer match is trusted less at every lead that needs it`() {
+        val good = RadarNowcaster.confidenceAt(60.0, 0.33f)
+        val poor = RadarNowcaster.confidenceAt(60.0, 0.20f)
+        assertTrue("good $good should beat poor $poor", good > poor)
+    }
+
+    @Test
+    fun `now is part of the series, not just the projections`() {
+        // Lead zero is the latest sweep itself - observed, not predicted - and
+        // is the most reliable number the package produces, so it belongs in the
+        // timeline rather than being filtered out of it.
+        val withNow = RadarNowcaster.nowcast(
+            movingEast(),
+            listOf(Duration.ZERO, Duration.ofMinutes(10)),
+        )!!
+        assertEquals(2, withNow.steps.size)
+        assertEquals(Duration.ZERO, withNow.steps.first().lead)
+        assertEquals(withNow.issuedAt, withNow.steps.first().at)
+        assertTrue(withNow.steps.first().confidence > withNow.steps.last().confidence)
     }
 
     @Test

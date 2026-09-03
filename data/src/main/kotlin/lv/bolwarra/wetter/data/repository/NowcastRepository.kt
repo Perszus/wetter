@@ -144,8 +144,14 @@ class NowcastRepository internal constructor(
          */
         const val FRAMES = 3
 
-        /** Ten-minute steps out to two hours, matching the composites' own cadence. */
-        val LEADS: List<Duration> = (1..12).map { Duration.ofMinutes(it * 10L) }
+        /**
+         * Now, then ten-minute steps out to two hours.
+         *
+         * The series starts at zero on purpose. That step is the latest sweep
+         * itself rather than a projection of it - rain that is falling, observed
+         * - and it is the most trustworthy number in the whole timeline.
+         */
+        val LEADS: List<Duration> = (0..12).map { Duration.ofMinutes(it * 10L) }
 
         val STEP: Duration = Duration.ofMinutes(10)
 

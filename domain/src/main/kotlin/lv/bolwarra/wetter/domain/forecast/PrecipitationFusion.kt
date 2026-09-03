@@ -36,13 +36,12 @@ data class FusedPrecipitation(
  *
  * ### The weight comes from the radar's own confidence
  *
- * docs/providers.md sketches a table: radar 80-95% for half an hour, tailing to
- * nothing by six. That table is a reasonable average and it is blind to the one
- * thing that matters most, which is whether *this* radar estimate is any good.
- * The nowcaster already measures that - how sharply the sweeps matched, decayed
- * by how far ahead it is being asked to see - so the weight is taken from there
- * instead. It reproduces the table's shape on a confident match and, unlike the
- * table, backs off on a poor one.
+ * The usual operational recipe is a fixed table of lead times: radar 80-95% for
+ * the first half hour, 60-85% to an hour, 40-70% to two, then handing over. That
+ * shape is right on average and it is blind to the one thing that matters most,
+ * which is whether *this* estimate is any good. The nowcaster measures exactly
+ * that, so the weight is taken from there: it reproduces the table on a
+ * confident match and, unlike the table, backs off on a poor one.
  *
  * That difference is not hypothetical. Checked against the 700 hPa steering
  * flow, motion over the Baltic, Berlin, Copenhagen and Reykjavik came out within
