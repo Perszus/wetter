@@ -4,6 +4,7 @@ import java.time.Duration
 import java.time.Instant
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.WeatherCondition
+import lv.bolwarra.wetter.domain.radar.RadarNowcaster
 import lv.bolwarra.wetter.domain.radar.RadarSample
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -171,6 +172,72 @@ class PrecipitationFusionTest {
         )
         assertEquals(0, fused[0].sources)
         assertEquals(0.0, fused[0].confidence, 0.0001)
+    }
+
+    @Test
+    fun `the answer about a shower sharpens as it approaches`() {
+        // The property the whole radar layer exists for, and the one thing a
+        // model cannot do. A model hands over a value for a given hour and that
+        // value is the same whenever you ask it - you get whatever was sent.
+        // Radar re-observes every ten minutes, so the same real shower is a
+        // distant projection when it is an hour off and very nearly an
+        // observation by the time it is ten minutes away.
+        //
+        // Here the same event is asked about at two removes, with the radar
+        // confidence each would genuinely carry at that lead.
+        val sharp = RadarNowcaster.GOOD_MATCH_SHARPNESS
+
+        fun askedAt(leadMinutes: Long) = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 0.0, 0.0),
+            radar = radar(
+                leadMinutes to (6f to RadarNowcaster.confidenceAt(leadMinutes.toDouble(), sharp)),
+            ),
+            from = start.plus(Duration.ofMinutes(leadMinutes)),
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        ).first()
+
+        val anHourOff = askedAt(60)
+        val closeIn = askedAt(10)
+
+        assertTrue(
+            "an hour off ${anHourOff.radarShare} vs close in ${closeIn.radarShare}",
+            closeIn.radarShare > anHourOff.radarShare,
+        )
+        assertTrue(closeIn.confidence > anHourOff.confidence)
+
+        // And the closer reading should be most of the answer rather than a
+        // minority share of it, or the sharpening is academic.
+        assertTrue("close in was ${closeIn.radarShare}", closeIn.radarShare > 0.8)
+        assertTrue(
+            "the model still overrode a shower ten minutes away: " +
+                "${closeIn.millimetresPerHour}",
+            closeIn.millimetresPerHour > 4.5,
+        )
+    }
+
+    @Test
+    fun `a model gains no confidence as the hour approaches, radar does`() {
+        // The contrast, stated as something that can actually fail. With only a
+        // model there is nothing to re-observe: its confidence in a given hour
+        // is a property of that hour and of how far the models are apart over
+        // it, and is the same at ten minutes' notice as at an hour's. Radar's
+        // rises as the thing gets closer, because it keeps looking.
+        val sharp = RadarNowcaster.GOOD_MATCH_SHARPNESS
+
+        fun modelOnlyAt(leadMinutes: Long) = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 6.0, 6.0),
+            radar = emptyList(),
+            from = start.plus(Duration.ofMinutes(leadMinutes)),
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        ).first().confidence
+
+        assertEquals(modelOnlyAt(60), modelOnlyAt(10), 1e-9)
+
+        val radarFar = RadarNowcaster.confidenceAt(60.0, sharp)
+        val radarNear = RadarNowcaster.confidenceAt(10.0, sharp)
+        assertTrue("$radarNear should beat $radarFar", radarNear > radarFar)
     }
 
     @Test

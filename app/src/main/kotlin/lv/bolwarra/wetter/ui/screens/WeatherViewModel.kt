@@ -4,11 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
@@ -17,6 +22,7 @@ import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
+import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.provider.asWeatherError
 import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.verification.withLocalCorrection
@@ -50,11 +56,70 @@ class WeatherViewModel(
         val bias: LearnedBias? = null,
     )
 
-    private val derived = MutableStateFlow(Derived())
+    /**
+     * The forecast for the selected place, shared so the three things derived
+     * from it do not each open their own query.
+     */
+    private val forecasts: StateFlow<WeatherForecast?> = selectedLocation.selected
+        .flatMapLatest { repository.observe(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
+
+    /**
+     * The fused timeline, rebuilt on a clock rather than only when a new
+     * forecast lands.
+     *
+     * This is the whole point of carrying radar. A model hands over a value for
+     * the next hour and that value does not improve as the hour approaches - it
+     * is simply what was sent. Radar re-observes every ten minutes, so a shower
+     * that was a vague possibility half an hour ago is a measured object with a
+     * measured heading by the time it is close, and the answer should sharpen
+     * accordingly. Recomputing only when the model refreshes threw that away and
+     * left the near term as stale as the thing it was supposed to improve on.
+     *
+     * It also has to be rebuilt simply to stay honest: the steps are anchored at
+     * the instant they were built, so a timeline left alone has its leading edge
+     * drift into the past and the chart quietly loses the minutes nearest now -
+     * which are the ones worth having.
+     *
+     * The loop is a cold flow, so it stops with the last subscriber rather than
+     * ticking away behind a screen nobody is looking at. Network is rate-limited
+     * by the repository's own cache, not by this cadence: most of these ticks
+     * only re-anchor what is already held.
+     */
+    private val timelines: Flow<List<FusedPrecipitation>> = forecasts
+        .flatMapLatest { forecast ->
+            if (forecast == null) {
+                flowOf(emptyList())
+            } else {
+                flow {
+                    while (true) {
+                        emit(
+                            runCatching {
+                                nowcasts.timeline(forecast, Instant.now())
+                            }.getOrDefault(emptyList()),
+                        )
+                        delay(TIMELINE_TICK_MS)
+                    }
+                }
+            }
+        }
+
+    /**
+     * What has been learned about this place. Re-read when the forecast changes
+     * rather than on the timeline's cadence: it is a database query whose answer
+     * moves over weeks, not minutes.
+     */
+    private val biases: Flow<LearnedBias?> = forecasts.map { forecast ->
+        forecast?.let { runCatching { verification.learnedBias(it.location) }.getOrNull() }
+    }
+
+    private val derived: Flow<Derived> = combine(timelines, biases) { timeline, bias ->
+        Derived(timeline = timeline, bias = bias)
+    }
 
     val state: StateFlow<WeatherUiState> = combine(
         selectedLocation.selected,
-        selectedLocation.selected.flatMapLatest { repository.observe(it) },
+        forecasts,
         refreshing,
         error,
         derived,
@@ -89,35 +154,8 @@ class WeatherViewModel(
                 // A failure belongs to the place it happened in. Carrying it to
                 // the next one would tell somebody their new location is broken.
                 error.value = null
-                derived.value = Derived()
                 if (repository.needsRefresh(repository.cached(location))) refresh()
             }
-        }
-
-        // Radar follows the forecast rather than being fetched alongside it. It
-        // is a second network call that fails independently and often has
-        // nothing to say, so the screen must never be waiting on it: the model
-        // draws immediately and radar sharpens the near term when it arrives.
-        viewModelScope.launch {
-            selectedLocation.selected
-                .flatMapLatest { repository.observe(it) }
-                .collect { forecast ->
-                    if (forecast == null) {
-                        derived.value = Derived()
-                        return@collect
-                    }
-                    val fused = runCatching {
-                        nowcasts.timeline(forecast, Instant.now())
-                    }.getOrDefault(emptyList())
-                    // Null until this place has enough verified records to show a
-                    // pattern, which is the normal state for the first weeks. It
-                    // needs no switch: the correction appears when the evidence
-                    // does, and strengthens as more arrives.
-                    val bias = runCatching {
-                        verification.learnedBias(forecast.location)
-                    }.getOrNull()
-                    derived.value = Derived(timeline = fused, bias = bias)
-                }
         }
     }
 
@@ -156,5 +194,15 @@ class WeatherViewModel(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+
+        /**
+         * How often the near term is rebuilt.
+         *
+         * A minute, which is finer than the radar publishes at. That is
+         * deliberate: most ticks fetch nothing and exist to keep the leading
+         * edge of the chart anchored to now, and the one that lands after a new
+         * sweep picks it up within a minute of it existing.
+         */
+        const val TIMELINE_TICK_MS = 60_000L
     }
 }
