@@ -1,13 +1,10 @@
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -165,7 +163,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
                     modifier = Modifier
                         .offset(x = -outwards, y = downwards)
                         .size(MARK_SIZE)
-                        .clickable { toggle(PlateMark.UMBRELLA) },
+                        .quietlyClickable { toggle(PlateMark.UMBRELLA) },
                 )
             }
 
@@ -174,7 +172,7 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
                 modifier = Modifier
                     .offset(x = outwards, y = downwards)
                     .size(MARK_SIZE)
-                    .clickable { toggle(PlateMark.WIND) },
+                    .quietlyClickable { toggle(PlateMark.WIND) },
             )
 
             Column(
@@ -213,6 +211,24 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
     }
 }
 
+/**
+ * Clickable without the ripple.
+ *
+ * These marks are drawn objects on a porcelain face, not buttons on a sheet, and
+ * a Material ripple washing across the dial behind one of them reads as damage
+ * rather than as feedback. The answer to the tap is the card appearing, which is
+ * a far clearer acknowledgement than a grey flash.
+ *
+ * The click semantics are untouched, so this stays reachable and announced.
+ */
+private fun Modifier.quietlyClickable(onClick: () -> Unit): Modifier = composed {
+    clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClick = onClick,
+    )
+}
+
 /** The two marks standing beside the dial, each of which can explain itself. */
 private enum class PlateMark { UMBRELLA, WIND }
 
@@ -246,8 +262,8 @@ private fun MarkExplanation(
 
     AnimatedVisibility(
         visible = mark != null,
-        enter = fadeIn() + expandVertically(),
-        exit = fadeOut() + shrinkVertically(),
+        enter = Reveal.enter,
+        exit = Reveal.exit,
     ) {
         val title = when (shown) {
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_title)
@@ -284,7 +300,7 @@ private fun MarkExplanation(
                 .padding(top = spacing.s)
                 .clip(RoundedCornerShape(CARD_CORNER))
                 .background(colors.surfaceSunken)
-                .clickable(onClick = onDismiss)
+                .quietlyClickable(onClick = onDismiss)
                 .padding(horizontal = spacing.l, vertical = spacing.m),
         ) {
             Row(

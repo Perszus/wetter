@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.chart.MonotoneCurve
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
@@ -333,6 +334,22 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
  * their neighbours. A tick carries the half hour perfectly well: its position is
  * the information, and the hour either side of it says what it is.
  */
+/**
+ * The hour marks under the chart.
+ *
+ * Positioned from the clock, not from the samples. The obvious version walks the
+ * points and marks the ones whose minute is zero, and it only works when a
+ * sample happens to land exactly on the hour - which the fused timeline never
+ * reliably does, because it is anchored at whatever moment it was built and
+ * re-anchored every minute. The result was an axis whose labels blinked in and
+ * out depending on what minute it currently was, looking for all the world like
+ * something slow to load.
+ *
+ * Walking the boundaries themselves and placing each one by where it falls in
+ * the window is correct however the samples are spaced, and cannot drift out of
+ * alignment with them either: the points are evenly spaced in time, so position
+ * along the track means the same thing to both.
+ */
 private fun DrawScope.drawTimeAxis(
     points: List<CurvePoint>,
     zone: ZoneId,
@@ -340,12 +357,21 @@ private fun DrawScope.drawTimeAxis(
     style: TextStyle,
     tick: Color,
 ) {
-    points.forEachIndexed { index, point ->
-        val minute = point.at.atZone(zone).minute
-        if (minute % LABEL_EVERY_MINUTES != 0) return@forEachIndexed
+    if (points.size < 2) return
+    val start = points.first().at
+    val end = points.last().at
+    val span = Duration.between(start, end).toMillis().toFloat()
+    if (span <= 0f) return
 
-        val x = xOf(index, points.size)
-        val onTheHour = minute == 0
+    val step = Duration.ofMinutes(LABEL_EVERY_MINUTES.toLong())
+    // The first boundary at or after the window opens, found from the hour
+    // containing it rather than by rounding the window's own ragged start.
+    var mark = start.atZone(zone).truncatedTo(ChronoUnit.HOURS).toInstant()
+    while (mark.isBefore(start)) mark = mark.plus(step)
+
+    while (!mark.isAfter(end)) {
+        val x = Duration.between(start, mark).toMillis() / span * size.width
+        val onTheHour = mark.atZone(zone).minute == 0
 
         drawLine(
             color = tick,
@@ -354,14 +380,15 @@ private fun DrawScope.drawTimeAxis(
             strokeWidth = if (onTheHour) 2f else 1f,
         )
 
-        if (!onTheHour) return@forEachIndexed
-
-        val measured = measurer.measure(clockOf(point.at, zone), style)
-        // Nudged inside the bounds so the first and last labels are not clipped
-        // by the edge of the tile.
-        val left = (x - measured.size.width / 2f)
-            .coerceIn(0f, size.width - measured.size.width)
-        drawText(measured, topLeft = Offset(left, LABEL_TOP.toPx()))
+        if (onTheHour) {
+            val measured = measurer.measure(clockOf(mark, zone), style)
+            // Nudged inside the bounds so the first and last labels are not
+            // clipped by the edge of the tile.
+            val left = (x - measured.size.width / 2f)
+                .coerceIn(0f, size.width - measured.size.width)
+            drawText(measured, topLeft = Offset(left, LABEL_TOP.toPx()))
+        }
+        mark = mark.plus(step)
     }
 }
 

@@ -2,10 +2,6 @@ package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -117,7 +113,14 @@ fun ExpandableTile(
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val turn by animateFloatAsState(if (expanded) HALF_TURN else 0f, label = "chevron")
+    // Turned on the same curve and over the same time as the panel it belongs
+    // to, so the arrow and the drawer arrive together rather than the arrow
+    // finishing first and waiting.
+    val turn by animateFloatAsState(
+        targetValue = if (expanded) HALF_TURN else 0f,
+        animationSpec = Reveal.chevron,
+        label = "chevron",
+    )
 
     Column(
         modifier = modifier
@@ -160,8 +163,8 @@ fun ExpandableTile(
         }
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
+            enter = Reveal.enter,
+            exit = Reveal.exit,
         ) {
             Column {
                 Spacer(Modifier.height(spacing.m))
