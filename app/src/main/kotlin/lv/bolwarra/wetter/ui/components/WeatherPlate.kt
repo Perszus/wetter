@@ -139,7 +139,10 @@ fun WeatherPlate(forecast: WeatherForecast, now: Instant, modifier: Modifier = M
                     drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
                     drawGlassEdge(colors.hairline, colors.surfaceRaised)
                     drawHourTicks(colors.hairline)
-                    drawTimeMark(now, zone, colors.textSecondary)
+                    // The pointer is ink, where the scale it aims at is hairline.
+                    // One step of tone was not enough separation to tell the mark
+                    // that means "now" from the twelve that mean nothing.
+                    drawTimeMark(now, zone, colors.textPrimary)
                     if (windSpeed >= STILL_AIR_MS) {
                         drawWindLight(beamAngle, colors.textPrimary)
                     }
@@ -505,19 +508,34 @@ private fun DrawScope.drawHourTicks(colour: Color) {
 }
 
 /**
- * Where we are in the day: a short radial line inside the edge rather than on
- * it, so the rim stays a clean unbroken circle.
+ * Where we are in the day: a pointer aimed at the hour scale.
+ *
+ * A *shape*, not a longer line. It used to be a radial stroke starting at the
+ * same radius as the hour ticks and only a few points longer than the ones at
+ * twelve, three, six and nine - which made the one mark on this face that says
+ * something about right now indistinguishable from the twelve that are just a
+ * scale. Any amount of making it longer or brighter would still have been a
+ * tick among ticks; a triangle is read as pointing at something, and that is
+ * the whole job.
+ *
+ * It sits inside the rim and aims outward at the scale rather than running from
+ * the centre like a clock hand, because the middle of this face is occupied by
+ * the temperature - which is what people open the app for, and which a hand
+ * sweeping across it would cross twice an hour.
  */
 private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
-    val outer = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
+    val tip = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
+    val base = tip - MARK_LENGTH.toPx()
+    val halfBase = MARK_WIDTH.toPx()
+
     rotate(degrees = angleOf(now, zone) + QUARTER_TURN, pivot = center) {
-        drawLine(
-            color = colour,
-            start = Offset(center.x, center.y - outer),
-            end = Offset(center.x, center.y - outer + MARK_LENGTH.toPx()),
-            strokeWidth = MARK_WIDTH.toPx(),
-            cap = StrokeCap.Round,
-        )
+        val pointer = Path().apply {
+            moveTo(center.x, center.y - tip)
+            lineTo(center.x - halfBase, center.y - base)
+            lineTo(center.x + halfBase, center.y - base)
+            close()
+        }
+        drawPath(pointer, colour)
     }
 }
 
@@ -572,7 +590,14 @@ private fun DrawScope.ringRadius(): Float = size.minDimension / 2f - EDGE_WIDTH.
  */
 private fun angleOf(instant: Instant, zone: ZoneId): Float {
     val local = instant.atZone(zone)
-    val minutes = (local.hour % HOURS_ON_FACE) * 60 + local.minute
+    // Seconds included so the pointer sits where the instant actually is rather
+    // than snapping to the last whole minute. The clock driving this only ticks
+    // once a minute today, so this changes nothing on screen - but it means the
+    // function answers the question it claims to, and a finer tick would simply
+    // work.
+    val minutes = (local.hour % HOURS_ON_FACE) * 60 +
+        local.minute +
+        local.second / SECONDS_PER_MINUTE
     return -QUARTER_TURN + minutes / MINUTES_ON_FACE * FULL_TURN
 }
 
@@ -594,8 +619,12 @@ private val EDGE_WIDTH = 3.dp
 private val TICK_GAP = 6.dp
 private val TICK_LONG = 7.dp
 private val TICK_SHORT = 3.5.dp
-private val MARK_LENGTH = 12.dp
-private val MARK_WIDTH = 2.5.dp
+
+/** Long enough to read as a pointer at arm's length, short enough not to crowd. */
+private val MARK_LENGTH = 11.dp
+
+/** Half the pointer's base. Slim, so it aims rather than blocks. */
+private val MARK_WIDTH = 3.dp
 
 private const val HOURS_ON_FACE = 12
 private const val DEGREES_PER_HOUR = 360f / HOURS_ON_FACE
@@ -606,6 +635,7 @@ private const val QUARTERS = 3
 private const val QUARTER_TURN = 90f
 private const val FULL_TURN = 360f
 private const val NANOS_PER_SECOND = 1_000_000_000f
+private const val SECONDS_PER_MINUTE = 60f
 
 private val CARD_CORNER = 14.dp
 private const val TAU = 6.2831855f
