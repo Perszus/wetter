@@ -68,6 +68,28 @@ object PrecipitationFusion {
     const val MAX_RADAR_WEIGHT = 0.95
 
     /**
+     * How far ahead the radar simply decides.
+     *
+     * Inside this window it is not one opinion of two. It is the only source
+     * that has actually looked: it sees where the cloud is, how dense it is and
+     * which way it is moving, and it looks again every ten minutes. A model's
+     * next two hours were computed hours ago from an analysis older still, and
+     * nothing about them improves as the hour approaches - whatever was sent is
+     * what you get.
+     *
+     * So inside two hours the projection carries the answer and the model fills
+     * only the last sliver. Blending the two in proportion, which is what
+     * happened before, let a stale hourly average pull a measured shower back
+     * towards the middle exactly where the measurement was strongest.
+     *
+     * Measured against the lead of the projection rather than against the clock.
+     * A sweep half an hour old asked about ninety minutes from now has been
+     * pushed two hours downwind, and how far the field has been carried is what
+     * decides whether it is still an observation or a guess of its own.
+     */
+    val RADAR_AUTHORITY: Duration = Duration.ofHours(2)
+
+    /**
      * Confidence attributed to the model when there is nothing to check it
      * against - no ensemble, so no measurement of how hard the hour is.
      */
@@ -126,7 +148,7 @@ object PrecipitationFusion {
                     sources = 1,
                 )
                 else -> {
-                    val share = sample.confidence.toDouble().coerceIn(0.0, 1.0) * MAX_RADAR_WEIGHT
+                    val share = radarShareFor(sample)
                     FusedPrecipitation(
                         at = at,
                         millimetresPerHour =
@@ -155,6 +177,25 @@ object PrecipitationFusion {
      * Relative to their own size, because half a millimetre apart is close
      * agreement in a downpour and complete disagreement in a drizzle.
      */
+    /**
+     * How much of the answer the radar gets.
+     *
+     * Full weight while the projection is still inside its window, and the
+     * confidence-weighted blend after it - beyond two hours a field has been
+     * carried further than the motion it was measured from can justify, and the
+     * model's physics starts being the better bet.
+     *
+     * Confidence is deliberately not raised to match. Taking the value from the
+     * radar says where the number came from; it does not say the number is
+     * certain, and a reading two hours out is less certain than one ten minutes
+     * out however it was arrived at.
+     */
+    private fun radarShareFor(sample: RadarSample): Double = if (sample.lead <= RADAR_AUTHORITY) {
+        MAX_RADAR_WEIGHT
+    } else {
+        sample.confidence.toDouble().coerceIn(0.0, 1.0) * MAX_RADAR_WEIGHT
+    }
+
     fun agreement(a: Double, b: Double): Double {
         val scale = maxOf(a, b, AGREEMENT_SCALE_FLOOR)
         return (1.0 - kotlin.math.abs(a - b) / scale).coerceIn(0.0, 1.0)

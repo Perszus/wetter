@@ -273,27 +273,47 @@ nothing to fetch.
 
 ### Where the handover happens
 
+**Inside two hours the radar decides.** It is not one opinion of two there; it is
+the only source that has actually looked. It sees where the cloud is, how dense
+it is and which way it is moving, and it looks again every ten minutes. A
+model's next two hours were computed hours ago from an analysis older still, and
+nothing about them improves as the hour approaches — whatever was sent is what
+you get. We do not need a report from half an hour ago to tell us there is rain
+overhead when we can see it.
+
 | Lead | Radar | Why |
 |---|---|---|
-| now | ~95% | An observation. Needs no motion estimate at all. |
-| 30 min | ~88% | Advection is reliable this far on a decent match. |
-| 1 h | ~73% | Still better than a model that has not seen the current field. |
-| 2 h | ~43% | Storms have grown, died and turned; the model is catching up. |
-| 3 h+ | <25% | Extrapolation is spent. The model is all there is. |
+| 0 – 2 h | 95% | The window where the sky is being watched rather than predicted. |
+| 2 h+ | confidence × 95% | The field has been carried further than the motion behind it justifies. |
+| 3 h+ | in practice <25% | Extrapolation is spent. The model is all there is. |
 
-The weight is **not** read off that table at runtime. It is derived from the
-nowcast's own confidence, which is the product of two independent things: how far
-radar can usefully see at all, and how well *this* sweep matched the last one.
-A fixed table is right on average and blind to the second — and the second is
-what separates a good estimate from the one over Dublin that came out fifty
-degrees wrong on a thin, structureless field.
+Past the window the share is **not** read off a table at runtime. It is derived
+from the nowcast's own confidence, the product of two independent things: how far
+radar can usefully see at all, and how well *this* sweep matched the last one. A
+fixed table is right on average and blind to the second — and the second is what
+separates a good estimate from the one over Dublin that came out fifty degrees
+wrong on a thin, structureless field.
+
+**Confidence is not raised to match.** Taking the value from the radar says where
+the number came from; it does not claim the number is certain. A reading two
+hours out is less certain than one ten minutes out however it was arrived at, and
+the confidence carried alongside each point still says so. That is where the
+sharpening lives now: as a shower approaches, the answer does not become *more
+radar*, it becomes more certain.
+
+The cost of this is deliberate and worth writing down. A projection built on
+almost no echo — the Dublin case — now leads inside the window where it used to
+hand back to the model. It reports a low confidence while doing so. The judgement
+is that a thin look at the real sky beats a fresh look at an old model, and that
+two hours of immediate precision is what the radar layer exists to buy.
 
 Two properties of that split are worth keeping:
 
 - **The present moment does not depend on the motion estimate.** A flat rain
   field gives a poor match, but the sweep still shows rain that is falling. Only
-  the projection needs the motion, so a featureless field is trusted completely
-  about now and discounted quickly for anything beyond it.
+  the projection needs the motion — which is why a featureless field is still
+  worth believing about now, and why its confidence falls away with lead even
+  though its share no longer does.
 - **The model is never switched off.** Radar sees precipitation, not the sky. It
   misses what falls below the beam, misses snow it cannot detect, and cannot see
   past its own coverage. A standing model share means those gaps degrade the

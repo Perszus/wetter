@@ -64,13 +64,35 @@ class PrecipitationFusionTest {
     }
 
     @Test
-    fun `an unconfident radar hands over to the model`() {
-        // The Dublin case: an estimate built on almost no echo. A fixed
-        // lead-time table would still have given it most of the weight.
+    fun `inside the window a thin estimate still leads, and says so`() {
+        // The Dublin case: an estimate built on almost no echo. This used to
+        // hand the answer back to the model, and inside the window it no longer
+        // does - for the first two hours the radar reports what it is looking
+        // at, which is the whole point of looking.
+        //
+        // The doubt does not disappear, it moves. The value comes from the
+        // radar; the confidence still says how much of it to believe.
         val fused = PrecipitationFusion.fuse(
             hourly = hours(2.0, 2.0, 2.0),
             radar = radar(10L to (9f to 0.05f)),
             from = start.plus(Duration.ofMinutes(10)),
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        )
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused[0].radarShare, 1e-6)
+        assertTrue("the radar's nine should carry it", fused[0].millimetresPerHour > 8.0)
+        assertTrue("a thin estimate must not read as certain", fused[0].confidence < 0.4)
+    }
+
+    @Test
+    fun `past the window a thin estimate hands over`() {
+        // Beyond two hours the field has been carried further than the motion
+        // behind it can justify, so confidence weighs it again and the model
+        // takes the answer back.
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(2.0, 2.0, 2.0, 2.0),
+            radar = radar(150L to (9f to 0.05f)),
+            from = start.plus(Duration.ofMinutes(150)),
             step = Duration.ofMinutes(10),
             steps = 1,
         )
@@ -206,15 +228,16 @@ class PrecipitationFusionTest {
         val anHourOff = askedAt(60)
         val closeIn = askedAt(10)
 
+        // Both are radar-led now - inside two hours that is the rule - so what
+        // sharpens is the certainty rather than the share. A projection ten
+        // minutes out has barely been carried at all; one an hour out has been
+        // pushed a long way on a motion measured once.
         assertTrue(
-            "an hour off ${anHourOff.radarShare} vs close in ${closeIn.radarShare}",
-            closeIn.radarShare > anHourOff.radarShare,
+            "an hour off ${anHourOff.confidence} vs close in ${closeIn.confidence}",
+            closeIn.confidence > anHourOff.confidence,
         )
-        assertTrue(closeIn.confidence > anHourOff.confidence)
-
-        // And the closer reading should be most of the answer rather than a
-        // minority share of it, or the sharpening is academic.
-        assertTrue("close in was ${closeIn.radarShare}", closeIn.radarShare > 0.8)
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, closeIn.radarShare, 1e-6)
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, anHourOff.radarShare, 1e-6)
         assertTrue(
             "the model still overrode a shower ten minutes away: " +
                 "${closeIn.millimetresPerHour}",
@@ -255,5 +278,75 @@ class PrecipitationFusionTest {
             PrecipitationFusion.fuse(hours(1.0), emptyList(), start, Duration.ofMinutes(10), 0)
                 .isEmpty(),
         )
+    }
+
+    @Test
+    fun `inside two hours the radar decides, whatever the model says`() {
+        // The model says a steady 4 mm an hour. The radar has looked and there
+        // is nothing there. Within the window the answer is what was seen.
+        val dryRadar = List(6) { index ->
+            RadarSample(
+                at = start.plus(Duration.ofMinutes(index * 20L)),
+                lead = Duration.ofMinutes(index * 20L),
+                millimetresPerHour = 0f,
+                // A middling confidence on purpose: it must not water the
+                // observation down inside the window.
+                confidence = 0.4f,
+            )
+        }
+
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(4.0, 4.0, 4.0),
+            radar = dryRadar,
+            from = start,
+            step = Duration.ofMinutes(20),
+            steps = 6,
+        )
+
+        val early = fused.first { it.at == start }
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, early.radarShare, 1e-6)
+        // 95% of nothing plus 5% of the model's four.
+        assertEquals(0.2, early.millimetresPerHour, 1e-6)
+    }
+
+    @Test
+    fun `past two hours the model comes back`() {
+        val late = RadarSample(
+            at = start.plus(Duration.ofMinutes(150)),
+            lead = Duration.ofMinutes(150),
+            millimetresPerHour = 0f,
+            confidence = 0.4f,
+        )
+
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(4.0, 4.0, 4.0, 4.0),
+            radar = listOf(late),
+            from = start.plus(Duration.ofMinutes(150)),
+            step = Duration.ofMinutes(20),
+            steps = 1,
+        )
+
+        val point = fused.single()
+        // Beyond the window the projection has been carried further than the
+        // motion behind it can justify, so its confidence weighs it again.
+        assertTrue(point.radarShare < PrecipitationFusion.MAX_RADAR_WEIGHT)
+        assertEquals(0.4 * PrecipitationFusion.MAX_RADAR_WEIGHT, point.radarShare, 1e-6)
+    }
+
+    @Test
+    fun `authority does not inflate confidence`() {
+        // Taking the value from the radar says where the number came from. It
+        // does not say the number is certain.
+        val faint = RadarSample(start, Duration.ZERO, 3f, confidence = 0.3f)
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(3.0, 3.0),
+            radar = listOf(faint),
+            from = start,
+            step = Duration.ofMinutes(20),
+            steps = 1,
+        ).single()
+
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused.radarShare, 1e-6)
+        assertTrue("confidence should not be raised to match", fused.confidence < 0.8)
     }
 }
