@@ -104,6 +104,8 @@ class WeatherData(
             source = radarSource,
             ensembles = OpenMeteoEnsemble(httpClient),
             seriesStore = RadarSeriesStore(database.radarSeries(), WetterHttpClient.json),
+            // So every projection is scored against the sweep that answers it.
+            verification = verification,
         )
     }
 

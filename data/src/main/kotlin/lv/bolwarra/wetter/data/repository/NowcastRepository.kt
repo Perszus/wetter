@@ -60,6 +60,13 @@ class NowcastRepository internal constructor(
      * behaviour can be tested without a database.
      */
     private val seriesStore: RadarSeriesStore? = null,
+    /**
+     * Where the projection is held to its word.
+     *
+     * Optional, because scoring is not required for the app to work and a
+     * failure to record must never cost somebody their forecast.
+     */
+    private val verification: VerificationRepository? = null,
 ) {
 
     /** Shown wherever radar contributes. Several sources require it. */
@@ -123,14 +130,32 @@ class NowcastRepository internal constructor(
         // Kept so the next launch starts from something rather than nothing.
         // Only the samples under this place are stored; the grid they came from
         // is megabytes and nothing reads it.
+        val series = nowcast?.seriesAt(location.latitude, location.longitude).orEmpty()
+
         val store = seriesStore
         if (nowcast != null && sweepAt != null && store != null) {
+            runCatching { store.write(cacheKeyOf(location), sweepAt, series) }
+        }
+
+        // Mark the last projection's homework, then set the next.
+        //
+        // The order matters: the sweep that just landed is the observation that
+        // answers what was claimed for this moment, and it has to settle those
+        // claims before the new projection writes its own for the same times.
+        //
+        // Wrapped, because none of this is worth a forecast. A scoring failure
+        // should cost the app its self-knowledge, never its answer.
+        val scorer = verification
+        if (nowcast != null && sweepAt != null && scorer != null) {
             runCatching {
-                store.write(
-                    cacheKeyOf(location),
-                    sweepAt,
-                    nowcast.seriesAt(location.latitude, location.longitude),
-                )
+                series.firstOrNull { it.lead.isZero }?.let { observation ->
+                    scorer.settleFromRadar(
+                        location = location,
+                        observedAt = sweepAt,
+                        observed = observation.millimetresPerHour.toDouble(),
+                    )
+                }
+                scorer.recordNowcast(location, sweepAt, series)
             }
         }
         nowcast

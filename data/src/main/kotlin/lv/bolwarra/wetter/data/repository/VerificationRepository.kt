@@ -11,6 +11,7 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.observation.LocalEstimate
 import lv.bolwarra.wetter.domain.observation.ObservationSource
 import lv.bolwarra.wetter.domain.observation.WeatherObservation
+import lv.bolwarra.wetter.domain.radar.RadarSample
 import lv.bolwarra.wetter.domain.verification.BiasCorrection
 import lv.bolwarra.wetter.domain.verification.ForecastRecord
 import lv.bolwarra.wetter.domain.verification.LearnedBias
@@ -87,6 +88,71 @@ class VerificationRepository internal constructor(
                 }
             }
         if (rows.isNotEmpty()) dao.write(rows)
+    }
+
+    /**
+     * Record what the radar projection claimed, so it can be held to it.
+     *
+     * The nowcast is the one source in this app that can be marked without any
+     * outside help. Every ten minutes a real sweep arrives, and it is a
+     * measurement of exactly the quantity the projection guessed at, over
+     * exactly the same field. No station, no interpolation, no waiting an hour
+     * for a METAR that may say nothing useful.
+     *
+     * That matters more than convenience. The hour the radar is trusted for is
+     * currently a judgement - a reasoned one, but nobody has measured where the
+     * projection actually stops beating the model. With both scored the
+     * hand-over can sit where the two curves genuinely cross, per location,
+     * rather than where anybody reasoned it should.
+     *
+     * The zero-lead sample is deliberately not recorded. It is the observation
+     * itself, and scoring it would be marking the radar's homework against a
+     * copy of the same homework.
+     */
+    suspend fun recordNowcast(
+        location: WeatherLocation,
+        issuedAt: Instant,
+        samples: List<RadarSample>,
+    ) {
+        val key = cacheKeyOf(location)
+        val rows = samples
+            .filter { !it.lead.isZero && it.lead <= NOWCAST_HORIZON }
+            .map { sample ->
+                ForecastRecordEntity(
+                    cacheKey = key,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    validAtEpochSecond = sample.at.epochSecond,
+                    issuedAtEpochSecond = issuedAt.epochSecond,
+                    source = NOWCAST_SOURCE,
+                    variable = VerifiedVariable.PRECIPITATION.name,
+                    predicted = sample.millimetresPerHour.toDouble(),
+                    observed = null,
+                )
+            }
+        if (rows.isNotEmpty()) dao.write(rows)
+    }
+
+    /**
+     * Settle outstanding radar predictions against a sweep that has now landed.
+     *
+     * @param observedAt the moment the sweep describes.
+     * @param observed what it measured at this place, mm/h.
+     * @return how many claims were settled.
+     */
+    suspend fun settleFromRadar(
+        location: WeatherLocation,
+        observedAt: Instant,
+        observed: Double,
+    ): Int {
+        val key = cacheKeyOf(location)
+        val outstanding = dao.awaitingVerification(
+            nowEpochSecond = observedAt.plus(SWEEP_TOLERANCE).epochSecond,
+            earliestEpochSecond = observedAt.minus(SWEEP_TOLERANCE).epochSecond,
+        ).filter { it.cacheKey == key && it.source == NOWCAST_SOURCE }
+
+        outstanding.forEach { dao.markVerified(it.id, observed) }
+        return outstanding.size
     }
 
     /**
@@ -225,7 +291,33 @@ class VerificationRepository internal constructor(
         return "$latitude,$longitude"
     }
 
-    private companion object {
+    companion object {
+        /**
+         * The name the radar projection is scored under.
+         *
+         * A source like any other, which is the point: it sits in the same
+         * table as the providers and is compared on the same terms, so the
+         * hand-over between them can be read off the numbers rather than
+         * argued about.
+         */
+        const val NOWCAST_SOURCE = "radar-nowcast"
+
+        /**
+         * How close a projected step must sit to a sweep to be the same moment.
+         *
+         * Sweeps land about every ten minutes and the projection steps at the
+         * same cadence, so half a step either way pairs each claim with the
+         * observation that answers it and no other.
+         */
+        val SWEEP_TOLERANCE: Duration = Duration.ofMinutes(5)
+
+        /**
+         * How far ahead the projection is held to its word. Beyond this the
+         * model already carries the answer, so scoring it would be scoring
+         * something nobody is shown.
+         */
+        val NOWCAST_HORIZON: Duration = Duration.ofHours(2)
+
         /** How far ahead predictions are written down. */
         val RECORD_HORIZON: Duration = Duration.ofHours(12)
 
