@@ -388,14 +388,14 @@ private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
 /**
  * How far along the ramp each level sits.
  *
- * The bottom is not the palette's light-precipitation tone itself. That colour
- * was chosen to fill an area, and drawn as a two-point line on a pale ground it
- * is barely there - which matters because most weather most of the time lives
- * down here, so the washed-out end is the one people would actually be reading.
- * The ramp starts a third of the way up instead: still plainly the lightest of
- * the three, still legible on its own.
+ * The bottom sits a touch above the palette's light-precipitation tone rather
+ * than on it. That colour was chosen to fill an area and, drawn as a two-point
+ * line, is thin enough to lose - but only just, so the correction needed is
+ * small. An earlier attempt lifted it a third of the way toward the loud colour,
+ * which was over-corrected: light rain came out a confident mid-blue and the
+ * ramp had nowhere left to go by the time it reached moderate.
  */
-private const val LIGHT_MIX = 0.32f
+private const val LIGHT_MIX = 0.10f
 private const val MODERATE_MIX = 0.72f
 
 /**
