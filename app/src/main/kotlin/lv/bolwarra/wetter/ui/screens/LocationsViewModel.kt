@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,29 @@ import lv.bolwarra.wetter.domain.location.PlaceSearch
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /** What the locations screen is showing. */
+/**
+ * What makes one row in the locations list different from another.
+ *
+ * Coordinates alone were used for this and are not an identity. The geocoder
+ * returns "Singapore" and "Singapore Island" at exactly 1.36667, 103.8 - two
+ * different places by name, one point on the earth - and a list keyed on the
+ * point alone crashed outright the moment somebody searched for it.
+ *
+ * So the key is everything the row actually shows. Two rows identical in all of
+ * it are the same row to whoever is reading, and showing one of them is the
+ * right answer rather than a workaround.
+ *
+ * Coordinates are formatted against the root locale on purpose: a decimal comma
+ * would still be deterministic, but a key that changes shape with the phone's
+ * language is a bug waiting for somebody else's device.
+ */
+internal fun WeatherLocation.rowKey(): String = listOf(
+    name,
+    region.orEmpty(),
+    country.orEmpty(),
+    String.format(Locale.ROOT, "%.5f,%.5f", latitude, longitude),
+).joinToString("|")
+
 data class LocationsUiState(
     val query: String = "",
     val results: List<WeatherLocation> = emptyList(),

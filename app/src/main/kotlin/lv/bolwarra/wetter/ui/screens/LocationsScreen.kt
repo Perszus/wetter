@@ -109,7 +109,12 @@ fun LocationsScreen(
         )
         Spacer(Modifier.height(spacing.m))
 
-        val showing = if (state.searchable) state.results else state.places
+        // Deduplicated by the same function that keys the list, so the two
+        // cannot disagree about what one place is - which is exactly how this
+        // crashed before, with a tolerant sameness test on one side and exact
+        // coordinates on the other.
+        val showing = (if (state.searchable) state.results else state.places)
+            .distinctBy { it.rowKey() }
 
         // A word about what the list currently is, so a search that matched
         // nothing cannot be mistaken for the saved places having vanished.
@@ -130,7 +135,7 @@ fun LocationsScreen(
         }
 
         LazyColumn {
-            items(showing, key = { "${it.latitude},${it.longitude}" }) { location ->
+            items(showing, key = { it.rowKey() }) { location ->
                 val isSelected = location.latitude == selected.latitude &&
                     location.longitude == selected.longitude
                 LocationRow(
