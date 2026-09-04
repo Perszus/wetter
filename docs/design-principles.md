@@ -61,6 +61,18 @@ dashboard. It should read as measured, quiet, and precise.
    dismissed. Every one of those is a sentence about Wetter appearing on a
    screen whose whole job is to be a sentence about the sky.
 
+   The same rule governs failure, and there it is about accountability rather
+   than clutter. When a car's engine goes, the dealership does not get to
+   explain that their piston supplier had a defective batch. The buyer bought a
+   car from the dealership; checking the pistons was the dealership's job. So
+   Wetter never names the service that let it down, and never says "the weather
+   service did not answer" - Wetter is the one that did not answer. Every
+   failure sentence takes Wetter as its subject.
+
+   The two exceptions are the reader's own business rather than ours: no network
+   (their connection, which they may want to do something about) and no location
+   chosen yet (we are waiting on them).
+
    This does not soften rule 7 by one degree - it is why rule 7 has to be
    carried properly. The reader has no way to discount a bad reading, because
    they are not being told which readings to discount. Correctness is the only

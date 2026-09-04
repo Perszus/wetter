@@ -8,7 +8,7 @@
     <string name="locations_clear">Clear</string>
     <string name="locations_forget">Forget %1$s</string>
     <string name="locations_no_matches">Nothing found for “%1$s”.</string>
-    <string name="locations_search_failed">Could not reach the place search. Your saved places are still here.</string>
+    <string name="locations_search_failed">Could not search just now. Your saved places are still here.</string>
     <string name="locations_none_saved">Search for a place to add it here.</string>
     <string name="nav_settings">Settings</string>
     <string name="action_back">Back</string>
@@ -79,18 +79,15 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="status_days_ago">Updated %1$d days ago</string>
     <string name="status_offline_cached">Offline · showing the last forecast</string>
     <string name="status_update_failed">Could not update · showing the last forecast</string>
-    <string name="status_no_provider">No source covers this location</string>
 
     <!-- States where there is nothing at all to show -->
     <string name="state_no_forecast">No forecast available</string>
     <string name="state_no_forecast_detail">Wetter needs a location before it can show you anything.</string>
     <string name="state_choose_location">Choose a location</string>
     <string name="state_offline">No connection</string>
-    <string name="state_offline_detail">Wetter will show the forecast as soon as it can reach a weather service.</string>
-    <string name="state_could_not_fetch">Could not fetch a forecast</string>
-    <string name="state_could_not_fetch_detail">The weather service did not answer. This usually passes on its own.</string>
-    <string name="state_no_provider">No source covers this location</string>
-    <string name="state_no_provider_detail">None of the weather services Wetter uses forecasts for this place.</string>
+    <string name="state_offline_detail">Wetter will show the forecast as soon as it is back online.</string>
+    <string name="state_could_not_fetch">Could not get a forecast</string>
+    <string name="state_could_not_fetch_detail">Wetter is still trying. This usually passes on its own.</string>
 
     <!-- The three pages. Words, not icons: nobody recognises a month from a picture. -->
     <string name="domain_today">Today</string>

@@ -265,17 +265,31 @@ private fun WeatherScreenBody(
     }
 }
 
+/**
+ * What to say when there is nothing to show.
+ *
+ * Only two of these are the reader's business. Being offline is, because it is
+ * their network and they may want to do something about it; having no location
+ * yet is, because the app is waiting on them. Everything else is Wetter failing
+ * to do its job, and the reader gets one sentence saying so.
+ *
+ * In particular there is no message for [WeatherError.NoProviderAvailable].
+ * There used to be - "No source covers this location", with a detail line naming
+ * the services Wetter uses - and it was wrong twice over. Wrong as a fact, since
+ * every provider here is global and none of them has ever declined a place on
+ * geography. And wrong as a thing to say at all: which supplier let us down is
+ * not the reader's problem. They did not buy a forecast from a model in Oslo,
+ * they opened Wetter (docs/design-principles.md, rule 8).
+ */
 private fun emptyTitleFor(error: WeatherError?) = when (error) {
     null -> R.string.state_no_forecast
     is WeatherError.Offline -> R.string.state_offline
-    is WeatherError.NoProviderAvailable -> R.string.state_no_provider
     else -> R.string.state_could_not_fetch
 }
 
 private fun emptyDetailFor(error: WeatherError?) = when (error) {
     null -> R.string.state_no_forecast_detail
     is WeatherError.Offline -> R.string.state_offline_detail
-    is WeatherError.NoProviderAvailable -> R.string.state_no_provider_detail
     else -> R.string.state_could_not_fetch_detail
 }
 
