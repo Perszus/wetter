@@ -73,21 +73,26 @@ object PrecipitationFusion {
      * Inside this window it is not one opinion of two. It is the only source
      * that has actually looked: it sees where the cloud is, how dense it is and
      * which way it is moving, and it looks again every ten minutes. A model's
-     * next two hours were computed hours ago from an analysis older still, and
+     * next hours were computed hours ago from an analysis older still, and
      * nothing about them improves as the hour approaches - whatever was sent is
-     * what you get.
+     * what you get. Nobody needs a report from half an hour ago to know there is
+     * rain overhead.
      *
-     * So inside two hours the projection carries the answer and the model fills
-     * only the last sliver. Blending the two in proportion, which is what
-     * happened before, let a stale hourly average pull a measured shower back
-     * towards the middle exactly where the measurement was strongest.
+     * **One hour, not two.** The method underneath is advection: the field is
+     * assumed frozen and only carried along. Over ten minutes that is very
+     * nearly true. By an hour it is strained, and by two the cell that was
+     * coming may have rained itself out while something new built overhead that
+     * no amount of looking at old frames could have shown. An hour is where the
+     * assumption is still doing more good than harm, and handing back earlier
+     * also means a thin, structureless field - the one case where the motion
+     * estimate is worth least - is trusted alone for less time.
      *
      * Measured against the lead of the projection rather than against the clock.
      * A sweep half an hour old asked about ninety minutes from now has been
      * pushed two hours downwind, and how far the field has been carried is what
      * decides whether it is still an observation or a guess of its own.
      */
-    val RADAR_AUTHORITY: Duration = Duration.ofHours(2)
+    val RADAR_AUTHORITY: Duration = Duration.ofHours(1)
 
     /**
      * Confidence attributed to the model when there is nothing to check it

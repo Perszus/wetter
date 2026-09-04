@@ -228,7 +228,7 @@ class PrecipitationFusionTest {
         val anHourOff = askedAt(60)
         val closeIn = askedAt(10)
 
-        // Both are radar-led now - inside two hours that is the rule - so what
+        // Both are radar-led now - inside the window that is the rule - so what
         // sharpens is the certainty rather than the share. A projection ten
         // minutes out has barely been carried at all; one an hour out has been
         // pushed a long way on a motion measured once.
@@ -281,9 +281,12 @@ class PrecipitationFusionTest {
     }
 
     @Test
-    fun `inside two hours the radar decides, whatever the model says`() {
+    fun `inside the window the radar decides, whatever the model says`() {
         // The model says a steady 4 mm an hour. The radar has looked and there
         // is nothing there. Within the window the answer is what was seen.
+        //
+        // Stepped every twenty minutes, so the later samples deliberately fall
+        // outside the hour and are not what this asserts on.
         val dryRadar = List(6) { index ->
             RadarSample(
                 at = start.plus(Duration.ofMinutes(index * 20L)),
@@ -310,7 +313,7 @@ class PrecipitationFusionTest {
     }
 
     @Test
-    fun `past two hours the model comes back`() {
+    fun `past the window the model comes back`() {
         val late = RadarSample(
             at = start.plus(Duration.ofMinutes(150)),
             lead = Duration.ofMinutes(150),

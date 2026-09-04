@@ -273,19 +273,41 @@ nothing to fetch.
 
 ### Where the handover happens
 
-**Inside two hours the radar decides.** It is not one opinion of two there; it is
+**Radar is the immediate layer.** Not because it stops being a prediction — it
+does not. Carrying a field forward is a forecast, and it rests on an assumption
+that gets worse every minute: that the rain keeps doing what it was measured
+doing. The difference is what the prediction is *built on*.
+
+A model predicts from a simulated atmosphere initialised hours ago. The nowcast
+predicts from what is in the sky right now — where the rain actually is, how
+dense it actually is, which way it was actually observed to move. Both are
+guesses about the future; one of them starts from a look out of the window.
+
+That is the whole claim, and it is a narrow one. It is also why the claim
+expires: the shorter the extrapolation, the more of the answer is observation
+and the less is assumption. An hour in, most of it is still the observation.
+
+**So inside an hour the radar decides.** It is not one opinion of two there; it is
 the only source that has actually looked. It sees where the cloud is, how dense
 it is and which way it is moving, and it looks again every ten minutes. A
-model's next two hours were computed hours ago from an analysis older still, and
+model's next hours were computed hours ago from an analysis older still, and
 nothing about them improves as the hour approaches — whatever was sent is what
 you get. We do not need a report from half an hour ago to tell us there is rain
 overhead when we can see it.
 
 | Lead | Radar | Why |
 |---|---|---|
-| 0 – 2 h | 95% | The window where the sky is being watched rather than predicted. |
-| 2 h+ | confidence × 95% | The field has been carried further than the motion behind it justifies. |
+| 0 – 1 h | 95% | The window where the sky is being watched rather than predicted. |
+| 1 h+ | confidence × 95% | The field has been carried further than the motion behind it justifies. |
 | 3 h+ | in practice <25% | Extrapolation is spent. The model is all there is. |
+
+An hour rather than two, and the reason is the method. Underneath is advection:
+the field is assumed frozen and only carried along. Over ten minutes that is
+very nearly true; by an hour it is strained; by two the cell that was coming may
+have rained itself out while something new built overhead that no amount of
+looking at old frames could have shown. Physics can model formation and decay,
+which is the one thing advection cannot — so the hand-over belongs where the
+assumption stops paying.
 
 Past the window the share is **not** read off a table at runtime. It is derived
 from the nowcast's own confidence, the product of two independent things: how far
@@ -302,10 +324,12 @@ sharpening lives now: as a shower approaches, the answer does not become *more
 radar*, it becomes more certain.
 
 The cost of this is deliberate and worth writing down. A projection built on
-almost no echo — the Dublin case — now leads inside the window where it used to
-hand back to the model. It reports a low confidence while doing so. The judgement
-is that a thin look at the real sky beats a fresh look at an old model, and that
-two hours of immediate precision is what the radar layer exists to buy.
+almost no echo — the Dublin case — leads inside the window where it used to hand
+back to the model, reporting a low confidence while it does. The judgement is
+that a thin look at the real sky beats a fresh look at an old model. Shortening
+the window from two hours to one narrows that exposure: the case where the
+motion estimate is worth least is also the case where it is trusted alone for
+the shortest time.
 
 Two properties of that split are worth keeping:
 
