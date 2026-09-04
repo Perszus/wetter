@@ -118,13 +118,10 @@ fun RainCurve(
     val axisStyle = WetterTheme.type.axis.copy(color = colors.textTertiary)
 
     // Resolved here rather than in the draw scope, which has no way to reach a
-    // string resource. Every level is named now that every level has an equal
-    // share of the track and room for its word.
+    // string resource. The chart speaks in three levels; each entry is the
+    // bottom of its band, so light's is the floor and needs no rule of its own.
     val guides = listOf(
-        heightFraction(PrecipitationIntensity.TRACE_MM_PER_HOUR.toFloat()) to
-            stringResource(PrecipitationIntensity.TRACE.labelRes()),
-        heightFraction(PrecipitationIntensity.LIGHT_MM_PER_HOUR.toFloat()) to
-            stringResource(PrecipitationIntensity.LIGHT.labelRes()),
+        0f to stringResource(PrecipitationIntensity.LIGHT.labelRes()),
         heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat()) to
             stringResource(PrecipitationIntensity.MODERATE.labelRes()),
         heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat()) to
@@ -325,9 +322,7 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
             text = stringResource(
                 R.string.curve_reading,
                 clockOf(point.at, zone),
-                stringResource(
-                    PrecipitationIntensity.ofRate(point.millimetresPerHour.toDouble()).labelRes(),
-                ),
+                stringResource(curveLevel(point.millimetresPerHour.toDouble()).labelRes()),
             ),
             style = WetterTheme.type.meta,
             color = colors.textTertiary,
@@ -384,9 +379,7 @@ private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
         (1f - heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat())) to full,
         (1f - heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat())) to
             step(MODERATE_MIX),
-        (1f - heightFraction(PrecipitationIntensity.LIGHT_MM_PER_HOUR.toFloat())) to
-            step(LIGHT_MIX),
-        1f to step(FAINTEST_MIX),
+        1f to step(LIGHT_MIX),
         startY = 0f,
         endY = size.height,
     )
@@ -399,11 +392,10 @@ private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
  * was chosen to fill an area, and drawn as a two-point line on a pale ground it
  * is barely there - which matters because most weather most of the time lives
  * down here, so the washed-out end is the one people would actually be reading.
- * The ramp starts a quarter of the way up instead: still clearly the lightest of
- * the four, still legible on its own.
+ * The ramp starts a third of the way up instead: still plainly the lightest of
+ * the three, still legible on its own.
  */
-private const val FAINTEST_MIX = 0.25f
-private const val LIGHT_MIX = 0.45f
+private const val LIGHT_MIX = 0.32f
 private const val MODERATE_MIX = 0.72f
 
 /**
@@ -434,18 +426,32 @@ private fun DrawScope.drawIntensityGuides(
     guides.forEach { (fraction, label) ->
         val y = size.height * (1f - fraction)
 
-        drawLine(
-            color = rule.copy(alpha = GUIDE_RULE_ALPHA),
-            start = Offset(0f, y),
-            end = Offset(size.width, y),
-            strokeWidth = 1f,
-        )
+        // The lowest band's boundary is the floor of the chart, which is already
+        // drawn by the axis beneath it. A second rule on top of it would only
+        // thicken the frame.
+        if (fraction > 0f) {
+            drawLine(
+                color = rule.copy(alpha = GUIDE_RULE_ALPHA),
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = GUIDE_RULE_WIDTH.toPx(),
+            )
+        }
         val measured = measurer.measure(
             label,
             style.copy(color = style.color.copy(alpha = GUIDE_TEXT_ALPHA)),
         )
-        // Sat just above its own rule, inside the band it names.
-        drawText(measured, topLeft = Offset(0f, y - measured.size.height - GUIDE_LABEL_GAP.toPx()))
+        // Held to the right edge. On the left they sat over the leftmost minutes
+        // of the chart, which are *now* - the one moment on the track somebody
+        // is certain to be looking at. The far right is six hours out, which is
+        // the part it costs least to write under.
+        drawText(
+            textLayoutResult = measured,
+            topLeft = Offset(
+                size.width - measured.size.width - GUIDE_LABEL_INSET.toPx(),
+                y - measured.size.height - GUIDE_LABEL_GAP.toPx(),
+            ),
+        )
     }
 }
 
@@ -588,30 +594,59 @@ private fun clockOf(instant: Instant, zone: ZoneId): String {
  * is linear in is how wet you get, which is what the chart is for.
  */
 /**
- * Where each intensity sits on the track: one equal share each.
+ * Where a rate sits on the track: three levels, a third of the height each.
  *
- * The rates are not evenly spaced - a trace is a tenth of a millimetre and
- * torrential is fifty - so the track is deliberately not a scale of millimetres.
- * It is a scale of *levels*, and every level gets the same height. That makes
- * the chart something you can learn once: a fifth of the way up is always the
- * boundary between one word and the next, wherever the rain happens to be
- * today.
+ * The rates are wildly unevenly spaced - a trace is a tenth of a millimetre and
+ * torrential is fifty - so this is not a scale of millimetres and never was. It
+ * is a scale of the three words anybody acts on, and each of them owns exactly a
+ * third of the track.
  *
- * Earlier versions weighted the bands by feel, which meant light rain wandered
- * between a third and a half of the track depending on how the neighbouring
- * thresholds had last been nudged, and no two readings of the chart were quite
- * the same skill.
+ * Two things went with the earlier five-level version. "Barely" was a level
+ * nobody does anything differently about, so it is folded into light: the
+ * bottom third now means anything from a spit to a proper shower. And the top
+ * band was reserved for torrential, which put a fifth of the chart aside for
+ * weather that essentially never arrives and pushed everything real into the
+ * lower half.
  *
- * Dry is still flat on the floor and torrential still fills it.
+ * Dry sits on the floor and the least rain there is steps just clear of it, so
+ * the question the chart is asked most - whether it will rain at all - is still
+ * answered without reading anything.
  */
 private val BAND_HEIGHTS = listOf(
     0.0 to 0.00f,
-    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.20f,
-    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.40f,
-    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.60f,
-    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.80f,
+    // The least rain there is, lifted just clear of the floor.
+    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.08f,
+    PrecipitationIntensity.MODERATE_MM_PER_HOUR to LIGHT_TOP,
+    PrecipitationIntensity.HEAVY_MM_PER_HOUR to MODERATE_TOP,
     PrecipitationIntensity.VIOLENT_MM_PER_HOUR to 1.00f,
 )
+
+/**
+ * Light takes a fifth less than the other two, which between them split what is
+ * left. Written as the arithmetic rather than as two rounded decimals, so the
+ * relationship survives anybody changing the ratio later.
+ */
+private const val LIGHT_SHARE = 0.8f
+private const val TALLER_BANDS = 2f
+private const val LIGHT_TOP = LIGHT_SHARE / (LIGHT_SHARE + TALLER_BANDS)
+private const val MODERATE_TOP = (LIGHT_SHARE + 1f) / (LIGHT_SHARE + TALLER_BANDS)
+
+/**
+ * The level the chart names a rate, which is coarser than the domain's own.
+ *
+ * The bands fold a trace into light, so the readout has to as well. Scrubbing a
+ * spit of rain and being told "barely" while it sits plainly inside the band
+ * labelled "light" is the chart disagreeing with itself, and the reader has no
+ * way to know which half to believe.
+ */
+private fun curveLevel(millimetresPerHour: Double): PrecipitationIntensity = when {
+    millimetresPerHour < PrecipitationIntensity.TRACE_MM_PER_HOUR -> PrecipitationIntensity.NONE
+    millimetresPerHour < PrecipitationIntensity.MODERATE_MM_PER_HOUR ->
+        PrecipitationIntensity.LIGHT
+    millimetresPerHour < PrecipitationIntensity.HEAVY_MM_PER_HOUR ->
+        PrecipitationIntensity.MODERATE
+    else -> PrecipitationIntensity.HEAVY
+}
 
 /** Where a rate sits on the track, as a fraction of its height. */
 private fun heightFraction(millimetresPerHour: Float): Float {
@@ -649,10 +684,11 @@ private fun smoothStep(t: Float): Float {
 /** Above this share, the point is carried by radar rather than by the model. */
 private const val RADAR_BACKED = 0.5
 
-private const val GUIDE_RULE_ALPHA = 0.45f
-private const val GUIDE_TEXT_ALPHA = 0.40f
-private val GUIDE_LABEL_GAP = 1.dp
-private val GUIDE_LABEL_INSET = 2.dp
+private const val GUIDE_RULE_ALPHA = 1f
+private const val GUIDE_TEXT_ALPHA = 0.85f
+private val GUIDE_LABEL_GAP = 2.dp
+private val GUIDE_RULE_WIDTH = 1.dp
+private val GUIDE_LABEL_INSET = 4.dp
 
 /** Sub-steps drawn between two fused points, purely to round the corners. */
 private const val SMOOTH_STEPS = 5
