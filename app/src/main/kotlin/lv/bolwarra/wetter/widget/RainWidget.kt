@@ -9,14 +9,11 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.text.format.DateFormat
 import android.widget.RemoteViews
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -170,7 +167,7 @@ class RainWidget : AppWidgetProvider() {
                     windSpeed = frame.windSpeed,
                     windFrom = frame.windFrom,
                     hourOffset = hourOffset(frame),
-                    hourLabels = hourLabels(context, frame),
+                    hourLabels = hourLabels(frame),
                 ),
             )
         }
@@ -196,20 +193,23 @@ class RainWidget : AppWidgetProvider() {
     }
 
     /**
-     * The clock times of those boundaries, in the reader's own 12- or 24-hour
-     * preference. Whether each one has room to be drawn is decided where it is
-     * drawn, against the measured width of the text.
+     * The clock times of those boundaries.
+     *
+     * Twenty-four hour, and not the device's 12/24 preference, because the app's
+     * own time axis is `"%d:%02d"` unconditionally (clockOf in RainCurve.kt).
+     * Following the setting here made the widget say "12 AM" beside a chart
+     * saying "0:00" for the same moment.
+     *
+     * Whether each label has room to be drawn is decided where it is drawn,
+     * against the measured width of the text.
      */
-    private fun hourLabels(context: Context, frame: Frame): List<String> {
-        val pattern = if (DateFormat.is24HourFormat(context)) HOUR_24 else HOUR_12
-        val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
-            .withZone(frame.zone)
+    private fun hourLabels(frame: Frame): List<String> {
         val first = frame.now.atZone(frame.zone)
             .truncatedTo(ChronoUnit.HOURS)
             .plusHours(1)
-            .toInstant()
         return (0 until HOURS_IN_WINDOW).map {
-            formatter.format(first.plus(Duration.ofHours(it.toLong())))
+            val at = first.plusHours(it.toLong())
+            "%d:%02d".format(at.hour, at.minute)
         }
     }
 
@@ -311,9 +311,6 @@ class RainWidget : AppWidgetProvider() {
         private const val FUSION_BUDGET_MS = 6_000L
 
         private const val HOURS_IN_WINDOW = 4
-
-        private const val HOUR_24 = "HH"
-        private const val HOUR_12 = "h a"
 
         /** Three cells by one, before anybody resizes it. */
         private const val DEFAULT_WIDTH_DP = 240f

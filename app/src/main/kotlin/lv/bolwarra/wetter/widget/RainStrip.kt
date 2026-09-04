@@ -265,8 +265,15 @@ internal object RainStrip {
         hourOffset: Float,
         hourLabels: List<String>,
     ) {
+        // The marks are read, so they take a text tone rather than the gridline
+        // one. Drawn in the tone the band rules use they were technically
+        // present and practically invisible - a scale nobody can see is a scale
+        // that is not there.
+        val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.textTertiary.toArgb()
+        }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.gridline.toArgb()
+            color = colors.hairline.toArgb()
             strokeWidth = HAIRLINE_DP * scale
         }
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -290,13 +297,13 @@ internal object RainStrip {
             if (fraction > 0f) {
                 val x = chart.left + chart.width() * fraction
                 val onTheHour = step % 2 == 0
-                paint.strokeWidth = (if (onTheHour) HOUR_STROKE_DP else HAIRLINE_DP) * scale
+                tick.strokeWidth = (if (onTheHour) HOUR_STROKE_DP else HALF_STROKE_DP) * scale
                 canvas.drawLine(
                     x,
                     chart.bottom,
                     x,
                     chart.bottom + (if (onTheHour) HOUR_TICK_DP else HALF_TICK_DP) * scale,
-                    paint,
+                    tick,
                 )
 
                 // The label belongs to the rule beside it, so it starts just to
@@ -534,7 +541,7 @@ internal object RainStrip {
 
     /** Room under the chart for the hour labels, which are real text on top. */
     private const val LABEL_SHARE = 0.30f
-    private const val MIN_LABEL_DP = 15f
+    private const val MIN_LABEL_DP = 17f
     private const val MAX_LABEL_DP = 24f
 
     private const val STROKE_DP = 2.5f
@@ -544,13 +551,14 @@ internal object RainStrip {
     private const val HALF_HOUR = 0.125f
 
     /** The same proportions the app's own time axis uses. */
-    private const val HOUR_TICK_DP = 5f
-    private const val HALF_TICK_DP = 3f
-    private const val HOUR_STROKE_DP = 1.4f
+    private const val HOUR_TICK_DP = 6f
+    private const val HALF_TICK_DP = 4f
+    private const val HOUR_STROKE_DP = 1.8f
+    private const val HALF_STROKE_DP = 1.3f
 
     private const val LABEL_DP = 10f
     private const val LABEL_GAP_DP = 3f
-    private const val LABEL_BASELINE_DP = 13f
+    private const val LABEL_BASELINE_DP = 15f
     private const val HAIRLINE_DP = 1f
 
     /** Thin and hard, the way a bevel catches light. */
