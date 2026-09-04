@@ -308,8 +308,17 @@ overhead when we can see it.
 | Lead | Radar | Why |
 |---|---|---|
 | 0 – 1 h | 95% | The window where the sky is being watched rather than predicted. |
-| 1 h+ | confidence × 95% | The field has been carried further than the motion behind it justifies. |
+| the next 20 min | eased between | The projection does not stop being an observation at a stroke. |
+| after that | confidence × 95% | The field has been carried further than the motion behind it justifies. |
 | 3 h+ | in practice <25% | Extrapolation is spent. The model is all there is. |
+
+The hand-over is eased with a smoothstep rather than dropped at the boundary. A
+step in the weighting is a step in the answer, and nothing in the sky steps at
+the moment a projection turns an hour old — it showed as a kink in the curve at
+the same place every time, which is the signature of an artefact rather than of
+weather. Smoothstep rather than a straight ramp because its slope is zero at
+both ends: a linear fade removes the step in the value and leaves one in its
+rate of change, which the eye still finds.
 
 An hour rather than two, and the reason is the method. Underneath is advection:
 the field is assumed frozen and only carried along. Over ten minutes that is

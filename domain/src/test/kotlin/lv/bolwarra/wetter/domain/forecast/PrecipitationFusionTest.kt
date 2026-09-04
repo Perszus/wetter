@@ -422,4 +422,82 @@ class PrecipitationFusionTest {
             askedAt(0f).radarShare < PrecipitationFusion.MAX_RADAR_WEIGHT,
         )
     }
+
+    @Test
+    fun `the hand-over has no step in it`() {
+        // A step in the weighting is a step in the answer, and there is nothing
+        // in the sky that steps when a projection turns an hour old. Walked a
+        // minute at a time across the boundary, no two neighbours may jump.
+        fun shareAt(leadMinutes: Long): Double = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 0.0, 0.0, 0.0),
+            radar = listOf(
+                RadarSample(
+                    at = start.plus(Duration.ofMinutes(leadMinutes)),
+                    lead = Duration.ofMinutes(leadMinutes),
+                    millimetresPerHour = 4f,
+                    confidence = 0.3f,
+                    motionQuality = 1f,
+                ),
+            ),
+            from = start.plus(Duration.ofMinutes(leadMinutes)),
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        ).single().radarShare
+
+        val walk = (40L..110L).map { shareAt(it) }
+        val biggestJump = walk.zipWithNext { a, b -> kotlin.math.abs(b - a) }.max()
+
+        // What the boundary used to do in a single minute: the whole distance
+        // between full authority and the confidence-weighted blend.
+        val theStepItReplaced =
+            PrecipitationFusion.MAX_RADAR_WEIGHT - 0.3 * PrecipitationFusion.MAX_RADAR_WEIGHT
+
+        // A smoothstep cannot be flat - its steepest point is 1.5 times the
+        // average slope, which over a twenty minute fade is about 0.05 a minute.
+        // The test is that the cliff is gone, not that the hillside is level.
+        val steepestPossible = 1.5 * theStepItReplaced / 20.0
+        assertTrue(
+            "biggest single-minute jump was $biggestJump",
+            biggestJump <= steepestPossible + 1e-6,
+        )
+        assertTrue(
+            "the fade is no better than the step it replaced",
+            biggestJump < theStepItReplaced / 10.0,
+        )
+
+        // And no kink: the change in the slope is bounded too, which is what
+        // separates an eased hand-over from a merely shorter one.
+        val slopes = walk.zipWithNext { a, b -> b - a }
+        val biggestBend = slopes.zipWithNext { a, b -> kotlin.math.abs(b - a) }.max()
+        assertTrue("biggest bend in the slope was $biggestBend", biggestBend < 0.01)
+    }
+
+    @Test
+    fun `the fade starts and ends where it should`() {
+        fun shareAt(leadMinutes: Long): Double = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 0.0, 0.0, 0.0),
+            radar = listOf(
+                RadarSample(
+                    at = start.plus(Duration.ofMinutes(leadMinutes)),
+                    lead = Duration.ofMinutes(leadMinutes),
+                    millimetresPerHour = 4f,
+                    confidence = 0.3f,
+                    motionQuality = 1f,
+                ),
+            ),
+            from = start.plus(Duration.ofMinutes(leadMinutes)),
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        ).single().radarShare
+
+        // Full authority right up to the boundary.
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, shareAt(60), 1e-6)
+        // And fully handed over once the fade is spent.
+        assertEquals(0.3 * PrecipitationFusion.MAX_RADAR_WEIGHT, shareAt(80), 1e-6)
+        // Halfway through, halfway between - smoothstep is symmetric there.
+        val middle =
+            0.5 *
+                (PrecipitationFusion.MAX_RADAR_WEIGHT + 0.3 * PrecipitationFusion.MAX_RADAR_WEIGHT)
+        assertEquals(middle, shareAt(70), 1e-6)
+    }
 }

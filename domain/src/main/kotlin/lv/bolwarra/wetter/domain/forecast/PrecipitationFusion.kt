@@ -106,6 +106,16 @@ object PrecipitationFusion {
     val LEAST_AUTHORITY: Duration = Duration.ofMinutes(15)
 
     /**
+     * How long the hand-over takes.
+     *
+     * The projection does not stop being an observation at a stroke, so the
+     * weighting should not either. Twenty minutes is long enough that nobody
+     * can see where it happens and short enough that it is not quietly a
+     * longer window by another name.
+     */
+    val AUTHORITY_FADE: Duration = Duration.ofMinutes(20)
+
+    /**
      * Confidence attributed to the model when there is nothing to check it
      * against - no ensemble, so no measurement of how hard the hour is.
      */
@@ -206,12 +216,34 @@ object PrecipitationFusion {
      * certain, and a reading two hours out is less certain than one ten minutes
      * out however it was arrived at.
      */
-    private fun radarShareFor(sample: RadarSample): Double =
-        if (sample.lead <= authorityFor(sample.motionQuality)) {
-            MAX_RADAR_WEIGHT
-        } else {
-            sample.confidence.toDouble().coerceIn(0.0, 1.0) * MAX_RADAR_WEIGHT
+    private fun radarShareFor(sample: RadarSample): Double {
+        val confidence = sample.confidence.toDouble().coerceIn(0.0, 1.0)
+        val authority = authorityFor(sample.motionQuality)
+        val past = sample.lead.toMillis() - authority.toMillis()
+
+        // Eased across the boundary rather than dropped at it.
+        //
+        // A step in the weighting is a step in the answer, and there is nothing
+        // in the sky that steps at the moment a projection turns an hour old.
+        // It showed as a kink in the curve at the same place every time, which
+        // is the signature of an artefact rather than of weather.
+        //
+        // Smoothstep, not a straight ramp, because its slope is zero at both
+        // ends: the answer leaves full authority gently and arrives at the
+        // confidence-weighted blend gently. A linear fade removes the step in
+        // the value and leaves one in its rate of change, which the eye still
+        // finds.
+        val eased = when {
+            past <= 0L -> 0.0
+            past >= AUTHORITY_FADE.toMillis() -> 1.0
+            else -> {
+                val t = past.toDouble() / AUTHORITY_FADE.toMillis()
+                t * t * (3.0 - 2.0 * t)
+            }
         }
+
+        return MAX_RADAR_WEIGHT * (1.0 + (confidence - 1.0) * eased)
+    }
 
     /**
      * How far ahead this particular projection is allowed to decide.
