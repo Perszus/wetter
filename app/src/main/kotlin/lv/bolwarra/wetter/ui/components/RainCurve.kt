@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
@@ -117,11 +118,11 @@ fun RainCurve(
     val axisStyle = WetterTheme.type.axis.copy(color = colors.textTertiary)
 
     // Resolved here rather than in the draw scope, which has no way to reach a
-    // string resource. Only the three levels anybody distinguishes by eye:
-    // "barely" sits too close to the floor to have room for a word, and nothing
-    // useful is added by naming the difference between heavy and torrential
-    // when both mean stay indoors.
+    // string resource. Every level is named now that every level has an equal
+    // share of the track and room for its word.
     val guides = listOf(
+        heightFraction(PrecipitationIntensity.TRACE_MM_PER_HOUR.toFloat()) to
+            stringResource(PrecipitationIntensity.TRACE.labelRes()),
         heightFraction(PrecipitationIntensity.LIGHT_MM_PER_HOUR.toFloat()) to
             stringResource(PrecipitationIntensity.LIGHT.labelRes()),
         heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat()) to
@@ -164,7 +165,6 @@ fun RainCurve(
         ) {
             Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
                 drawIntensityGuides(
-                    points = points,
                     guides = guides,
                     measurer = measurer,
                     style = axisStyle,
@@ -187,7 +187,7 @@ fun RainCurve(
                 )
                 drawPath(
                     path = path,
-                    color = colors.precipitation,
+                    brush = intensityBrush(colors.precipitationMuted, colors.precipitation),
                     style = Stroke(width = STROKE.toPx(), cap = StrokeCap.Round),
                 )
                 scrubbed?.let { index ->
@@ -356,6 +356,57 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
  * the information, and the hour either side of it says what it is.
  */
 /**
+ * The line's colour, deepening as it climbs into heavier rain.
+ *
+ * A vertical gradient rather than a path cut into coloured segments, and that
+ * falls out of what the chart already is: height *is* intensity here, so a
+ * colour that varies with height varies with intensity by construction. Cutting
+ * the path at each threshold would do the same job with hard joins, an
+ * off-by-one at every boundary, and a seam wherever the line grazes a level
+ * without settling in it.
+ *
+ * It stays inside the one hue precipitation already owns, running from the
+ * palette's light-precipitation tone up to its full one. Reaching for a warning
+ * colour at the top would put a second meaning on the chart and break the rule
+ * that this app has exactly one loud colour - and the guide labels behind the
+ * line already say which level it is in words. This is reinforcement, not the
+ * message.
+ *
+ * Stops are given as one minus the height, because a vertical gradient measures
+ * from the top of the canvas downwards while intensity is measured up from the
+ * floor.
+ */
+private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
+    fun step(mix: Float) = lerp(muted, full, mix)
+    return Brush.verticalGradient(
+        // Ascending in gradient space, which is descending in intensity.
+        0f to full,
+        (1f - heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat())) to full,
+        (1f - heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat())) to
+            step(MODERATE_MIX),
+        (1f - heightFraction(PrecipitationIntensity.LIGHT_MM_PER_HOUR.toFloat())) to
+            step(LIGHT_MIX),
+        1f to step(FAINTEST_MIX),
+        startY = 0f,
+        endY = size.height,
+    )
+}
+
+/**
+ * How far along the ramp each level sits.
+ *
+ * The bottom is not the palette's light-precipitation tone itself. That colour
+ * was chosen to fill an area, and drawn as a two-point line on a pale ground it
+ * is barely there - which matters because most weather most of the time lives
+ * down here, so the washed-out end is the one people would actually be reading.
+ * The ramp starts a quarter of the way up instead: still clearly the lightest of
+ * the four, still legible on its own.
+ */
+private const val FAINTEST_MIX = 0.25f
+private const val LIGHT_MIX = 0.45f
+private const val MODERATE_MIX = 0.72f
+
+/**
  * Faint marks saying what the height means.
  *
  * The line's height carries the whole reading and, without this, says nothing on
@@ -367,27 +418,20 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
  * is a nudge, not a grid: the shape of the line is still the thing being read
  * and a chart ruled into slabs would fight it.
  *
- * Only the bands the weather reaches are drawn, plus the first one above it. On
- * a dry afternoon three labelled rules across an empty track would be noise
- * about rain that is not coming; the one above the peak is worth its space
- * because it is what says the line is not about to get worse - a curve sitting
- * under "Moderate" is a different afternoon from one pressing against it.
+ * The whole scale is drawn, every time. An earlier version showed only the
+ * bands the weather reached, to keep a dry afternoon clean, and that was the
+ * wrong trade: a chart whose gridlines move with the data is a different chart
+ * each time you open it, and the reader has to re-learn where they are before
+ * they can read anything. Fixed rules cost a little ink on a quiet day and buy
+ * a scale that means the same thing every morning.
  */
 private fun DrawScope.drawIntensityGuides(
-    points: List<CurvePoint>,
     guides: List<Pair<Float, String>>,
     measurer: TextMeasurer,
     style: TextStyle,
     rule: Color,
 ) {
-    val peak = points.maxOfOrNull { heightFraction(it.millimetresPerHour) } ?: return
-    if (peak < GUIDE_FLOOR) return
-
-    // Everything the line reaches, and the next one up for scale.
-    val topmost = guides.indexOfFirst { it.first > peak }
-    val shown = if (topmost < 0) guides else guides.take(topmost + 1)
-
-    shown.forEach { (fraction, label) ->
+    guides.forEach { (fraction, label) ->
         val y = size.height * (1f - fraction)
 
         drawLine(
@@ -544,28 +588,28 @@ private fun clockOf(instant: Instant, zone: ZoneId): String {
  * is linear in is how wet you get, which is what the chart is for.
  */
 /**
- * Where each intensity sits on the track.
+ * Where each intensity sits on the track: one equal share each.
  *
- * Dry is flat on the floor and torrential fills it, so the reading stays the one
- * anybody actually uses: high means pouring, low means drizzle.
+ * The rates are not evenly spaced - a trace is a tenth of a millimetre and
+ * torrential is fifty - so the track is deliberately not a scale of millimetres.
+ * It is a scale of *levels*, and every level gets the same height. That makes
+ * the chart something you can learn once: a fifth of the way up is always the
+ * boundary between one word and the next, wherever the rain happens to be
+ * today.
  *
- * The step from dry to a trace is deliberately large, because the question the
- * chart is most often asked is not how hard it will rain but *whether* it will,
- * and a trace drawn a tenth of the way up was a bump you could scroll straight
- * past on a track this short.
+ * Earlier versions weighted the bands by feel, which meant light rain wandered
+ * between a third and a half of the track depending on how the neighbouring
+ * thresholds had last been nudged, and no two readings of the chart were quite
+ * the same skill.
  *
- * But it was overdone. Lifting the trace to a quarter of the height carried
- * light rain up with it to nearly half, which reads as a serious afternoon when
- * it is a shower you would walk through. The floor is still well clear of dry -
- * a trace is unmistakable - while light rain now sits under a third, leaving the
- * top half of the track to mean what its name says.
+ * Dry is still flat on the floor and torrential still fills it.
  */
 private val BAND_HEIGHTS = listOf(
     0.0 to 0.00f,
-    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.17f,
-    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.31f,
-    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.56f,
-    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.79f,
+    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.20f,
+    PrecipitationIntensity.LIGHT_MM_PER_HOUR to 0.40f,
+    PrecipitationIntensity.MODERATE_MM_PER_HOUR to 0.60f,
+    PrecipitationIntensity.HEAVY_MM_PER_HOUR to 0.80f,
     PrecipitationIntensity.VIOLENT_MM_PER_HOUR to 1.00f,
 )
 
@@ -605,11 +649,8 @@ private fun smoothStep(t: Float): Float {
 /** Above this share, the point is carried by radar rather than by the model. */
 private const val RADAR_BACKED = 0.5
 
-/** Below this the window is dry enough that naming intensities is noise. */
-private const val GUIDE_FLOOR = 0.10f
-
-private const val GUIDE_RULE_ALPHA = 0.55f
-private const val GUIDE_TEXT_ALPHA = 0.55f
+private const val GUIDE_RULE_ALPHA = 0.45f
+private const val GUIDE_TEXT_ALPHA = 0.40f
 private val GUIDE_LABEL_GAP = 1.dp
 private val GUIDE_LABEL_INSET = 2.dp
 
@@ -621,7 +662,14 @@ private const val STEP_MINUTES = 10L
 /** How often the axis is labelled. */
 private const val LABEL_EVERY_MINUTES = 30
 
-private val TRACK_HEIGHT = 96.dp
+/**
+ * Tall enough for five equal bands to each hold a word.
+ *
+ * At the old height a band was under twenty points and the lowest labels had
+ * nowhere to sit, so the scale could only be shown in part. This is the height
+ * at which the whole of it fits.
+ */
+private val TRACK_HEIGHT = 148.dp
 private val READOUT_HEIGHT = 24.dp
 private val AXIS_HEIGHT = 26.dp
 private val STROKE = 2.dp
