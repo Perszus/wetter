@@ -355,15 +355,18 @@ private fun MarkExplanation(
             PlateMark.STARS -> stringResource(starsTitle(sky))
             PlateMark.HAZARD -> stringResource(R.string.hazard_title)
         }
-        val body = when (shown) {
+        // Null for the hazard card: the rows are the answer, and a paragraph
+        // explaining how the thresholds were chosen is our reasoning, not the
+        // reader's business. Somebody looking at a storm warning wants the storm.
+        val body: String? = when (shown) {
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_body)
             PlateMark.WIND -> stringResource(R.string.explain_wind_body)
-            PlateMark.HAZARD -> stringResource(R.string.hazard_body)
             PlateMark.STARS -> if (sky.moonWashed) {
                 stringResource(R.string.explain_stars_body_moon)
             } else {
                 stringResource(R.string.explain_stars_body)
             }
+            PlateMark.HAZARD -> null
         }
         // The wind card carries the number the whole indicator is derived from.
         // Without it the levels and the speed of the light are two things you
@@ -463,7 +466,9 @@ private fun MarkExplanation(
                 WindBands(level)
                 Spacer(Modifier.height(spacing.m))
             }
-            Text(text = body, style = WetterTheme.type.body, color = colors.textSecondary)
+            if (body != null) {
+                Text(text = body, style = WetterTheme.type.body, color = colors.textSecondary)
+            }
         }
     }
 }

@@ -167,7 +167,6 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="hazard_tomorrow">tomorrow %1$s</string>
     <string name="hazard_on_day">%1$s %2$s</string>
     <string name="hazard_from_open">from %1$s</string>
-    <string name="hazard_body">Thresholds are set where the danger is, not where any one country draws its line. Tap again to dismiss.</string>
     <string name="stars_excellent">Excellent stargazing</string>
     <string name="stars_good">Good stargazing</string>
     <string name="stars_fair">Some stars out</string>
