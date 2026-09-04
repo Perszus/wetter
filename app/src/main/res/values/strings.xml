@@ -21,14 +21,16 @@
     <!-- Readings -->
     <string name="unit_celsius">C</string>
     <!-- Read aloud in place of the umbrella glyph on the dial. -->
-    <string name="plate_umbrella">Rain expected today</string>
+    <string name="plate_umbrella">Rain worth an umbrella today</string>
     <!-- Read aloud in place of the wind level lines on the dial. -->
     <string name="wind_light">Light wind</string>
     <string name="wind_moderate">Moderate wind</string>
     <string name="wind_strong">Strong wind</string>
 
     <string name="explain_umbrella_title">Take an umbrella</string>
-    <string name="explain_umbrella_body">Rain is forecast here before the day is out. The umbrella appears whenever anything is expected to fall between now and midnight, so you can catch it on the way out the door. It goes once the last of it has passed.</string>
+    <string name="explain_umbrella_body">Moderate rain or worse is forecast here before the day is out — enough to be worth taking something for, rather than a shower you would walk through.
+
+It appears only for rain at that level between now and midnight, and goes once the last of it has passed.</string>
     <string name="explain_wind_reading">%1$s · gusting %2$s</string>
     <string name="explain_wind_band_light">Light · under %1$s</string>
     <string name="explain_wind_band_moderate">Moderate · %1$s to %2$s</string>

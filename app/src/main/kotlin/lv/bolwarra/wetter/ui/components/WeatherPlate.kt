@@ -54,6 +54,7 @@ import java.time.ZoneId
 import kotlin.math.sin
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.conditionsAt
+import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
@@ -117,7 +118,7 @@ fun WeatherPlate(
     // simply reports one figure rather than a nonsensical one.
     val windGust = (current.windGust ?: windSpeed).coerceAtLeast(windSpeed)
     val beamAngle = rememberBeamAngle(windSpeed)
-    val showUmbrella = forecast.rainExpectedToday(now)
+    val showUmbrella = forecast.umbrellaWeatherToday(now)
 
     fun toggle(mark: PlateMark) {
         onExplain(if (explaining == mark) null else mark)
@@ -439,18 +440,24 @@ private fun windLevelLabel(level: Int) = when (level) {
 }
 
 /**
- * Whether anything is expected to fall today, from now on.
+ * Whether the day still holds rain worth carrying something for.
+ *
+ * Moderate, not merely wet. The mark used to appear for anything at all, which
+ * meant it was up on most days in a maritime climate and stopped being read: a
+ * warning that is always on is furniture. Moderate is where rain stops being
+ * something you walk through and starts being something you take a coat for, and
+ * an umbrella that appears only then is one worth looking at.
  *
  * From now rather than across the whole calendar day: a shower that finished
  * this morning is not a reason to carry an umbrella this afternoon.
  */
-private fun WeatherForecast.rainExpectedToday(now: Instant): Boolean {
+private fun WeatherForecast.umbrellaWeatherToday(now: Instant): Boolean {
     val zone = location.zone
     val today = now.atZone(zone).toLocalDate()
     return hourly.any { hour ->
         !hour.timestamp.isBefore(now) &&
             hour.timestamp.atZone(zone).toLocalDate() == today &&
-            hour.intensity.isWet
+            hour.intensity >= PrecipitationIntensity.MODERATE
     }
 }
 
