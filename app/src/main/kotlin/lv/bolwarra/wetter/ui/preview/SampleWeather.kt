@@ -96,6 +96,9 @@ object SampleWeather {
                 0.0
             },
             cloudCover = 70 + (index % 4) * 8,
+            cloudLow = 40 + (index % 3) * 12,
+            cloudMedium = 30 + (index % 5) * 6,
+            cloudHigh = 10 + (index % 4) * 9,
             isDay = localHour in 7..18,
         )
     }

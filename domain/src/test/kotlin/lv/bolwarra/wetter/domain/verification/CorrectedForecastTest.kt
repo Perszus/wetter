@@ -50,6 +50,9 @@ class CorrectedForecastTest {
                 apparentTemperature = null,
                 uvIndex = null,
                 cloudCover = 10,
+                cloudLow = null,
+                cloudMedium = null,
+                cloudHigh = null,
                 isDay = false,
             )
         },

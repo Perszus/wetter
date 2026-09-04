@@ -51,12 +51,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.MoonPhase
+import lv.bolwarra.wetter.domain.SolarTime
+import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
+import lv.bolwarra.wetter.domain.sky.Stargazing
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
 import lv.bolwarra.wetter.ui.format.labelRes
@@ -127,6 +133,23 @@ fun WeatherPlate(
     val beamAngle = rememberBeamAngle(windSpeed)
     val showUmbrella = forecast.umbrellaWeatherToday(now, timeline)
 
+    // The cloud decks are what make this answerable at all: the total cannot
+    // tell a veil of cirrus from a lid of stratus, and for this question that
+    // is the only distinction that matters.
+    val hour = forecast.hourly.at(now)
+    val sky = Stargazing.assess(
+        cloudLow = hour?.cloudLow,
+        cloudMedium = hour?.cloudMedium,
+        cloudHigh = hour?.cloudHigh,
+        sunElevationDegrees = SolarTime.elevationDegrees(
+            now,
+            forecast.location.latitude,
+            forecast.location.longitude,
+        ),
+        moonIllumination = MoonPhase.illuminationAt(now),
+        precipitationMmPerHour = current.precipitation,
+    )
+
     fun toggle(mark: PlateMark) {
         onExplain(if (explaining == mark) null else mark)
     }
@@ -167,6 +190,15 @@ fun WeatherPlate(
                         drawWindLight(beamAngle, colors.textPrimary)
                     }
                 }
+            }
+
+            if (sky.isWorthIt) {
+                StarsMark(
+                    modifier = Modifier
+                        .offset(x = -outwards, y = -downwards)
+                        .size(MARK_SIZE)
+                        .quietlyClickable { toggle(PlateMark.STARS) },
+                )
             }
 
             if (showUmbrella) {
@@ -221,6 +253,7 @@ fun WeatherPlate(
 
         MarkExplanation(
             mark = explaining,
+            sky = sky,
             windSpeedMs = windSpeed,
             windGustMs = windGust,
             onDismiss = { onExplain(null) },
@@ -247,7 +280,7 @@ private fun Modifier.quietlyClickable(onClick: () -> Unit): Modifier = composed 
 }
 
 /** The two marks standing beside the dial, each of which can explain itself. */
-enum class PlateMark { UMBRELLA, WIND }
+enum class PlateMark { UMBRELLA, WIND, STARS }
 
 /**
  * What the mark you just tapped actually means.
@@ -264,6 +297,7 @@ enum class PlateMark { UMBRELLA, WIND }
 @Composable
 private fun MarkExplanation(
     mark: PlateMark?,
+    sky: Stargazing.Sky,
     windSpeedMs: Double,
     windGustMs: Double,
     onDismiss: () -> Unit,
@@ -285,10 +319,16 @@ private fun MarkExplanation(
         val title = when (shown) {
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_title)
             PlateMark.WIND -> stringResource(windLevelLabel(windLevel(windSpeedMs)))
+            PlateMark.STARS -> stringResource(starsTitle(sky))
         }
         val body = when (shown) {
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_body)
             PlateMark.WIND -> stringResource(R.string.explain_wind_body)
+            PlateMark.STARS -> if (sky.moonWashed) {
+                stringResource(R.string.explain_stars_body_moon)
+            } else {
+                stringResource(R.string.explain_stars_body)
+            }
         }
         // The wind card carries the number the whole indicator is derived from.
         // Without it the levels and the speed of the light are two things you
@@ -309,6 +349,13 @@ private fun MarkExplanation(
                 formatWindSpeed(windSpeedMs)
             }
             PlateMark.UMBRELLA -> null
+            // The figure the mark is derived from, as the wind card does it:
+            // "clear" is a judgement, and the share of open sky is the reading
+            // it was made from.
+            PlateMark.STARS -> stringResource(
+                R.string.explain_stars_reading,
+                (sky.clarity * PERCENT).roundToInt(),
+            )
         }
 
         Column(
@@ -861,3 +908,72 @@ private const val FASTEST_LAP_S = 1.0
 
 /** A slow crawl. Still air stops the light entirely, so this is a light breeze. */
 private const val SLOWEST_LAP_S = 22.0
+
+/**
+ * The mark for a night worth looking up at.
+ *
+ * Drawn rather than dropped in as an image, like the wind levels beside it: one
+ * bright four-pointed star and two lesser ones, which reads as sky at 26dp where
+ * a five-pointed star reads as a rating and a dot reads as nothing.
+ *
+ * The points are concave-sided on purpose - straight edges make a compass rose,
+ * and the pinched waist is what the eye recognises as a star's flare.
+ */
+@Composable
+private fun StarsMark(modifier: Modifier = Modifier) {
+    val colour = WetterTheme.colors.textPrimary
+    val description = stringResource(R.string.plate_stars)
+
+    Canvas(modifier.semantics { contentDescription = description }) {
+        drawStar(Offset(size.width * 0.36f, size.height * 0.38f), size.minDimension * 0.30f, colour)
+        drawStar(
+            Offset(size.width * 0.78f, size.height * 0.22f),
+            size.minDimension * 0.15f,
+            colour.copy(alpha = LESSER_STAR),
+        )
+        drawStar(
+            Offset(size.width * 0.68f, size.height * 0.76f),
+            size.minDimension * 0.19f,
+            colour.copy(alpha = LESSER_STAR),
+        )
+    }
+}
+
+/** One four-pointed star: long points, pinched waist. */
+private fun DrawScope.drawStar(centre: Offset, radius: Float, colour: Color) {
+    val path = Path()
+    val waist = radius * STAR_WAIST
+    repeat(STAR_POINTS * 2) { step ->
+        val reach = if (step % 2 == 0) radius else waist
+        // Starting a quarter turn round so a point aims straight up.
+        val angle = step * (TAU / (STAR_POINTS * 2)) - TAU / 4
+        val x = centre.x + reach * cos(angle).toFloat()
+        val y = centre.y + reach * sin(angle).toFloat()
+        if (step == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    path.close()
+    drawPath(path, colour)
+}
+
+/** Companions, drawn back so the main star is read first. */
+private const val LESSER_STAR = 0.45f
+
+private const val STAR_POINTS = 4
+
+/**
+ * How far the star pinches in between its points. Small, because a wide waist
+ * makes a diamond and the flare is the whole of the shape.
+ */
+private const val STAR_WAIST = 0.2f
+
+private const val PERCENT = 100
+
+/** The word for a night, from how good it actually is. */
+private fun starsTitle(sky: Stargazing.Sky): Int = when {
+    sky.quality >= EXCELLENT_SKY -> R.string.stars_excellent
+    sky.quality >= GOOD_SKY -> R.string.stars_good
+    else -> R.string.stars_fair
+}
+
+private const val EXCELLENT_SKY = 0.85f
+private const val GOOD_SKY = 0.6f

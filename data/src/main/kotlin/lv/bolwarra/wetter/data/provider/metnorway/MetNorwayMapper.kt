@@ -115,6 +115,9 @@ internal object MetNorwayMapper {
                 windGust = details.windGust,
                 uvIndex = details.uvIndex,
                 cloudCover = details.cloudAreaFraction?.roundToInt()?.coerceIn(0, 100),
+                cloudLow = details.cloudLow?.roundToInt()?.coerceIn(0, 100),
+                cloudMedium = details.cloudMedium?.roundToInt()?.coerceIn(0, 100),
+                cloudHigh = details.cloudHigh?.roundToInt()?.coerceIn(0, 100),
                 isDay = SolarTime.isDaylight(parsed.at, location.latitude, location.longitude),
             )
         }

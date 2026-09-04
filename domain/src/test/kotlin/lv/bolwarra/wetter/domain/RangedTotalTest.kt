@@ -32,6 +32,9 @@ class RangedTotalTest {
             apparentTemperature = null,
             uvIndex = null,
             cloudCover = null,
+            cloudLow = null,
+            cloudMedium = null,
+            cloudHigh = null,
             isDay = true,
         )
     }

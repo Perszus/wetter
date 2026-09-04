@@ -40,6 +40,9 @@ internal fun testForecast(location: WeatherLocation, at: Instant) = WeatherForec
             apparentTemperature = null,
             uvIndex = null,
             cloudCover = null,
+            cloudLow = null,
+            cloudMedium = null,
+            cloudHigh = null,
             isDay = true,
         )
     },

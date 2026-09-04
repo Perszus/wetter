@@ -37,6 +37,9 @@ class CurrentConditionsTest {
         apparentTemperature = null,
         uvIndex = null,
         cloudCover = 20,
+        cloudLow = null,
+        cloudMedium = null,
+        cloudHigh = null,
         isDay = true,
     )
 

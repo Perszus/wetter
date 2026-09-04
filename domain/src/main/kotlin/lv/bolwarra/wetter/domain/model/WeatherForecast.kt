@@ -107,6 +107,19 @@ data class HourlyWeather(
     /** percent, 0..100 */
     val cloudCover: Int?,
     /**
+     * The sky broken into its three decks, each a percentage.
+     *
+     * The total alone cannot tell a bright day from a grey one: 99% of thin
+     * cirrus is a hazy sun, 99% of low stratus is a lid. They do not sum to
+     * [cloudCover] and are not meant to - a deck seen through a gap in the one
+     * below it is counted by both, which is why the total is not their sum.
+     *
+     * Roughly: low is below 2 km, medium 2-6 km, high above.
+     */
+    val cloudLow: Int?,
+    val cloudMedium: Int?,
+    val cloudHigh: Int?,
+    /**
      * Clear-sky UV index for this hour.
      *
      * Both sources quote it for a clear sky, which makes it a ceiling rather

@@ -49,6 +49,9 @@ class HourlySeriesTest {
             apparentTemperature = null,
             uvIndex = null,
             cloudCover = null,
+            cloudLow = null,
+            cloudMedium = null,
+            cloudHigh = null,
             isDay = hour in 7..18,
         )
     }

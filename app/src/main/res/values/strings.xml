@@ -142,6 +142,16 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="metric_gust">Gusts</string>
     <string name="metric_chance_of_rain">Chance of rain</string>
     <string name="metric_uv">UV index</string>
+    <string name="plate_stars">Good night for stars</string>
+    <string name="stars_excellent">Excellent stargazing</string>
+    <string name="stars_good">Good stargazing</string>
+    <string name="stars_fair">Some stars out</string>
+    <string name="explain_stars_body">The sky is dark and mostly open, so the stars are out. Read from the cloud layers rather than the total: high cloud is a thin veil, low cloud is a lid, and only the split tells them apart.</string>
+    <string name="explain_stars_body_moon">The sky is dark and mostly open. A bright moon is washing out the fainter stars, though the bright ones and the planets carry on regardless.</string>
+    <string name="explain_stars_reading">%1$d%% of the sky open</string>
+    <string name="metric_cloud_low">Low cloud</string>
+    <string name="metric_cloud_medium">Mid cloud</string>
+    <string name="metric_cloud_high">High cloud</string>
     <string name="uv_low">Low</string>
     <string name="uv_moderate">Moderate</string>
     <string name="uv_high">High</string>

@@ -209,6 +209,23 @@ private fun AdvancedTile(
                         stringResource(R.string.metric_cloud),
                         formatPercent(hour?.cloudCover),
                     ),
+                    // Broken out because the total cannot tell a bright day from
+                    // a grey one - 99% of thin cirrus is a hazy sun, 99% of low
+                    // stratus is a lid. They do not sum to the total and are not
+                    // meant to: a deck seen through a gap in the one below it is
+                    // counted twice.
+                    Metric(
+                        stringResource(R.string.metric_cloud_low),
+                        formatPercent(hour?.cloudLow),
+                    ),
+                    Metric(
+                        stringResource(R.string.metric_cloud_medium),
+                        formatPercent(hour?.cloudMedium),
+                    ),
+                    Metric(
+                        stringResource(R.string.metric_cloud_high),
+                        formatPercent(hour?.cloudHigh),
+                    ),
                     Metric(
                         stringResource(R.string.metric_chance_of_rain),
                         formatPercent(hour?.precipitationProbability),

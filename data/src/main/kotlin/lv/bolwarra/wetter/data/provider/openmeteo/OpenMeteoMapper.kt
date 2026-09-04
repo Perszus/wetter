@@ -97,6 +97,9 @@ object OpenMeteoMapper {
                 windGust = hourly.windGust.at(index),
                 uvIndex = hourly.uvIndex.at(index),
                 cloudCover = hourly.cloudCover.at(index),
+                cloudLow = hourly.cloudLow.at(index),
+                cloudMedium = hourly.cloudMedium.at(index),
+                cloudHigh = hourly.cloudHigh.at(index),
                 isDay = hourly.isDay.at(index)?.let { it == 1 } ?: true,
             )
         }

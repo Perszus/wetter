@@ -85,6 +85,10 @@ internal data class StoredHour(
     /** Defaulted, so forecasts cached before it existed still read back. */
     val uvIndex: Double? = null,
     val cloudCover: Int?,
+    /** Defaulted, so forecasts cached before the decks existed still read back. */
+    val cloudLow: Int? = null,
+    val cloudMedium: Int? = null,
+    val cloudHigh: Int? = null,
     val isDay: Boolean,
 )
 
@@ -165,6 +169,9 @@ private fun HourlyWeather.toStored() = StoredHour(
     windGust = windGust,
     uvIndex = uvIndex,
     cloudCover = cloudCover,
+    cloudLow = cloudLow,
+    cloudMedium = cloudMedium,
+    cloudHigh = cloudHigh,
     isDay = isDay,
 )
 
@@ -240,6 +247,9 @@ private fun StoredHour.toDomain() = HourlyWeather(
     windGust = windGust,
     uvIndex = uvIndex,
     cloudCover = cloudCover,
+    cloudLow = cloudLow,
+    cloudMedium = cloudMedium,
+    cloudHigh = cloudHigh,
     isDay = isDay,
 )
 
