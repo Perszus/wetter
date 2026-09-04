@@ -71,7 +71,10 @@ private fun MetricCell(metric: Metric, modifier: Modifier = Modifier) {
         Text(
             text = metric.value,
             style = WetterTheme.type.figure,
-            color = colors.textPrimary,
+            // A dash is the absence of a reading, not a quiet one. Drawn at the
+            // disabled tone it cannot be mistaken for a value at a glance, which
+            // an em dash in reading ink can be.
+            color = if (metric.value == NO_READING) colors.textDisabled else colors.textPrimary,
         )
     }
 }
@@ -110,11 +113,11 @@ fun MetricGroup(
         Text(
             text = label.uppercase(),
             style = WetterTheme.type.groupLabel,
-            color = colors.onGroupBand,
+            color = colors.onSurfaceStrong,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(BAND_CORNER))
-                .background(colors.groupBand)
+                .background(colors.surfaceStrong)
                 .padding(horizontal = spacing.m, vertical = spacing.s),
         )
         Spacer(Modifier.height(spacing.m))

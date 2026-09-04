@@ -45,6 +45,7 @@ import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.ui.format.formatMillimetres
 import lv.bolwarra.wetter.ui.format.labelRes
+import lv.bolwarra.wetter.ui.theme.Emphasis
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
@@ -165,7 +166,7 @@ fun RainCurve(
                     guides = guides,
                     measurer = measurer,
                     style = axisStyle,
-                    rule = colors.hairline,
+                    rule = colors.gridline,
                 )
                 val path = curvePath(points)
                 drawPath(
@@ -462,7 +463,7 @@ private fun DrawScope.drawIntensityGuides(
         // thicken the frame.
         if (fraction > 0f) {
             drawLine(
-                color = rule.copy(alpha = GUIDE_RULE_ALPHA),
+                color = rule,
                 start = Offset(0f, y),
                 end = Offset(size.width, y),
                 strokeWidth = GUIDE_RULE_WIDTH.toPx(),
@@ -470,7 +471,7 @@ private fun DrawScope.drawIntensityGuides(
         }
         val measured = measurer.measure(
             label,
-            style.copy(color = style.color.copy(alpha = GUIDE_TEXT_ALPHA)),
+            style,
         )
         // Held to the right edge. On the left they sat over the leftmost minutes
         // of the chart, which are *now* - the one moment on the track somebody
@@ -715,8 +716,6 @@ private fun smoothStep(t: Float): Float {
 /** Above this share, the point is carried by radar rather than by the model. */
 private const val RADAR_BACKED = 0.5
 
-private const val GUIDE_RULE_ALPHA = 1f
-private const val GUIDE_TEXT_ALPHA = 0.85f
 private val GUIDE_LABEL_GAP = 2.dp
 private val GUIDE_RULE_WIDTH = 1.dp
 private val GUIDE_LABEL_INSET = 4.dp
@@ -747,6 +746,6 @@ private val TICK_HOUR = 5.dp
 private val TICK_HALF = 3.dp
 private val LABEL_TOP = 8.dp
 
-private const val FILL_TOP_ALPHA = 0.34f
-private const val FILL_BOTTOM_ALPHA = 0.02f
-private const val CURSOR_ALPHA = 0.45f
+private const val FILL_TOP_ALPHA = Emphasis.MUTED
+private const val FILL_BOTTOM_ALPHA = 0f
+private const val CURSOR_ALPHA = Emphasis.MUTED

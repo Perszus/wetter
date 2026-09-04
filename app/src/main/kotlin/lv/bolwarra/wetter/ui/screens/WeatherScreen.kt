@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -38,6 +39,8 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.delay
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.conditionsAt
+import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.DomainSwitcher
@@ -46,6 +49,7 @@ import lv.bolwarra.wetter.ui.components.PlateMark
 import lv.bolwarra.wetter.ui.components.WeatherHeader
 import lv.bolwarra.wetter.ui.components.WeatherPlate
 import lv.bolwarra.wetter.ui.preview.SampleWeather
+import lv.bolwarra.wetter.ui.theme.Atmosphere
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
@@ -131,11 +135,59 @@ fun WeatherScreen(
     // those are things the dial can see.
     var explaining by remember { mutableStateOf<PlateMark?>(null) }
 
+    // The sky this screen is read under. Only this screen: the locations list
+    // and settings are not showing weather, and tinting them to a city's
+    // overcast would be decoration rather than information.
+    val current = state.forecast?.conditionsAt(now)
+    val sky = remember(current?.condition, current?.precipitation) {
+        current?.let {
+            Atmosphere.of(
+                condition = it.condition,
+                intensity = PrecipitationIntensity.ofRate(it.precipitation),
+                isDay = it.isDay,
+            )
+        } ?: Atmosphere.Neutral
+    }
+
+    WetterTheme(sky = sky) {
+        WeatherScreenBody(
+            state = state,
+            domain = domain,
+            onSelectDomain = onSelectDomain,
+            onOpenLocations = onOpenLocations,
+            onOpenSettings = onOpenSettings,
+            onRetry = onRetry,
+            now = now,
+            explaining = explaining,
+            onExplain = { explaining = it },
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun WeatherScreenBody(
+    state: WeatherUiState,
+    domain: WeatherDomain,
+    onSelectDomain: (WeatherDomain) -> Unit,
+    onOpenLocations: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onRetry: () -> Unit,
+    now: Instant,
+    explaining: PlateMark?,
+    onExplain: (PlateMark?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = WetterTheme.spacing
+
     Column(
         modifier = modifier
             .fillMaxSize()
+            // The screen paints its own ground, because the sky has moved it and
+            // the shell above this was themed before the weather was known.
+            .background(WetterTheme.colors.surface)
             .padding(horizontal = spacing.screen)
-            .dismissOnOutsideTap(active = explaining != null) { explaining = null },
+            .dismissOnOutsideTap(active = explaining != null) { onExplain(null) },
     ) {
         WeatherHeader(
             locationName = state.location?.name,
@@ -173,7 +225,7 @@ fun WeatherScreen(
                 hazards = state.hazards,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 explaining = explaining,
-                onExplain = { explaining = it },
+                onExplain = onExplain,
             )
             Spacer(Modifier.height(spacing.xl))
             DomainSwitcher(selected = domain, onSelect = onSelectDomain)

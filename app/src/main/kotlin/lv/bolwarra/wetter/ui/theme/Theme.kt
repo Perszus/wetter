@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 
 /**
  * The single entry point to Wetter's design language.
@@ -15,8 +16,24 @@ import androidx.compose.runtime.ReadOnlyComposable
  * (docs/decisions.md).
  */
 @Composable
-fun WetterTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = if (darkTheme) DarkWetterColors else LightWetterColors
+fun WetterTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    /**
+     * The sky the app is being read under.
+     *
+     * Which plate is used stays a system setting - somebody who has asked for a
+     * dark interface has asked for one, and the weather does not overrule that.
+     * What the weather changes is the light *within* the chosen plate, which is
+     * a change of atmosphere rather than a change of mode.
+     */
+    sky: Atmosphere = Atmosphere.Neutral,
+    content: @Composable () -> Unit,
+) {
+    // Remembered because generating a plate is thirty colour-space conversions,
+    // and the sky changes on the hour rather than on the frame.
+    val colors = remember(darkTheme, sky) {
+        if (darkTheme) darkPlate(sky) else lightPlate(sky)
+    }
 
     CompositionLocalProvider(
         LocalWetterColors provides colors,

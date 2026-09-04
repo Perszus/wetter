@@ -208,7 +208,7 @@ private fun SearchField(
             unfocusedContainerColor = colors.surfaceRaised,
             focusedTextColor = colors.textPrimary,
             unfocusedTextColor = colors.textPrimary,
-            cursorColor = colors.accent,
+            cursorColor = colors.interactive,
             // The underline a filled field normally carries fights the pill.
             focusedIndicatorColor = Color.Transparent,
             unfocusedIndicatorColor = Color.Transparent,
@@ -242,7 +242,7 @@ private fun LocationRow(
                 style = WetterTheme.type.title,
                 // Selection is shown by weight of colour rather than by a tick.
                 // One row in the list is darker than the rest; that is enough.
-                color = if (isSelected) colors.accent else colors.textPrimary,
+                color = if (isSelected) colors.interactive else colors.textPrimary,
             )
             val place = listOfNotNull(location.region, location.country).joinToString(", ")
             if (place.isNotEmpty()) {

@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +69,7 @@ import lv.bolwarra.wetter.ui.format.formatHazardWindow
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
 import lv.bolwarra.wetter.ui.format.labelRes
+import lv.bolwarra.wetter.ui.theme.Emphasis
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
@@ -185,15 +185,26 @@ fun WeatherPlate(
 
             Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize()) {
-                    drawPorcelain(colors.surfaceRaised, colors.surfaceSunken)
-                    drawGlassEdge(colors.hairline, colors.surfaceRaised)
+                    drawPorcelain(
+                        face = colors.surfaceRaised,
+                        highlight = colors.surfaceHighlight,
+                        shade = colors.surfaceShade,
+                    )
+                    drawGlassEdge(colors.hairline, colors.surfaceHighlight)
                     drawHourTicks(colors.hairline)
                     // The pointer is ink, where the scale it aims at is hairline.
                     // One step of tone was not enough separation to tell the mark
                     // that means "now" from the twelve that mean nothing.
                     drawTimeMark(now, zone, colors.textPrimary)
                     if (windSpeed >= STILL_AIR_MS) {
-                        drawWindLight(beamAngle, colors.textPrimary)
+                        // The light on the face is the light of the hour: warm
+                        // while the sun is up, cool once it is not. It is the
+                        // only thing on the dial that moves, so it is the right
+                        // place for the day to show.
+                        drawWindLight(
+                            beamAngle,
+                            if (current.isDay) colors.day else colors.night,
+                        )
                     }
                 }
             }
@@ -510,7 +521,7 @@ private fun WindLevels(speedMs: Double, modifier: Modifier = Modifier) {
             drawWave(
                 y = gap * (index + 1),
                 gap = gap,
-                colour = colour.copy(alpha = if (lit) WAVE_LIT else WAVE_UNLIT),
+                colour = colour.copy(alpha = if (lit) Emphasis.FULL else Emphasis.GHOST),
             )
         }
     }
@@ -684,15 +695,11 @@ private fun lapSecondsFor(windSpeedMs: Double): Float? {
  * the difference between glazed ceramic and a moulded plastic button — real
  * objects are lit from somewhere.
  */
-private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
+private fun DrawScope.drawPorcelain(face: Color, highlight: Color, shade: Color) {
     val radius = ringRadius()
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(
-                lerp(face, Color.White, GLAZE_HIGHLIGHT),
-                face,
-                lerp(face, sunken, RIM_SHADE),
-            ),
+            colors = listOf(highlight, face, shade),
             center = Offset(center.x, center.y - radius * LIGHT_FROM_ABOVE),
             radius = radius * GLAZE_SPREAD,
         ),
@@ -707,12 +714,12 @@ private fun DrawScope.drawPorcelain(face: Color, sunken: Color) {
  * light at the top. Without the second the ring is a drawn circle rather than
  * something with thickness.
  */
-private fun DrawScope.drawGlassEdge(edge: Color, face: Color) {
+private fun DrawScope.drawGlassEdge(edge: Color, catch: Color) {
     val radius = ringRadius()
     drawCircle(color = edge, radius = radius, style = Stroke(EDGE_WIDTH.toPx()))
     drawCircle(
         brush = Brush.verticalGradient(
-            colors = listOf(lerp(face, Color.White, GLASS_CATCH), Color.Transparent),
+            colors = listOf(catch, Color.Transparent),
             startY = center.y - radius,
             endY = center.y,
         ),
@@ -878,15 +885,9 @@ private const val TAU = 6.2831855f
 /** How far above centre the glaze highlight sits, as a fraction of the radius. */
 private const val LIGHT_FROM_ABOVE = 0.35f
 private const val GLAZE_SPREAD = 1.25f
-private const val GLAZE_HIGHLIGHT = 0.55f
-private const val GLASS_CATCH = 0.7f
-private const val RIM_SHADE = 0.35f
-
-private const val BEAM_ALPHA = 0.5f
+private const val BEAM_ALPHA = Emphasis.MUTED
 
 private const val WIND_LINES = 3
-private const val WAVE_LIT = 1f
-private const val WAVE_UNLIT = 0.16f
 private const val WAVE_CYCLES = 1f
 
 /** As a fraction of the gap between lines, so deeper waves cannot collide. */
@@ -978,7 +979,7 @@ private const val SLOWEST_LAP_S = 22.0
  */
 @Composable
 private fun StarsMark(modifier: Modifier = Modifier) {
-    val colour = WetterTheme.colors.textPrimary
+    val colour = WetterTheme.colors.night
     val description = stringResource(R.string.plate_stars)
 
     Canvas(modifier.semantics { contentDescription = description }) {
@@ -1013,7 +1014,7 @@ private fun DrawScope.drawStar(centre: Offset, radius: Float, colour: Color) {
 }
 
 /** Companions, drawn back so the main star is read first. */
-private const val LESSER_STAR = 0.45f
+private const val LESSER_STAR = Emphasis.MUTED
 
 private const val STAR_POINTS = 4
 
@@ -1097,7 +1098,7 @@ private fun HazardMark(severity: HazardSeverity, modifier: Modifier = Modifier) 
 }
 
 /** A hazard that has not started yet is drawn back this far. */
-private const val WARNING_AHEAD = 0.65f
+private const val WARNING_AHEAD = Emphasis.STRONG
 
 /** Slightly wider than tall, which is how a road sign reads. */
 private const val TRIANGLE_RATIO = 0.88f
