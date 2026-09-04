@@ -370,20 +370,50 @@ private fun Readout(point: CurvePoint?, zone: ZoneId) {
  * Stops are given as one minus the height, because a vertical gradient measures
  * from the top of the canvas downwards while intensity is measured up from the
  * floor.
+ *
+ * ### Why the steps are hard
+ *
+ * The first version ramped smoothly from one tone to the other, on the reasoning
+ * that a blend has no off-by-one at a boundary and no seam where the line grazes
+ * a level without settling in it. Measured on a real curve it ran from
+ * rgb(21,129,185) at the peak to rgb(110,178,214) at the floor - a real
+ * difference, and an invisible one: with the change spread over the whole track
+ * there is nothing to notice at the moment it matters, and the line reads as one
+ * blue that happens to be paler at the bottom.
+ *
+ * So each band now holds one flat tone and changes at its edge, which is the
+ * only place the change carries any information. A stroke takes its colour from
+ * where its pixels are, so a line climbing through a boundary changes colour
+ * exactly where it crosses - the part in moderate is the moderate tone, and the
+ * part below it is not.
+ *
+ * The seam that worried the first version is real and turns out to be the point:
+ * a line grazing a level should show it.
  */
 private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
     fun step(mix: Float) = lerp(muted, full, mix)
+
+    // Gradient space runs down from the top, so a band's ceiling in intensity is
+    // its lower bound here.
+    val heavyEdge = 1f - heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat())
+    val moderateEdge = 1f - heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat())
+
     return Brush.verticalGradient(
-        // Ascending in gradient space, which is descending in intensity.
-        0f to full,
-        (1f - heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat())) to full,
-        (1f - heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat())) to
-            step(MODERATE_MIX),
+        0f to step(HEAVY_MIX),
+        heavyEdge to step(HEAVY_MIX),
+        // A hair further down, because stops have to keep increasing and two at
+        // the same offset are not guaranteed to be drawn as an edge.
+        (heavyEdge + SEAM) to step(MODERATE_MIX),
+        moderateEdge to step(MODERATE_MIX),
+        (moderateEdge + SEAM) to step(LIGHT_MIX),
         1f to step(LIGHT_MIX),
         startY = 0f,
         endY = size.height,
     )
 }
+
+/** Narrow enough to read as an edge, wide enough to survive rounding. */
+private const val SEAM = 0.001f
 
 /**
  * How far along the ramp each level sits.
@@ -395,8 +425,9 @@ private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
  * which was over-corrected: light rain came out a confident mid-blue and the
  * ramp had nowhere left to go by the time it reached moderate.
  */
-private const val LIGHT_MIX = 0.10f
-private const val MODERATE_MIX = 0.72f
+private const val LIGHT_MIX = 0.06f
+private const val MODERATE_MIX = 0.5f
+private const val HEAVY_MIX = 1f
 
 /**
  * Faint marks saying what the height means.
