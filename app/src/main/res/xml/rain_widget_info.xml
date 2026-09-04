@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Three cells across, two down.
+  Three cells across, one down.
 
   minWidth and minHeight are the old way of saying that and still the only way
   older launchers hear it: the grid formula is 70n - 30, so three columns is
-  180dp and two rows is 110dp. targetCellWidth and targetCellHeight say the same
+  180dp and one row is 40dp. targetCellWidth and targetCellHeight say the same
   thing in cells for Android 12 and later, which places widgets by grid rather
   than by guessing from dp.
+
+  One row is about 56dp of real height on a phone, which is why the chart's
+  insets are proportions rather than fixed dp and the hour labels shrink a step.
 
   updatePeriodMillis is zero on purpose. The system floor is thirty minutes, and
   a schedule of its own would wake the device to redraw a curve that has not
@@ -16,14 +19,14 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_rain_description"
     android:initialLayout="@layout/widget_rain"
-    android:minHeight="110dp"
-    android:minResizeHeight="110dp"
+    android:minHeight="40dp"
+    android:minResizeHeight="40dp"
     android:minResizeWidth="180dp"
     android:minWidth="180dp"
     android:previewImage="@mipmap/ic_launcher"
     android:previewLayout="@layout/widget_rain"
     android:resizeMode="horizontal|vertical"
-    android:targetCellHeight="2"
+    android:targetCellHeight="1"
     android:targetCellWidth="3"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />

@@ -29,7 +29,7 @@
         android:orientation="horizontal"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
-        android:paddingBottom="6dp">
+        android:paddingBottom="4dp">
 
         <TextView
             android:id="@+id/widget_hour_0"

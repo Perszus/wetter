@@ -10,6 +10,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateFormat
+import android.util.TypedValue
 import android.widget.RemoteViews
 import androidx.compose.ui.graphics.toArgb
 import java.time.Duration
@@ -80,12 +81,17 @@ class RainWidget : AppWidgetProvider() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             try {
-                val frame = frameFor(context)
-                ids.forEach { id -> draw(context, manager, id, frame) }
+                paint(context, manager, ids)
             } finally {
                 pending.finish()
             }
         }
+    }
+
+    /** Read once, drawn for every widget on the screen. */
+    internal suspend fun paint(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        val frame = frameFor(context)
+        ids.forEach { id -> draw(context, manager, id, frame) }
     }
 
     /**
@@ -166,7 +172,7 @@ class RainWidget : AppWidgetProvider() {
                     windFrom = frame.windFrom,
                 ),
             )
-            labelHours(context, views, colors, frame)
+            labelHours(context, views, colors, frame, size.second)
         }
         manager.updateAppWidget(id, views)
     }
@@ -182,8 +188,10 @@ class RainWidget : AppWidgetProvider() {
         views: RemoteViews,
         colors: WetterColors,
         frame: Frame,
+        heightDp: Float,
     ) {
         val pattern = if (DateFormat.is24HourFormat(context)) HOUR_24 else HOUR_12
+        val textSize = if (heightDp < SMALL_HEIGHT_DP) SMALL_LABEL_SP else LABEL_SP
         val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
             .withZone(frame.zone)
 
@@ -193,6 +201,7 @@ class RainWidget : AppWidgetProvider() {
                 formatter.format(frame.now.plus(Duration.ofHours(index.toLong()))),
             )
             views.setTextColor(viewId, colors.textTertiary.toArgb())
+            views.setTextViewTextSize(viewId, TypedValue.COMPLEX_UNIT_SP, textSize)
         }
     }
 
@@ -265,18 +274,24 @@ class RainWidget : AppWidgetProvider() {
          * of its own - `updatePeriodMillis` is zero - because a schedule that
          * woke the device to redraw the same curve would be spending battery to
          * change nothing.
+         *
+         * It draws directly rather than asking the system to. The first version
+         * broadcast ACTION_APPWIDGET_UPDATE at itself, which looks like the
+         * obvious way to do this and silently does nothing: that action is
+         * protected, so the broadcast is refused with a permission denial the
+         * sender never sees. Nothing in the app can send it - only the system
+         * can - and an app that wants its widget redrawn simply hands
+         * AppWidgetManager the new views.
          */
-        fun refresh(context: Context) {
+        suspend fun refresh(context: Context) {
             val manager = AppWidgetManager.getInstance(context) ?: return
             val ids = manager.getAppWidgetIds(ComponentName(context, RainWidget::class.java))
             if (ids.isEmpty()) return
 
-            context.sendBroadcast(
-                Intent(context, RainWidget::class.java).apply {
-                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
-                },
-            )
+            // An instance purely to reach the drawing, which is a member because
+            // onUpdate needs it too. A provider is an ordinary BroadcastReceiver
+            // and nothing here touches its receiver half.
+            RainWidget().paint(context, manager, ids)
         }
 
         /** Four hours, as asked for, at the timeline's own ten-minute spacing. */
@@ -297,9 +312,20 @@ class RainWidget : AppWidgetProvider() {
         private const val HOUR_24 = "HH"
         private const val HOUR_12 = "h a"
 
-        /** Three cells by two, before anybody resizes it. */
+        /** Three cells by one, before anybody resizes it. */
         private const val DEFAULT_WIDTH_DP = 240f
-        private const val DEFAULT_HEIGHT_DP = 130f
+        private const val DEFAULT_HEIGHT_DP = 70f
+
+        /**
+         * Where the labels stop being readable as 11sp.
+         *
+         * Text does not scale with the widget - it is real type, at the reader's
+         * own size - so on a one-cell widget it is a much larger share of the
+         * height than on a two-cell one, and has to give some back.
+         */
+        private const val SMALL_HEIGHT_DP = 90f
+        private const val LABEL_SP = 11f
+        private const val SMALL_LABEL_SP = 9f
 
         private const val FALLBACK_RADIUS_DP = 16f
     }

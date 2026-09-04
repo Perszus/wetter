@@ -119,11 +119,21 @@ private const val MODERATE_EDGE_MM = PrecipitationIntensity.MODERATE_MM_PER_HOUR
 private const val HEAVY_EDGE_MM = PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat()
 
 /**
- * Light takes a fifth less than the other two, which between them split what is
- * left. Written as the arithmetic rather than as two rounded decimals, so the
- * relationship survives anybody changing the ratio later.
+ * The three levels take the same height as each other.
+ *
+ * Light used to take a fifth less, on the reasoning that it is the least of the
+ * three. There is no reading of the chart that wants that: the bands are a scale
+ * of the three words anybody acts on, and a scale whose steps are different
+ * sizes is asking the reader to remember which step is which. Equal thirds means
+ * the height a curve has climbed is the fraction of the way through the levels
+ * it has climbed, with nothing to correct for.
+ *
+ * The floor sits *inside* the light band rather than under all three. The first
+ * attempt at equal bands added it underneath, which made light 38.7% of the
+ * height against 30.7% for the other two - arithmetic that said "equal" over a
+ * picture that plainly was not. A trace is not a fourth level; it is the bottom
+ * of the light one.
  */
-private const val LIGHT_SHARE = 0.8f
-private const val TALLER_BANDS = 2f
-private const val LIGHT_TOP = LIGHT_SHARE / (LIGHT_SHARE + TALLER_BANDS)
-private const val MODERATE_TOP = (LIGHT_SHARE + 1f) / (LIGHT_SHARE + TALLER_BANDS)
+private const val BANDS = 3f
+private const val LIGHT_TOP = 1f / BANDS
+private const val MODERATE_TOP = 2f / BANDS

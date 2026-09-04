@@ -131,9 +131,6 @@ fun RainCurve(
     )
 
     Column(modifier.fillMaxWidth()) {
-        Readout(point = scrubbed?.let(points::getOrNull), zone = zone)
-        Spacer(Modifier.height(spacing.s))
-
         Box(
             Modifier
                 .fillMaxWidth()
@@ -162,6 +159,26 @@ fun RainCurve(
                     }
                 },
         ) {
+            // Inside the track, not above it.
+            //
+            // This used to be its own 24 dp row with an 8 dp spacer under it,
+            // held blank so the layout would not jump when a finger landed. Held
+            // blank is exactly the problem: 32 dp of nothing sat directly on top
+            // of the chart with no rule between, so it read as part of the heavy
+            // lane and made heavy look 1.65 times the height of the other two
+            // when all three are equal thirds.
+            //
+            // Overlaid, it costs no height at all and still cannot make the
+            // layout jump. It sits in the top of the heavy lane, which is the
+            // one part of the chart that is empty in almost every forecast -
+            // and necessarily empty in any forecast light enough to be worth
+            // scrubbing for a number.
+            Readout(
+                point = scrubbed?.let(points::getOrNull),
+                zone = zone,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+
             Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
                 drawIntensityGuides(
                     guides = guides,
@@ -307,11 +324,11 @@ private fun resample(hours: List<HourlyWeather>): List<CurvePoint> {
  * wrong.
  */
 @Composable
-private fun Readout(point: CurvePoint?, zone: ZoneId) {
+private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modifier) {
     val colors = WetterTheme.colors
 
     Row(
-        Modifier.fillMaxWidth().height(READOUT_HEIGHT),
+        modifier.fillMaxWidth().height(READOUT_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Blank while nothing is selected, rather than absent: the row holds its

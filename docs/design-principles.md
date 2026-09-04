@@ -123,6 +123,46 @@ Every number that can change is set in tabular figures. A temperature ticking
 from 9 to 10 that shifts the layout is exactly the kind of imprecision an
 instrument must not show.
 
+## The rain axis
+
+The vertical axis of every rain curve is `RainCurveBands` in `:domain`, shared by
+the app's chart and the widget's bitmap. It is **not** a scale of millimetres and
+does not pretend to be: rates are wildly unevenly spaced, a trace being a tenth
+of a millimetre and torrential fifty, so drawn linearly against a real downpour
+drizzle is two percent of the height and reads as nothing — when it is precisely
+the difference between nothing and take a coat.
+
+**The three levels are the same height, and must look it.** They are a scale of
+the three words anybody acts on; a scale whose steps are different sizes asks the
+reader to remember which step is which. Three things broke that, all of them
+arithmetic that said "equal" over a picture that was not:
+
+- the light band being given a fifth less than the other two, on the reasoning
+  that it is the least of them — there is no reading of the chart that wants that
+- the trace floor being added *under* all three rather than sitting inside the
+  light one, which made light 38.7% against 30.7%. A trace is not a fourth level;
+  it is the bottom of the light one
+- blank space directly above the chart with no rule under it, which reads as more
+  chart. A 24 dp readout row and an 8 dp spacer made heavy look **1.65×** the
+  others while all three measured identical. Anything above the track has to earn
+  its height or be overlaid inside it
+
+The lesson in all three is the same: **measure the rendered pixels, not the
+constants.** Equal-looking arithmetic is not the claim being made.
+
+What the two painters must agree on is **which band a rate is in**, because a
+widget placing a peak in moderate while the app puts the same hour in heavy
+leaves the reader with two pictures of one afternoon and no way to tell which
+lied. That is what `RainCurveBandsTest` is for.
+
+What they need not agree on is where a rate lands *within* a band. The app
+captions its bands, so eight percent of the track is enough to say "it is
+raining"; the widget has no captions and a third of the height, so it lifts low
+rain with a square root that has the light band's ceiling as a fixed point —
+leaving the boundaries exactly on the thirds. **A legibility problem on one
+surface is fixed on that surface**, and never by changing the shared axis, which
+silently redraws the main chart to solve a problem somewhere else.
+
 ## Architecture rules
 
 - **The domain model represents weather, not an API response.** No integer
@@ -170,8 +210,8 @@ pass. Roughly:
 3. Persistence — Room, a cache that survives the process
 4. The visual phase — precipitation timeline, temperature curve, daily forecast
 5. Locations — search, saved places, optional device position
-6. Widget — a precipitation-focused home-screen widget
-7. Background refresh
+6. Widget — a precipitation-focused home-screen widget *(first one done)*
+7. Background refresh *(done)*
 8. Settings
 9. Polish, accessibility, tablets
 10. F-Droid preparation

@@ -1,7 +1,6 @@
 package lv.bolwarra.wetter.widget
 
 import android.graphics.Bitmap
-import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Matrix
@@ -15,7 +14,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 import lv.bolwarra.wetter.domain.curve.RainCurveBands
-import lv.bolwarra.wetter.ui.theme.Emphasis
 import lv.bolwarra.wetter.ui.theme.WetterColors
 
 /**
@@ -75,13 +73,16 @@ internal object RainStrip {
         val radius = cornerRadiusDp * scale
 
         drawPlate(canvas, plate, radius, colors)
-        drawWind(canvas, plate, radius, scale, colors, windSpeed, windFrom)
+        drawRim(canvas, plate, radius, scale, colors, windSpeed, windFrom)
 
+        // Proportional, not fixed. At one cell tall the whole widget is about
+        // 56 dp, and a 10 dp head plus a 24 dp foot would leave the chart less
+        // room than its own margins.
         val chart = RectF(
             CHART_INSET_DP * scale,
-            CHART_TOP_DP * scale,
+            topInset(heightDp) * scale,
             width - CHART_INSET_DP * scale,
-            height - CHART_BOTTOM_DP * scale,
+            height - labelInset(heightDp) * scale,
         )
         if (chart.width() > 0f && chart.height() > 0f) {
             drawBands(canvas, chart, scale, colors)
@@ -99,35 +100,64 @@ internal object RainStrip {
      * those ratios mean anything.
      */
     private fun drawPlate(canvas: Canvas, plate: RectF, radius: Float, colors: WetterColors) {
+        // The raised tone rather than the page tone. On a screen the plate sits
+        // on a known ground; on a home screen it sits on a wallpaper, and the
+        // first build used `surface` - which on the dark palette is very nearly
+        // black, against a wallpaper that was also very nearly black. It read as
+        // a hole rather than as a card.
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.surface.toArgb()
+            color = colors.surfaceRaised.toArgb()
             style = Paint.Style.FILL
         }
         canvas.drawRoundRect(plate, radius, radius, paint)
+
+        // A sheen down the top third. Glass is not a flat fill: it catches the
+        // light it is under, brightest where it faces the source and falling
+        // away below. Two percent of a highlight tone is enough - any more and
+        // it stops being light on a surface and becomes a painted stripe.
+        val sheen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                plate.top,
+                0f,
+                plate.top + plate.height() * SHEEN_DEPTH,
+                withAlpha(colors.surfaceHighlight.toArgb(), SHEEN_ALPHA),
+                withAlpha(colors.surfaceHighlight.toArgb(), 0f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRoundRect(plate, radius, radius, sheen)
     }
 
     /**
-     * Wind, as a glow on the edge it is coming from.
+     * The edge, as a rim of light - and the wind, as where it is brightest.
      *
-     * The idea this replaces was a gradient travelling around the border, which
-     * a widget cannot do: there is no animation primitive for arbitrary
-     * graphics, and the nearest thing - a ViewFlipper cycling pre-rendered
-     * frames - costs a full bitmap per frame out of the same one-megabyte
-     * budget, advances on a coarse timer, and is paused by launchers at will. It
-     * would read as a stutter rather than as a breeze.
+     * The first version was a soft blurred band, which read as a smudge round
+     * the outside rather than as an edge: it made the widget look grubby, like a
+     * drop shadow drawn on the wrong side. Glass does not have a halo. It has a
+     * thin, bright, hard rim where the light catches the bevel, and that rim
+     * goes all the way round whether or not anything is happening.
      *
-     * Standing still turns out to say more anyway. Motion could only have
-     * carried speed; a fixed glow carries direction as well, by sitting on the
-     * side the wind blows from - which is the half somebody actually acts on
-     * when deciding which way to walk home.
+     * So the rim is the material and the wind is a modulation of it. It is
+     * always drawn, at a low base brightness, which is what makes the widget
+     * read as an object sitting on the wallpaper rather than a hole cut in it.
+     * Where the wind blows from, the rim brightens.
      *
-     * It is deliberately soft and wide rather than a hairline. A 2 dp stroke
-     * upscaled from a half-resolution bitmap looks like a rendering fault; a
-     * diffuse band looks like light, and reads as atmosphere rather than as a
-     * drawn line - which is also the honest register for a quantity nobody wants
-     * to the nearest metre per second.
+     * ### Why it does not move
+     *
+     * The idea this serves was a gradient travelling around the border, which a
+     * widget cannot do: [android.widget.RemoteViews] is inflated in the
+     * launcher's process, so there is no frame loop of ours and no animation
+     * primitive for arbitrary graphics. The nearest thing - a ViewFlipper
+     * cycling pre-rendered frames - costs a full bitmap per frame out of a
+     * one-megabyte budget, advances on a coarse timer, and is paused by
+     * launchers at will. It would read as a stutter, not as a breeze.
+     *
+     * Standing still says more anyway. Motion could only have carried speed; a
+     * fixed bright side carries direction too, which is the half somebody acts
+     * on when deciding which way to walk home.
      */
-    private fun drawWind(
+    private fun drawRim(
         canvas: Canvas,
         plate: RectF,
         radius: Float,
@@ -136,44 +166,47 @@ internal object RainStrip {
         windSpeed: Double?,
         windFrom: Int?,
     ) {
-        // No reading is not a calm reading. With nothing known the edge stays
-        // bare, rather than showing a still day that was never measured.
-        if (windSpeed == null || windFrom == null) return
-
-        val strength = (windSpeed / GALE_MS).coerceIn(0.0, 1.0).toFloat()
-        if (strength <= 0f) return
-
-        val width = RING_WIDTH_DP * scale
+        val width = RIM_DP * scale
         val band = RectF(plate).apply { inset(width / 2f, width / 2f) }
         if (band.width() <= 0f || band.height() <= 0f) return
 
-        val alpha = (RING_ALPHA * strength * 255).toInt().coerceIn(0, 255)
-        val head = (colors.textPrimary.toArgb() and 0x00FFFFFF) or (alpha shl 24)
-        val tail = head and 0x00FFFFFF
-
-        // Sweep angles start at three o'clock and run clockwise; compass
-        // bearings start at twelve and also run clockwise, so the two differ by
-        // a quarter turn. Rotating by that puts the head of the gradient exactly
-        // on the bearing.
-        val shader = SweepGradient(
-            band.centerX(),
-            band.centerY(),
-            intArrayOf(head, tail, tail, head),
-            floatArrayOf(0f, TAIL_START, TAIL_END, 1f),
-        )
-        shader.setLocalMatrix(
-            Matrix().apply {
-                postRotate(windFrom - QUARTER_TURN, band.centerX(), band.centerY())
-            },
-        )
+        val rim = colors.surfaceHighlight.toArgb() and 0x00FFFFFF
+        val base = withAlpha(rim, RIM_BASE_ALPHA)
 
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = width
-            this.shader = shader
-            maskFilter = BlurMaskFilter(width * BLUR_SHARE, BlurMaskFilter.Blur.NORMAL)
+            color = base
         }
-        canvas.drawRoundRect(band, radius, radius, paint)
+
+        // No reading is not a calm reading, so with nothing measured the rim
+        // stays even and says nothing about the wind either way.
+        if (windSpeed != null && windFrom != null) {
+            // Square-rooted, so a real breeze is visible rather than sitting at
+            // a fifteenth of the range. Gale force is the top of the scale and
+            // almost nothing reaches it, so a linear ramp spends nearly all its
+            // range on wind nobody will ever stand in.
+            val strength = sqrt((windSpeed / GALE_MS).coerceIn(0.0, 1.0)).toFloat()
+            val lit = withAlpha(rim, RIM_BASE_ALPHA + (RIM_PEAK_ALPHA - RIM_BASE_ALPHA) * strength)
+
+            // Sweep angles start at three o'clock and run clockwise; compass
+            // bearings start at twelve and also run clockwise, so the two differ
+            // by a quarter turn. Rotating by that puts the bright part of the
+            // rim exactly on the bearing.
+            paint.shader = SweepGradient(
+                band.centerX(),
+                band.centerY(),
+                intArrayOf(lit, base, base, lit),
+                floatArrayOf(0f, TAIL_START, TAIL_END, 1f),
+            ).apply {
+                setLocalMatrix(
+                    Matrix().apply {
+                        postRotate(windFrom - QUARTER_TURN, band.centerX(), band.centerY())
+                    },
+                )
+            }
+        }
+        canvas.drawRoundRect(band, radius - width / 2f, radius - width / 2f, paint)
     }
 
     /**
@@ -225,7 +258,8 @@ internal object RainStrip {
 
         val points = rates.mapIndexed { index, rate ->
             val x = chart.left + chart.width() * index / max(1, rates.size - 1)
-            val y = chart.bottom - chart.height() * RainCurveBands.heightFraction(rate.toFloat())
+            val y = chart.bottom -
+                chart.height() * lifted(RainCurveBands.heightFraction(rate.toFloat()))
             x to y
         }
 
@@ -246,8 +280,8 @@ internal object RainStrip {
                     chart.top,
                     0f,
                     chart.bottom,
-                    withAlpha(full, Emphasis.MUTED),
-                    withAlpha(full, 0f),
+                    withAlpha(full, FILL_TOP_ALPHA),
+                    withAlpha(full, FILL_BOTTOM_ALPHA),
                     Shader.TileMode.CLAMP,
                 )
             },
@@ -285,6 +319,54 @@ internal object RainStrip {
                 )
             },
         )
+    }
+
+    /** Breathing room over the tallest the curve can go. */
+    private fun topInset(heightDp: Float): Float =
+        (heightDp * TOP_SHARE).coerceIn(MIN_TOP_DP, MAX_TOP_DP)
+
+    /**
+     * The strip the hour labels sit in, which is text and therefore does not
+     * shrink in proportion to anything. Hence a floor: below this the labels
+     * would start clipping whatever the chart wanted.
+     */
+    fun labelInset(heightDp: Float): Float =
+        (heightDp * LABEL_SHARE).coerceIn(MIN_LABEL_DP, MAX_LABEL_DP)
+
+    /**
+     * Low rain, lifted so that it reads at this size.
+     *
+     * The shared axis puts the least rain there is at eight percent of the
+     * track. That is enough in the app, where the band is captioned "Light"
+     * right beside the curve; here there are no captions and a third of the
+     * height, so a genuine forecast of rain until four in the morning drew as a
+     * line along the floor and read as an empty widget.
+     *
+     * ### It stays inside the light band
+     *
+     * The lift is a square root applied only below the light band's ceiling, and
+     * that ceiling is a fixed point of it - so the boundaries stay exactly on
+     * the thirds and **the three levels remain the same height**. Only where a
+     * rate lands *within* light changes.
+     *
+     * The first attempt lifted everything, band lines included, which pushed
+     * light to 40.7% of the height against 29.7% for the other two. That is the
+     * same unequal-levels fault it was meant to avoid, reintroduced one surface
+     * over - the bands are a scale of the three words anybody acts on, and a
+     * scale whose steps are different sizes asks the reader to remember which
+     * step is which.
+     *
+     * The attempt before that raised the shared floor in [RainCurveBands], which
+     * fixed the widget and quietly redrew the main chart at the same time. A
+     * legibility problem on one surface gets fixed on that surface.
+     *
+     * Dry is exempt - zero maps to zero - because the whole point is to open a
+     * gap between no rain and some rain.
+     */
+    private fun lifted(fraction: Float): Float {
+        val ceiling = RainCurveBands.moderateEdge
+        if (fraction <= 0f || fraction >= ceiling) return fraction
+        return ceiling * sqrt(fraction / ceiling)
     }
 
     /**
@@ -344,18 +426,35 @@ internal object RainStrip {
      */
     private const val MAX_PIXELS = 64_000f
 
-    private const val CHART_INSET_DP = 12f
-    private const val CHART_TOP_DP = 14f
+    private const val CHART_INSET_DP = 10f
+
+    /**
+     * Nothing above the chart.
+     *
+     * Any inset here is empty space sitting directly on top of the heavy lane
+     * with no rule between them, so it reads as part of that lane and makes
+     * heavy look taller than the other two when all three are equal thirds. The
+     * ceiling of the scale is the top of the plate.
+     */
+    private const val TOP_SHARE = 0f
+    private const val MIN_TOP_DP = 0f
+    private const val MAX_TOP_DP = 0f
 
     /** Room under the chart for the hour labels, which are real text on top. */
-    private const val CHART_BOTTOM_DP = 22f
+    private const val LABEL_SHARE = 0.30f
+    private const val MIN_LABEL_DP = 15f
+    private const val MAX_LABEL_DP = 24f
 
-    private const val STROKE_DP = 2f
+    private const val STROKE_DP = 2.5f
     private const val HAIRLINE_DP = 1f
 
-    private const val RING_WIDTH_DP = 6f
-    private const val RING_ALPHA = 0.55f
-    private const val BLUR_SHARE = 0.7f
+    /** Thin and hard, the way a bevel catches light. */
+    private const val RIM_DP = 1.5f
+    private const val RIM_BASE_ALPHA = 0.22f
+    private const val RIM_PEAK_ALPHA = 0.85f
+
+    private const val SHEEN_ALPHA = 0.055f
+    private const val SHEEN_DEPTH = 0.38f
 
     /** Where the glow has fallen away entirely, and where it starts returning. */
     private const val TAIL_START = 0.3f
@@ -365,6 +464,18 @@ internal object RainStrip {
 
     /** Gale force, the same number the hazard rules use. Full glow sits here. */
     private const val GALE_MS = 17.2
+
+    /**
+     * The fill does not fade to nothing.
+     *
+     * Light rain sits at about a twelfth of the track, so a fill that vanishes
+     * on the way down leaves a hairline hugging the floor - which is what the
+     * first build showed for a genuine "rain until four", and it read as an
+     * empty widget. Keeping a floor under the fill means any rain at all is a
+     * band of colour rather than a line.
+     */
+    private const val FILL_TOP_ALPHA = 0.5f
+    private const val FILL_BOTTOM_ALPHA = 0.16f
 
     private const val SEAM = 0.001f
     private const val LIGHT_MIX = 0.06f
