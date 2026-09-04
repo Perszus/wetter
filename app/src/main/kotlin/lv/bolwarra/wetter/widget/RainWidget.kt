@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.widget.RemoteViews
 import java.time.Duration
 import java.time.Instant
@@ -123,7 +124,28 @@ class RainWidget : AppWidgetProvider() {
     private suspend fun frameFor(context: Context): Frame? {
         val container = (context.applicationContext as? WetterApplication)?.container ?: return null
         val location = container.selectedLocation.current()
-        val forecast = container.repository.cached(location) ?: return null
+
+        // Fetch for ourselves when the cache has aged out.
+        //
+        // The background job is the usual way new weather arrives, and on a
+        // phone whose battery manager has quietly stopped that job it is no way
+        // at all - the widget then redraws a forecast from this morning forever,
+        // which is worse than the blank one nobody would have trusted.
+        //
+        // This alarm belongs to the system rather than to us, so it arrives
+        // regardless, and a request made from inside it is a request the OEM has
+        // already allowed. Bounded well under the ten seconds a broadcast
+        // receiver gets, and simply skipped if it overruns: the old cache still
+        // draws, and there is another wake-up along shortly.
+        val cached = container.repository.cached(location)
+        val forecast = if (container.repository.needsRefresh(cached)) {
+            withTimeoutOrNull(FETCH_BUDGET_MS) {
+                container.repository.refresh(location).getOrNull()
+            } ?: cached
+        } else {
+            cached
+        } ?: return null
+
         val now = Instant.now()
 
         // The fused timeline is radar-led in the first hour, which is exactly
@@ -169,14 +191,42 @@ class RainWidget : AppWidgetProvider() {
             .ifEmpty { listOf(0.0, 0.0) }
     }
 
+    /**
+     * Hand the launcher a picture, and settle for a smaller one if it will not
+     * take it.
+     *
+     * The bitmap is drawn at the screen's own density, which on a large widget
+     * and a dense screen can still put the update past the megabyte a Binder
+     * transaction gets - a tablet-sized widget at 3x is several of them. There is no way to ask in advance - the sizes involved
+     * depend on the launcher's own overhead - so this tries, and on refusal
+     * comes back with a quarter of the pixels. Softer than intended is still a
+     * widget; refused is a blank rectangle.
+     */
     private fun draw(context: Context, manager: AppWidgetManager, id: Int, frame: Frame?) {
+        if (push(context, manager, id, frame, RainStrip.MAX_BYTES)) return
+        push(context, manager, id, frame, RainStrip.FALLBACK_BYTES)
+    }
+
+    private fun push(
+        context: Context,
+        manager: AppWidgetManager,
+        id: Int,
+        frame: Frame?,
+        maxBytes: Int,
+    ): Boolean {
+        // Nothing to draw means draw nothing - not draw a blank.
+        //
+        // This used to build the views anyway and push them without a bitmap,
+        // which wiped whatever the widget was showing. The comment on frameFor
+        // has always said it keeps its last picture instead; now it does. A
+        // slightly old curve is a widget, an empty rectangle is a fault report.
+        if (frame == null) return true
+
         val views = RemoteViews(context.packageName, R.layout.widget_rain)
         views.setOnClickPendingIntent(R.id.widget_root, openApp(context))
 
-        val colors = paletteFor(context)
-        val size = sizeOf(manager, id)
-
-        if (frame != null) {
+        run {
+            val size = sizeOf(manager, id)
             views.setImageViewBitmap(
                 R.id.widget_canvas,
                 RainStrip.render(
@@ -184,16 +234,27 @@ class RainWidget : AppWidgetProvider() {
                     heightDp = size.second,
                     density = context.resources.displayMetrics.density,
                     cornerRadiusDp = cornerRadiusDp(context),
-                    colors = colors,
+                    colors = paletteFor(context),
                     rates = frame.rates,
                     windSpeed = frame.windSpeed,
                     windFrom = frame.windFrom,
                     hourOffset = hourOffset(frame),
                     hourLabels = hourLabels(frame),
+                    maxBytes = maxBytes,
                 ),
             )
         }
-        manager.updateAppWidget(id, views)
+
+        return try {
+            manager.updateAppWidget(id, views)
+            true
+        } catch (refused: RuntimeException) {
+            // Both ways this fails arrive as a RuntimeException on this side:
+            // the widget service rejecting an oversized bitmap outright, and a
+            // Binder transaction that will not fit.
+            Log.w(TAG, "widget $id refused a $maxBytes byte update", refused)
+            false
+        }
     }
 
     /**
@@ -329,8 +390,17 @@ class RainWidget : AppWidgetProvider() {
         private val STEP: Duration = Duration.ofMinutes(10)
         private const val STEPS = 24
 
-        /** Comfortably inside the receiver's ten seconds. */
-        private const val FUSION_BUDGET_MS = 6_000L
+        /**
+         * The two network budgets, which have to share a receiver's ten seconds.
+         *
+         * Four and three leaves three spare for the drawing and for the fetch
+         * that only sometimes happens at all - most redraws find the cache fresh
+         * and skip the first of these entirely.
+         */
+        private const val FETCH_BUDGET_MS = 4_000L
+        private const val FUSION_BUDGET_MS = 3_000L
+
+        private const val TAG = "RainWidget"
 
         private const val HOURS_IN_WINDOW = 4
 

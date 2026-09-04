@@ -64,8 +64,9 @@ internal object RainStrip {
         windFrom: Int?,
         hourOffset: Float,
         hourLabels: List<String>,
+        maxBytes: Int,
     ): Bitmap {
-        val scale = renderScale(widthDp, heightDp, density)
+        val scale = renderScale(widthDp, heightDp, density, maxBytes)
         val width = max(1, (widthDp * scale).toInt())
         val height = max(1, (heightDp * scale).toInt())
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -499,14 +500,33 @@ internal object RainStrip {
     }
 
     /**
-     * How many device pixels to draw one dp at, given [MAX_PIXELS].
+     * How many device pixels to draw one dp at, within a byte budget.
      *
-     * Never above the real density - upscaling past it would spend budget on
-     * detail the screen cannot show.
+     * **The screen's own density, wherever it fits.** That is the whole rule,
+     * and it is what makes this adapt rather than being tuned to one handset: a
+     * widget's true pixel size is its dp size times whatever the device's
+     * density happens to be, so asking for native asks for exactly the right
+     * number on a 2x phone, a 3x phone and a tablet alike.
+     *
+     * The ceiling is the part that does not scale with the device. A Binder
+     * transaction is about a megabyte on every Android device ever shipped -
+     * it is a property of the transport, not of the screen - so it is expressed
+     * in bytes here and the pixels are derived, rather than a pixel count
+     * measured off one phone and left to mean something different on the next.
+     *
+     * An earlier version had exactly that bug: a constant of 110,000 pixels,
+     * chosen when the widget was a different shape, which happened to sit just
+     * under what a 480 dpi phone needed and so upscaled every frame by nine
+     * percent.
      */
-    private fun renderScale(widthDp: Float, heightDp: Float, density: Float): Float {
+    private fun renderScale(
+        widthDp: Float,
+        heightDp: Float,
+        density: Float,
+        maxBytes: Int,
+    ): Float {
         val area = max(1f, widthDp * heightDp)
-        return min(density, sqrt(MAX_PIXELS / area))
+        return min(density, sqrt(maxBytes / BYTES_PER_PIXEL / area))
     }
 
     private fun mix(from: Int, to: Int, amount: Float): Int {
@@ -522,15 +542,26 @@ internal object RainStrip {
         (color and 0x00FFFFFF) or ((alpha * 255).toInt().coerceIn(0, 255) shl 24)
 
     /**
-     * About 440 KB as ARGB_8888, comfortably inside the roughly one megabyte a
-     * process gets per Binder transaction, with the rest of the update to carry.
+     * Three quarters of a Binder transaction, which is what the picture may
+     * weigh.
      *
-     * It was a quarter of that when the widget was two cells tall and the hour
-     * labels were real views. One cell is a much smaller picture, so this budget
-     * lets it render at the screen's own density instead of being upscaled -
-     * which is what makes the labels legible now that they are drawn in here.
+     * The rest of the megabyte carries the views, the pending intent and the
+     * launcher's own overhead. The widget service would allow far more - AOSP
+     * caps it at six times the display in bytes, some 20 MB on a modern phone -
+     * but that is not the wall a payload hits first.
      */
-    private const val MAX_PIXELS = 110_000f
+    internal const val MAX_BYTES = 768 * 1024
+
+    /**
+     * What to draw at when the launcher refuses the full-size payload.
+     *
+     * A quarter of the budget, so the retry cannot itself be marginal. Softer
+     * than intended is a widget; refused is a blank rectangle.
+     */
+    internal const val FALLBACK_BYTES = MAX_BYTES / 4
+
+    /** ARGB_8888, the only config with the alpha the rounded corners need. */
+    private const val BYTES_PER_PIXEL = 4f
 
     private const val CHART_INSET_DP = 10f
 
