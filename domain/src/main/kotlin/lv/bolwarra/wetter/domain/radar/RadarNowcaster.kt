@@ -167,7 +167,10 @@ object RadarNowcaster {
         if (recent.size < 2 || leads.isEmpty()) return null
         val frames = recent.sortedBy { it.at }
         val latest = frames.last()
-        val motion = MotionEstimator.estimate(frames[frames.size - 2], latest) ?: return null
+        // Every frame held, not just the last pair: a long baseline finds
+        // motion on smooth fields that ten minutes cannot resolve, and the two
+        // spans check each other.
+        val motion = MotionEstimator.estimate(frames) ?: return null
 
         val trend = estimateTrend(frames, motion)
 

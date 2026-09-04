@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.domain.radar
 
 import java.time.Duration
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
@@ -40,6 +41,25 @@ object MotionEstimator {
      */
     const val MAX_GROUND_SPEED_KMH = 150.0
 
+    /**
+     * How far back the long baseline reaches, in frames.
+     *
+     * Three frames is half an hour at the usual ten-minute cadence. Far enough
+     * that a slow, smooth field has actually moved a measurable distance; near
+     * enough that it has not also changed shape, which would break the
+     * assumption the match rests on.
+     */
+    const val LONG_BASELINE_FRAMES = 3
+
+    /**
+     * The floor on agreement. Two estimates pointing opposite ways discount a
+     * projection hard; they do not erase a field that is still right about now.
+     */
+    const val LEAST_AGREEMENT = 0.25
+
+    /** Below this combined speed there is no motion to disagree about. */
+    private const val STILL_FIELD = 0.05
+
     /** Below this share of wet pixels there is nothing to track. */
     const val MIN_WET_FRACTION = 0.004f
 
@@ -69,6 +89,78 @@ object MotionEstimator {
 
     /** A candidate needs this many comparable pixels before its cost means anything. */
     private const val MIN_SAMPLES = 24
+
+    /**
+     * The best motion available from a run of sweeps.
+     *
+     * Two sweeps ten minutes apart was all this ever used, and on a smooth field
+     * that is the hardest possible question: ten minutes of drift may move the
+     * pattern less than the noise in it, so the match is ambiguous and the
+     * vector is close to a guess. The frames to do better were already being
+     * fetched and thrown away - thirteen of them, two hours of history.
+     *
+     * So the same measurement is made twice, over a short span and a long one.
+     * The long span moves the field further, which is a larger signal against
+     * the same noise, and on a featureless sheet it often finds a match the
+     * short one cannot.
+     *
+     * ### The two answers are also a check on each other
+     *
+     * Match sharpness says how distinctly one displacement beat the others
+     * *within a single comparison*. It cannot tell that the whole comparison was
+     * misled - a repeating texture matches itself sharply at the wrong offset.
+     * Two spans measured independently can: if they agree the motion is real, and
+     * if they disagree something is wrong that neither could have reported alone.
+     *
+     * That disagreement is folded into the confidence the field carries, so a
+     * projection built on an unstable estimate is trusted less far. Sharpness
+     * says "this match was clean"; agreement says "and it was not a coincidence".
+     */
+    fun estimate(frames: List<RadarField>): MotionField? {
+        val sorted = frames.sortedBy { it.at }
+        if (sorted.size < 2) return null
+
+        val latest = sorted.last()
+        val short = estimate(sorted[sorted.size - 2], latest)
+
+        val longIndex = sorted.size - 1 - LONG_BASELINE_FRAMES
+        val long = if (longIndex >= 0 && longIndex < sorted.size - 2) {
+            estimate(sorted[longIndex], latest)
+        } else {
+            null
+        }
+
+        if (long == null) return short
+        if (short == null) return long
+
+        // Whichever matched more distinctly carries the answer; the other one
+        // is kept only to say whether to believe it.
+        val best = if (long.confidence > short.confidence) long else short
+        return best.withConfidence(best.confidence * agreementBetween(short, long))
+    }
+
+    /**
+     * How far two independent estimates of the same motion agree, 0..1.
+     *
+     * Measured as the size of their difference against their combined size, so
+     * it is scale-free: two vectors that differ by 2 px/min agree well if the
+     * wind is 40 and barely at all if it is 3.
+     *
+     * Never returns zero. Total disagreement should discount a projection
+     * heavily, not delete a field that may still be right about the present
+     * moment - which needs no motion at all.
+     */
+    fun agreementBetween(a: MotionField, b: MotionField): Float {
+        val first = a.meanVector()
+        val second = b.meanVector()
+        val dx = (first.x - second.x).toDouble()
+        val dy = (first.y - second.y).toDouble()
+        val difference = hypot(dx, dy)
+        val size = hypot(first.x.toDouble(), first.y.toDouble()) +
+            hypot(second.x.toDouble(), second.y.toDouble())
+        if (size < STILL_FIELD) return 1f
+        return (1.0 - difference / size).coerceIn(LEAST_AGREEMENT, 1.0).toFloat()
+    }
 
     fun estimate(previous: RadarField, current: RadarField): MotionField? {
         require(previous.geometry == current.geometry) { "frames must share a geometry" }

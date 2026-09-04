@@ -46,6 +46,31 @@ class MotionField(
         }
     }
 
+    /**
+     * The same field, believed more or less.
+     *
+     * Used when a second, independent estimate has something to say about
+     * whether this one should be trusted - the vectors are unchanged, only the
+     * weight put on them.
+     */
+    fun withConfidence(confidence: Float): MotionField = MotionField(
+        blockSize = blockSize,
+        blocksAcross = blocksAcross,
+        blocksDown = blocksDown,
+        vx = vx,
+        vy = vy,
+        confidence = confidence.coerceIn(0f, 1f),
+    )
+
+    /**
+     * The average vector over the whole field.
+     *
+     * For comparing one estimate against another - two fields measured over
+     * different spans agree or they do not, and the per-block detail is noise
+     * for that question.
+     */
+    fun meanVector(): Motion = Motion(vx.average().toFloat(), vy.average().toFloat())
+
     /** The block vector, clamped at the edges so lookups never fall off. */
     fun blockAt(column: Int, row: Int): Motion {
         val c = column.coerceIn(0, blocksAcross - 1)
