@@ -88,8 +88,8 @@ internal object RainStrip {
         )
         if (chart.width() > 0f && chart.height() > 0f) {
             drawBands(canvas, chart, scale, colors)
-            drawHours(canvas, chart, scale, colors, hourOffset, hourLabels)
             drawCurve(canvas, chart, scale, colors, rates)
+            drawHours(canvas, chart, scale, colors, hourOffset, hourLabels)
         }
         return bitmap
     }
@@ -234,23 +234,28 @@ internal object RainStrip {
     }
 
     /**
-     * The clock, as rules down the chart.
+     * The clock, along the foot of the chart.
      *
      * The hour labels used to sit at fixed quarters of the width, which put them
      * nowhere in particular: the window starts at *now*, so a quarter of the way
      * along is 23:47, not midnight. They read as shifted because they were.
      *
-     * These are the real hour boundaries, and the label for each one starts just
-     * to the right of its rule - so the rule is the moment and the text belongs
-     * to it, rather than floating between two of them. Because the window is
-     * exactly four hours, the boundaries stay evenly spaced a quarter apart and
-     * only the offset to the first one changes, which is what lets the labels
-     * stay four equal cells with one shared indent.
+     * These are the real hour boundaries, marked on the axis line and not as
+     * rules up the chart. Rules were the first attempt and they turned the thing
+     * into a grid: four verticals crossing three horizontals, competing with the
+     * one line that is supposed to be read. The chart has exactly one subject
+     * and the clock is not it.
      *
-     * Half hours get a short tick off the floor. They carry no text and are not
-     * meant to be read individually; they are there so the eye can halve the gap
-     * between two hours without measuring it, which is most of what anybody does
-     * with "when does this start".
+     * So the marks sit on the foot, where an axis belongs, and the label for
+     * each hour starts just to the right of its tick - the tick is the moment
+     * and the text belongs to it, rather than floating between two of them.
+     * Because the window is exactly four hours the boundaries stay a quarter
+     * apart, and only the offset to the first one changes.
+     *
+     * Half hours get a shorter tick and no text. They are not meant to be read
+     * individually; they are there so the eye can halve the gap between two
+     * hours without measuring it, which is most of what anybody does with "when
+     * does this start".
      */
     private fun drawHours(
         canvas: Canvas,
@@ -268,8 +273,11 @@ internal object RainStrip {
             color = colors.textTertiary.toArgb()
             textSize = LABEL_DP * scale
         }
-        val tickHeight = HALF_TICK_DP * scale
         val baseline = chart.bottom + LABEL_BASELINE_DP * scale
+
+        // The line the marks hang from. Drawn after the curve so the fill,
+        // whose own bottom edge sits here, cannot soften it.
+        canvas.drawLine(chart.left, chart.bottom, chart.right, chart.bottom, paint)
 
         // Counted in half-hour steps from the first hour boundary, so whether a
         // mark is on the hour is the parity of the step rather than a modulus of
@@ -282,13 +290,12 @@ internal object RainStrip {
             if (fraction > 0f) {
                 val x = chart.left + chart.width() * fraction
                 val onTheHour = step % 2 == 0
-                // The hour is a rule up the whole chart; the half hour hangs
-                // below the floor, where the fill cannot paint over it.
+                paint.strokeWidth = (if (onTheHour) HOUR_STROKE_DP else HAIRLINE_DP) * scale
                 canvas.drawLine(
                     x,
-                    if (onTheHour) chart.top else chart.bottom,
+                    chart.bottom,
                     x,
-                    if (onTheHour) chart.bottom else chart.bottom + tickHeight,
+                    chart.bottom + (if (onTheHour) HOUR_TICK_DP else HALF_TICK_DP) * scale,
                     paint,
                 )
 
@@ -536,8 +543,10 @@ internal object RainStrip {
     private const val HOUR = 0.25f
     private const val HALF_HOUR = 0.125f
 
-    /** Half hours are a mark off the floor, not a rule up the chart. */
-    private const val HALF_TICK_DP = 5f
+    /** The same proportions the app's own time axis uses. */
+    private const val HOUR_TICK_DP = 5f
+    private const val HALF_TICK_DP = 3f
+    private const val HOUR_STROKE_DP = 1.4f
 
     private const val LABEL_DP = 10f
     private const val LABEL_GAP_DP = 3f
