@@ -20,6 +20,7 @@ import lv.bolwarra.wetter.domain.air.AirQualityBand
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
+import lv.bolwarra.wetter.domain.sky.TideState
 
 /**
  * The one place where domain values become text.
@@ -250,6 +251,22 @@ fun formatConcentration(value: Double?): String = when {
         String.format(Locale.getDefault(), "%.1f", value),
     )
     else -> stringResource(R.string.concentration, value.roundToInt().toString())
+}
+
+/**
+ * The tide's place in its monthly rhythm.
+ *
+ * In the Moon group and nowhere else, because that is the honest frame: this is
+ * a fact about where the sun and moon are, not a water level. When high water
+ * arrives and how far it climbs are local, set by the shape of a particular
+ * coast, and would need a tide gauge to say.
+ */
+@StringRes
+fun TideState.labelRes(): Int = when (this) {
+    TideState.SPRING -> R.string.tide_spring
+    TideState.NEAP -> R.string.tide_neap
+    TideState.BUILDING -> R.string.tide_building
+    TideState.EASING -> R.string.tide_easing
 }
 
 @StringRes

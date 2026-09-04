@@ -40,6 +40,7 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
 import lv.bolwarra.wetter.domain.sky.StarWatch
 import lv.bolwarra.wetter.domain.sky.Stargazing
+import lv.bolwarra.wetter.domain.sky.Tides
 import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.window
 import lv.bolwarra.wetter.ui.components.ExpandableTile
@@ -299,8 +300,23 @@ private fun AdvancedTile(
             MetricGroup(stringResource(R.string.group_stars)) {
                 MetricGrid(
                     listOf(
+                        // A plain answer first, because that is the whole
+                        // question - everything under it is the working.
                         Metric(
-                            stringResource(R.string.metric_stars_window),
+                            stringResource(R.string.metric_worth_watching),
+                            stringResource(
+                                if (night.best != null) {
+                                    R.string.answer_yes
+                                } else {
+                                    R.string.answer_no
+                                },
+                            ),
+                        ),
+                        // Absent when the answer is no, rather than sitting
+                        // there as a dash: there is no "when" for a night that
+                        // never comes good.
+                        Metric(
+                            stringResource(R.string.metric_stars_when),
                             night.best
                                 ?.let {
                                     stringResource(
@@ -309,18 +325,12 @@ private fun AdvancedTile(
                                         formatTime(it.to, zone),
                                     )
                                 }
-                                ?: stringResource(
-                                    if (night.hasDarkness) {
-                                        R.string.stars_clouded_out
-                                    } else {
-                                        // Half the year above the arctic circle,
-                                        // and a "0%" here would be a lie about
-                                        // the cloud rather than a fact about the
-                                        // sun.
-                                        R.string.stars_no_darkness
-                                    },
-                                ),
+                                ?: NO_READING,
                         ),
+                        // Named "now" because it is, and the answer above it
+                        // is about tonight. A clear midday over a forecast
+                        // overcast night is an ordinary thing, and without the
+                        // word the two rows read as contradicting each other.
                         Metric(
                             stringResource(R.string.metric_sky_open),
                             Stargazing
@@ -370,6 +380,13 @@ private fun AdvancedTile(
                     Metric(
                         stringResource(R.string.metric_moon_illumination),
                         formatPercent((MoonPhase.illuminationAt(now) * PERCENT).roundToInt()),
+                    ),
+                    // The one thing the moon does that is not about light. Twice
+                    // a month it lines up with the sun and the two tides add;
+                    // at the quarters they pull square and cancel.
+                    Metric(
+                        stringResource(R.string.metric_tide),
+                        stringResource(Tides.stateAt(now).labelRes()),
                     ),
                 ),
             )
