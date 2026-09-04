@@ -14,6 +14,7 @@ import lv.bolwarra.wetter.BuildConfig
 import lv.bolwarra.wetter.WetterApplication
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.provider.asWeatherError
+import lv.bolwarra.wetter.widget.RainWidget
 
 /**
  * Keeps the cached forecast fresh while nobody is looking.
@@ -40,6 +41,11 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
         val outcome = container.repository.refresh(location)
         outcome.onSuccess { forecast ->
             log("refreshed ${location.name}")
+
+            // Redraw the home screen while the new forecast is in hand. This is
+            // the only thing that changes what the widget should say, which is
+            // why the widget asks for no schedule of its own.
+            RainWidget.refresh(applicationContext)
             // The verification loop rides along on the refresh rather than
             // having a schedule of its own. It needs exactly what this job
             // already has - a fresh forecast to write down, and a wake-up with

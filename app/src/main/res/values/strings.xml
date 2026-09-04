@@ -250,4 +250,8 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="condition_thunderstorm">Thunderstorm</string>
     <string name="condition_thunderstorm_hail">Thunderstorm with hail</string>
     <string name="condition_unknown">Unknown</string>
+    <!-- Widget -->
+    <string name="widget_rain_label">Rain</string>
+    <string name="widget_rain_description">Rain for the next four hours</string>
+
 </resources>

@@ -40,6 +40,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.chart.MonotoneCurve
+import lv.bolwarra.wetter.domain.curve.RainCurveBands
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
@@ -626,91 +627,18 @@ private fun clockOf(instant: Instant, zone: ZoneId): String {
  * is linear in is how wet you get, which is what the chart is for.
  */
 /**
- * Where a rate sits on the track: three levels, a third of the height each.
+ * The band geometry, which lives in `:domain` because the widget draws it too.
  *
- * The rates are wildly unevenly spaced - a trace is a tenth of a millimetre and
- * torrential is fifty - so this is not a scale of millimetres and never was. It
- * is a scale of the three words anybody acts on, and each of them owns exactly a
- * third of the track.
- *
- * Two things went with the earlier five-level version. "Barely" was a level
- * nobody does anything differently about, so it is folded into light: the
- * bottom third now means anything from a spit to a proper shower. And the top
- * band was reserved for torrential, which put a fifth of the chart aside for
- * weather that essentially never arrives and pushed everything real into the
- * lower half.
- *
- * Dry sits on the floor and the least rain there is steps just clear of it, so
- * the question the chart is asked most - whether it will rain at all - is still
- * answered without reading anything.
+ * These two are thin wrappers rather than direct calls at every use site, so the
+ * chart reads the same as it did when it owned the arithmetic - and so there is
+ * exactly one place to look when the app and the widget disagree about a peak.
  */
-private val BAND_HEIGHTS = listOf(
-    0.0 to 0.00f,
-    // The least rain there is, lifted just clear of the floor.
-    PrecipitationIntensity.TRACE_MM_PER_HOUR to 0.08f,
-    PrecipitationIntensity.MODERATE_MM_PER_HOUR to LIGHT_TOP,
-    PrecipitationIntensity.HEAVY_MM_PER_HOUR to MODERATE_TOP,
-    PrecipitationIntensity.VIOLENT_MM_PER_HOUR to 1.00f,
-)
-
-/**
- * Light takes a fifth less than the other two, which between them split what is
- * left. Written as the arithmetic rather than as two rounded decimals, so the
- * relationship survives anybody changing the ratio later.
- */
-private const val LIGHT_SHARE = 0.8f
-private const val TALLER_BANDS = 2f
-private const val LIGHT_TOP = LIGHT_SHARE / (LIGHT_SHARE + TALLER_BANDS)
-private const val MODERATE_TOP = (LIGHT_SHARE + 1f) / (LIGHT_SHARE + TALLER_BANDS)
-
-/**
- * The level the chart names a rate, which is coarser than the domain's own.
- *
- * The bands fold a trace into light, so the readout has to as well. Scrubbing a
- * spit of rain and being told "barely" while it sits plainly inside the band
- * labelled "light" is the chart disagreeing with itself, and the reader has no
- * way to know which half to believe.
- */
-private fun curveLevel(millimetresPerHour: Double): PrecipitationIntensity = when {
-    millimetresPerHour < PrecipitationIntensity.TRACE_MM_PER_HOUR -> PrecipitationIntensity.NONE
-    millimetresPerHour < PrecipitationIntensity.MODERATE_MM_PER_HOUR ->
-        PrecipitationIntensity.LIGHT
-    millimetresPerHour < PrecipitationIntensity.HEAVY_MM_PER_HOUR ->
-        PrecipitationIntensity.MODERATE
-    else -> PrecipitationIntensity.HEAVY
-}
+private fun curveLevel(millimetresPerHour: Double): PrecipitationIntensity =
+    RainCurveBands.levelOf(millimetresPerHour)
 
 /** Where a rate sits on the track, as a fraction of its height. */
-private fun heightFraction(millimetresPerHour: Float): Float {
-    val mm = millimetresPerHour.toDouble()
-    if (mm <= 0.0) return 0f
-    for (i in 0 until BAND_HEIGHTS.size - 1) {
-        val (lowMm, lowY) = BAND_HEIGHTS[i]
-        val (highMm, highY) = BAND_HEIGHTS[i + 1]
-        if (mm <= highMm) {
-            val t = ((mm - lowMm) / (highMm - lowMm)).toFloat()
-            // Eased across each band rather than run straight through it. The
-            // anchors are what carry the meaning - trace here, heavy there - but
-            // joining them with straight segments puts a slope change at every
-            // boundary, so a perfectly smooth rate still drew a visibly kinked
-            // line wherever it crossed from one intensity into the next.
-            return lowY + (highY - lowY) * smoothStep(t)
-        }
-    }
-    return 1f
-}
-
-/**
- * Smoothstep: flat at both ends, steepest in the middle.
- *
- * Chosen over a spline through the anchors because it is local. A spline would
- * let a change to one band's height shift the curve inside its neighbours,
- * which would make the bands stop meaning exactly what they say.
- */
-private fun smoothStep(t: Float): Float {
-    val x = t.coerceIn(0f, 1f)
-    return x * x * (3f - 2f * x)
-}
+private fun heightFraction(millimetresPerHour: Float): Float =
+    RainCurveBands.heightFraction(millimetresPerHour)
 
 /** How finely the curve is walked between the forecast's own samples. */
 /** Above this share, the point is carried by radar rather than by the model. */
