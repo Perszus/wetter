@@ -162,6 +162,14 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="group_wind">Wind</string>
     <string name="group_sky">Sky</string>
     <string name="group_sun">Sun</string>
+    <string name="group_stars">Stars</string>
+    <string name="metric_stars_window">Best tonight</string>
+    <string name="metric_sky_open">Sky open</string>
+    <string name="metric_dark_from">Dark from</string>
+    <string name="metric_dark_until">Dark until</string>
+    <string name="stars_window">%1$s – %2$s</string>
+    <string name="stars_clouded_out">Clouded out</string>
+    <string name="stars_no_darkness">Never fully dark</string>
     <string name="group_moon">Moon</string>
     <string name="group_here">This place</string>
     <string name="group_air_quality">Air quality</string>

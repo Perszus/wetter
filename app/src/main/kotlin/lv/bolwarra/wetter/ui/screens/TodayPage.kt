@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +38,8 @@ import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.nextPrecipitation
+import lv.bolwarra.wetter.domain.sky.StarWatch
+import lv.bolwarra.wetter.domain.sky.Stargazing
 import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.window
 import lv.bolwarra.wetter.ui.components.ExpandableTile
@@ -147,6 +150,23 @@ private fun AdvancedTile(
     val sunset = day?.sunset
 
     val hour = forecast.hourly.at(now)
+
+    // The mark on the dial answers "right now", which is the wrong horizon for
+    // this one thing - nobody decides to go and look at the sky at the instant
+    // they open a weather app. Here it is the coming night.
+    //
+    // Hoisted above every conditional in this composable and remembered, because
+    // it walks the next 24 hours in ten-minute steps and the clock behind `now`
+    // ticks far more often than the answer changes.
+    val night = remember(forecast, now) {
+        StarWatch.tonight(
+            hours = forecast.hourly,
+            now = now,
+            latitude = forecast.location.latitude,
+            longitude = forecast.location.longitude,
+            moonIllumination = MoonPhase.illuminationAt(now),
+        )
+    }
 
     ExpandableTile(
         label = stringResource(R.string.tile_advanced),
@@ -269,6 +289,52 @@ private fun AdvancedTile(
                         Metric(
                             stringResource(R.string.metric_no2),
                             formatConcentration(air.nitrogenDioxide),
+                        ),
+                    ),
+                )
+            }
+        }
+
+        if (night.isWorthShowing) {
+            MetricGroup(stringResource(R.string.group_stars)) {
+                MetricGrid(
+                    listOf(
+                        Metric(
+                            stringResource(R.string.metric_stars_window),
+                            night.best
+                                ?.let {
+                                    stringResource(
+                                        R.string.stars_window,
+                                        formatTime(it.from, zone),
+                                        formatTime(it.to, zone),
+                                    )
+                                }
+                                ?: stringResource(
+                                    if (night.hasDarkness) {
+                                        R.string.stars_clouded_out
+                                    } else {
+                                        // Half the year above the arctic circle,
+                                        // and a "0%" here would be a lie about
+                                        // the cloud rather than a fact about the
+                                        // sun.
+                                        R.string.stars_no_darkness
+                                    },
+                                ),
+                        ),
+                        Metric(
+                            stringResource(R.string.metric_sky_open),
+                            Stargazing
+                                .clarityOf(hour?.cloudLow, hour?.cloudMedium, hour?.cloudHigh)
+                                ?.let { formatPercent((it * PERCENT).roundToInt()) }
+                                ?: NO_READING,
+                        ),
+                        Metric(
+                            stringResource(R.string.metric_dark_from),
+                            night.darkFrom?.let { formatTime(it, zone) } ?: NO_READING,
+                        ),
+                        Metric(
+                            stringResource(R.string.metric_dark_until),
+                            night.darkUntil?.let { formatTime(it, zone) } ?: NO_READING,
                         ),
                     ),
                 )
