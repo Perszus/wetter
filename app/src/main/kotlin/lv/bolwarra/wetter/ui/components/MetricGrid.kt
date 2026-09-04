@@ -98,10 +98,10 @@ fun MetricGroup(
     Column(modifier.fillMaxWidth()) {
         Text(
             text = label.uppercase(),
-            style = WetterTheme.type.sectionLabel,
-            color = colors.textTertiary,
+            style = WetterTheme.type.groupLabel,
+            color = colors.textSecondary,
         )
-        Spacer(Modifier.height(spacing.s))
+        Spacer(Modifier.height(spacing.m))
         content()
         if (!last) {
             Spacer(Modifier.height(spacing.l))

@@ -103,6 +103,23 @@ object WetterType {
         letterSpacing = 0.14.em,
     )
 
+    /**
+     * The heading over a group of readings.
+     *
+     * Deliberately not [sectionLabel], which is what the readings inside the
+     * group are labelled with. Set in the same style, a heading and the first
+     * label under it read as two items in one list rather than as a title and
+     * its contents, and the grouping does no work. Heavier, a size larger,
+     * tracked wider and drawn in a darker ink than what it introduces.
+     */
+    val groupLabel = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.2.em,
+    )
+
     /** Hour ticks under the timeline, and any other axis. */
     val axis = TextStyle(
         fontFamily = FontFamily.SansSerif,
