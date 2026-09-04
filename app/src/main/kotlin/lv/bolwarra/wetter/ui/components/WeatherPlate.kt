@@ -186,11 +186,12 @@ fun WeatherPlate(
             Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawPorcelain(
-                        face = colors.surfaceRaised,
-                        highlight = colors.surfaceHighlight,
-                        shade = colors.surfaceShade,
+                        face = colors.surfaceSunken,
+                        lip = colors.surfaceShade,
+                        floorCatch = colors.surface,
+                        occlusion = colors.hairline,
                     )
-                    drawGlassEdge(colors.hairline, colors.surfaceHighlight)
+                    drawFiredEdge(colors.hairline)
                     drawHourTicks(colors.hairline)
                     // The pointer is ink, where the scale it aims at is hairline.
                     // One step of tone was not enough separation to tell the mark
@@ -699,13 +700,57 @@ private fun lapSecondsFor(windSpeedMs: Double): Float? {
  * the difference between glazed ceramic and a moulded plastic button — real
  * objects are lit from somewhere.
  */
-private fun DrawScope.drawPorcelain(face: Color, highlight: Color, shade: Color) {
+private fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color, occlusion: Color) {
     val radius = ringRadius()
+
+    // A well, not a button.
+    //
+    // The shading of a recess is the inverse of a raised one, and that inversion
+    // is the whole of the effect: the near lip overhangs and shadows the top of
+    // the interior, while the far wall at the bottom is turned towards the light
+    // and catches it. Get the sign wrong and the same gradient makes a dome.
+    //
+    // It is also a diffuse ramp rather than the offset radial glaze this used to
+    // be. A radial highlight is a reflection of the light source, so it belongs
+    // to a glossy surface; a matte one has no reflection to place and is lit
+    // only by how far each part of it is turned towards the light.
+    //
+    // Every tone is at or below the page, so the face reads as something the
+    // page has been hollowed into rather than as an object resting on it.
+    drawCircle(
+        brush = Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to lip,
+                FORM_MIDPOINT to face,
+                1f to floorCatch,
+            ),
+            startY = center.y - radius,
+            endY = center.y + radius,
+        ),
+        radius = radius,
+    )
+
+    // The occlusion under the lip: a narrow band of shadow inside the rim,
+    // gathered at the top by pushing the gradient's centre down.
+    //
+    // Drawn in the edge's own ink, not in a surface tone. The first version used
+    // the shade tone and measured invisible - a shadow is an absence of light,
+    // so a surface a step darker than another surface has nothing in it to cast
+    // one. A shadow and a drawn edge are the same darkness at different
+    // strengths, which is why they share a tone here.
+    //
+    // Kept to the rim on purpose. Spread wider it stops being contact shadow and
+    // becomes a vignette, which is an artefact of a lens rather than a property
+    // of a material - and there is no lens in this app.
     drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(highlight, face, shade),
-            center = Offset(center.x, center.y - radius * LIGHT_FROM_ABOVE),
-            radius = radius * GLAZE_SPREAD,
+            colorStops = arrayOf(
+                0f to Color.Transparent,
+                RIM_CONTACT to Color.Transparent,
+                1f to occlusion.copy(alpha = Emphasis.MUTED),
+            ),
+            center = Offset(center.x, center.y + radius * OCCLUSION_BIAS),
+            radius = radius * OCCLUSION_SPREAD,
         ),
         radius = radius,
     )
@@ -718,18 +763,16 @@ private fun DrawScope.drawPorcelain(face: Color, highlight: Color, shade: Color)
  * light at the top. Without the second the ring is a drawn circle rather than
  * something with thickness.
  */
-private fun DrawScope.drawGlassEdge(edge: Color, catch: Color) {
-    val radius = ringRadius()
-    drawCircle(color = edge, radius = radius, style = Stroke(EDGE_WIDTH.toPx()))
-    drawCircle(
-        brush = Brush.verticalGradient(
-            colors = listOf(catch, Color.Transparent),
-            startY = center.y - radius,
-            endY = center.y,
-        ),
-        radius = radius,
-        style = Stroke(EDGE_WIDTH.toPx() * 0.5f),
-    )
+/**
+ * The fired edge: one hairline, and nothing else.
+ *
+ * There used to be a second stroke over the top of it, a bright arc fading to
+ * nothing by the equator - a specular catch, which is the single clearest signal
+ * a surface is glossy. Porcelain has none. What it has is a clean edge, so that
+ * is all this draws.
+ */
+private fun DrawScope.drawFiredEdge(edge: Color) {
+    drawCircle(color = edge, radius = ringRadius(), style = Stroke(EDGE_WIDTH.toPx()))
 }
 
 /** One tick an hour, inside the edge. Twelve at the top, clockwise. */
@@ -857,6 +900,20 @@ private val MARK_GAP = 10.dp
  */
 private val MARK_BASE_OF_CIRCLE = 1f
 
+/**
+ * Where the face's own tone sits in the fall of light: a little above centre,
+ * because the shadowed half of a recess is the shallower of the two.
+ */
+private const val FORM_MIDPOINT = 0.46f
+
+/** How far out the edge begins turning away. Rim only, never a vignette. */
+private const val RIM_CONTACT = 0.90f
+
+/** How far the occlusion is pushed towards the far wall, so it gathers up top. */
+private const val OCCLUSION_BIAS = 0.30f
+
+private const val OCCLUSION_SPREAD = 1.24f
+
 private val EDGE_WIDTH = 3.dp
 private val TICK_GAP = 6.dp
 private val TICK_LONG = 7.dp
@@ -886,9 +943,6 @@ private const val GUST_WORTH_SAYING = 0.6
 
 private const val TAU = 6.2831855f
 
-/** How far above centre the glaze highlight sits, as a fraction of the radius. */
-private const val LIGHT_FROM_ABOVE = 0.35f
-private const val GLAZE_SPREAD = 1.25f
 private const val BEAM_ALPHA = Emphasis.MUTED
 
 private const val WIND_LINES = 3

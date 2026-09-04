@@ -54,7 +54,7 @@ not a second design.
 ## Rule 3 — one specification, read twice
 
 `PlateSpec(ground, inkIsDarker)` is the whole difference between the plates.
-Light is ground L\*94, ink darker. Night is ground L\*9, ink lighter.
+Light is ground L\*95, ink darker. Night is ground L\*9, ink lighter.
 
 Neither goes to an extreme. Pure white is a light source, not a surface, and
 everything on it has to fight it. Pure black leaves nothing for a sunken surface
@@ -96,6 +96,26 @@ There are no drop shadows. Depth is lightness and nothing else.
 Raised surfaces are lighter than their ground **on both plates**. A dark theme
 that darkens what it raises is lighting the scene from below, which reads as a
 hole rather than as a step, and is the commonest way a dark theme goes wrong.
+
+**A recess inverts that, and only that.** The dial is set into the page rather
+than standing on it: the near lip overhangs and shadows the top of the interior,
+while the far wall at the bottom is turned towards the light and catches it. Same
+light, same direction, opposite sign. Get the sign wrong and the identical
+gradient makes a dome.
+
+**A shadow is ink, never a surface.** Shading a recess with a tone one step
+darker than the face measured invisible — a surface has no darkness in it to cast
+with. A shadow is an absence of light, so it is drawn in the same ink as the edge
+it sits under, at a lower emphasis. A shadow and a drawn line are the same
+darkness at different strengths.
+
+**Matte, not glazed.** There is no specular anywhere. A radial highlight offset
+from the centre is a *reflection of the light source*, which is what a glossy
+surface does; a matte one has no reflection to place and is lit only by how far
+each part of it is turned towards the light — across a flat disc, a plain
+vertical ramp, wide and low in contrast. The bright arc that used to ride the top
+of the dial's edge was a specular catch, the single clearest signal a surface is
+glass, and it is gone.
 
 ## Rule 7 — emphasis is a ladder, not a judgement
 
