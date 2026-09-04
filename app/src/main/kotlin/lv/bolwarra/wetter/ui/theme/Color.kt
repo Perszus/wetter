@@ -166,7 +166,7 @@ private data class PlateSpec(
      * reads as a hole rather than as a step, and is the single most common way a
      * dark theme goes wrong.
      */
-    fun surface(steps: Double) = Tone.of((ground + steps).coerceIn(4.0, 98.0))
+    fun surface(steps: Double) = Tone.of((ground + steps).coerceIn(4.0, 99.4))
 }
 
 /** How far apart two surfaces sit. Small, because the step is the whole effect. */
@@ -315,7 +315,16 @@ val LightWetterColors = lightPlate(Atmosphere.Neutral)
 fun lightPlate(sky: Atmosphere): WetterColors =
     plate(PlateSpec(LIGHT_GROUND + sky.ground, inkIsDarker = true, sky = sky), isLight = true)
 
-private const val LIGHT_GROUND = 94.0
+/**
+ * L* 95: paper.
+ *
+ * The first attempt at this sat at 94 and read as card rather than paper - once
+ * an overcast sky took two more steps off it the page was grey, and the dial
+ * that is meant to be the one lit object on it had nothing to be lighter than.
+ * A page has to stay a page under the worst sky in the table, which is what sets
+ * this number rather than how it looks on a clear day.
+ */
+private const val LIGHT_GROUND = 95.0
 
 /**
  * Night: a deep blue-grey, not black.

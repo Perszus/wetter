@@ -6,6 +6,6 @@
       app opens with a flash of the wrong ground. Every other colour is defined
       once, in ui/theme/Color.kt.
     -->
-    <color name="window_background">#EAEEF2</color>
+    <color name="window_background">#EDF1F5</color>
     <color name="icon_background">#0E1A22</color>
 </resources>

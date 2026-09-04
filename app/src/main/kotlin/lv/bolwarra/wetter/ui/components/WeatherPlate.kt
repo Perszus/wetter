@@ -197,14 +197,13 @@ fun WeatherPlate(
                     // that means "now" from the twelve that mean nothing.
                     drawTimeMark(now, zone, colors.textPrimary)
                     if (windSpeed >= STILL_AIR_MS) {
-                        // The light on the face is the light of the hour: warm
-                        // while the sun is up, cool once it is not. It is the
-                        // only thing on the dial that moves, so it is the right
-                        // place for the day to show.
-                        drawWindLight(
-                            beamAngle,
-                            if (current.isDay) colors.day else colors.night,
-                        )
+                        // Ink, not a wash. This was briefly drawn in the
+                        // day/night tones, which are solved as fills - they sit
+                        // close to the ground by design, and a moving pointer
+                        // drawn in one simply disappeared. The one thing on the
+                        // face that moves has to be the most legible thing on
+                        // it.
+                        drawWindLight(beamAngle, colors.textPrimary)
                     }
                 }
             }
