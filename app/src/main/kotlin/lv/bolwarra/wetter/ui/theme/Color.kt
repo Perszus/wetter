@@ -55,6 +55,17 @@ data class WetterColors(
     val night: Color,
     /** The "now" marker and interactive affordances. */
     val accent: Color,
+    /**
+     * The band behind a group heading inside a tile.
+     *
+     * A slate rather than the accent: precipitation owns the only saturated
+     * hue here, and half a dozen blue bands down the drawer would argue with
+     * the rain chart they sit under. Dark enough to carry [onGroupBand].
+     */
+    val groupBand: Color,
+    /** Text on [groupBand]. */
+    val onGroupBand: Color,
+
     /** Stale data, failed refresh, severe weather. Never used decoratively. */
     val warning: Color,
 
@@ -81,6 +92,10 @@ val LightWetterColors = WetterColors(
 
     night = Color(0xFFE2E7EA),
     accent = Color(0xFF0E7FB8),
+
+    groupBand = Color(0xFF4E5C64),
+    onGroupBand = Color(0xFFF4F6F7),
+
     warning = Color(0xFFB4541F),
 
     isLight = true,
@@ -110,6 +125,12 @@ val DarkWetterColors = WetterColors(
 
     night = Color(0xFF0A0E11),
     accent = Color(0xFF4FB0E0),
+
+    // Lifted off the night ground rather than dropped into it: a darker band
+    // on a dark plate would read as a hole, not as a heading.
+    groupBand = Color(0xFF2B363D),
+    onGroupBand = Color(0xFFE4EAED),
+
     warning = Color(0xFFE08A5E),
 
     isLight = false,

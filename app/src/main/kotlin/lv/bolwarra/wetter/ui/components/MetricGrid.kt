@@ -1,14 +1,19 @@
 package lv.bolwarra.wetter.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import lv.bolwarra.wetter.ui.format.NO_READING
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
@@ -73,6 +78,9 @@ private fun MetricCell(metric: Metric, modifier: Modifier = Modifier) {
 
 private const val COLUMNS = 2
 
+/** Softened, not rounded: a pill would read as a chip you can press. */
+private val BAND_CORNER = 4.dp
+
 /**
  * A named cluster of readings inside a tile.
  *
@@ -81,8 +89,11 @@ private const val COLUMNS = 2
  * few rows lets the eye skip three quarters of it, which is the whole reason
  * the drawer can afford to be generous about what goes in.
  *
- * The rule underneath separates groups without boxing them - a tile of boxes
- * inside a tile reads as clutter, and the heading already does the work.
+ * The heading sits on a band of its own. A rule underneath was the first
+ * attempt and was too quiet to survive a drawer this long - by the fourth
+ * group it read as one more separator among the readings. A filled band is
+ * unmistakably a heading at any scroll position, and it makes the rules between
+ * groups redundant, so they are gone.
  */
 @Composable
 fun MetricGroup(
@@ -99,14 +110,15 @@ fun MetricGroup(
         Text(
             text = label.uppercase(),
             style = WetterTheme.type.groupLabel,
-            color = colors.textSecondary,
+            color = colors.onGroupBand,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(BAND_CORNER))
+                .background(colors.groupBand)
+                .padding(horizontal = spacing.m, vertical = spacing.s),
         )
         Spacer(Modifier.height(spacing.m))
         content()
-        if (!last) {
-            Spacer(Modifier.height(spacing.l))
-            HairlineRule()
-            Spacer(Modifier.height(spacing.l))
-        }
+        if (!last) Spacer(Modifier.height(spacing.l))
     }
 }
