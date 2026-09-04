@@ -238,6 +238,34 @@ tighter control of the numerals the whole design leans on. Not decided.
 In memory today. If real use shows the app repeatedly waking to a provider that
 has been down for hours, it should persist.
 
+**Street addresses, and a pin on a map.** *(parked — to be implemented)*
+
+Both are wanted. Neither is blocked on effort; both are blocked on taking a
+provider, and the groundwork is measured so it does not have to be re-derived.
+
+*Addresses.* The place search is a gazetteer of settlements. Asked for
+"Brīvības iela 32, Rīga" it returns **zero** results — this is not a ranking
+problem, it is the wrong kind of service. Two candidates were measured against
+that query:
+
+| | address | reverse | terms |
+|---|---|---|---|
+| Photon (komoot) | resolves, with house numbers | yes | free, built for autocomplete, one volunteer-run instance with no availability promise |
+| Nominatim (OSM) | resolves | yes | policy forbids autocomplete use and caps at one request a second — using it the way a search box behaves would be a breach |
+
+Photon is the only one whose terms fit how a search box works. Reverse
+geocoding matters because it is what turns a dropped pin into a name.
+
+*The map.* A pin needs a basemap, which means a map library and a tile
+provider. OpenStreetMap's own tiles forbid app use, so it is MapTiler, Stadia
+or Protomaps — a key, possibly a bill, and a native library that would dominate
+the APK. That cuts against three things this app has held to: keyless
+providers, a small download, and F-Droid's reproducible builds. It is a real
+decision, not a dependency to add quietly.
+
+*Shipped in the meantime.* The search box accepts a coordinate pair, which is
+the exact answer both features are ultimately for, and needs no new service.
+
 **How precipitation probability should be shown.**
 Intensity drives bar height. Probability could be opacity, a second mark, or
 nothing at all — showing both risks a chart that encodes two things badly rather
