@@ -108,4 +108,16 @@ class ProviderHealthRegistry {
     }
 
     fun snapshot(): Map<String, ProviderHealth> = health.toMap()
+
+    /**
+     * Put back what was known before the process restarted.
+     *
+     * Only fills gaps: anything learned since this registry was created is
+     * fresher than anything from disk and wins. That matters on a cold start
+     * racing the first request - the read must never overwrite a failure that
+     * has just happened.
+     */
+    fun restore(remembered: Map<String, ProviderHealth>) {
+        remembered.forEach { (id, state) -> health.putIfAbsent(id, state) }
+    }
 }

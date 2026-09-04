@@ -100,6 +100,36 @@ internal data class ForecastRecordEntity(
  * place found twice through different spellings is stored once, and so the table
  * does not depend on a gazetteer's identifiers staying stable.
  */
+/**
+ * What is known about a provider's recent behaviour.
+ *
+ * Kept across a restart because the knowledge is slow to earn and cheap to
+ * store. Held only in memory, an app that woke to a service which had been down
+ * for hours would try it, fail, and learn that fact again from scratch every
+ * time - which is exactly the request the backoff exists to avoid making.
+ *
+ * Nothing here is aggregated or reported anywhere. It is a note to self about
+ * who to ask first (docs/providers.md).
+ */
+@Entity(tableName = "provider_health")
+internal data class ProviderHealthEntity(
+    @PrimaryKey val providerId: String,
+    val lastSuccessEpochSecond: Long?,
+    val lastFailureEpochSecond: Long?,
+    val consecutiveFailures: Int,
+    val cooldownUntilEpochSecond: Long?,
+)
+
+@Dao
+internal interface ProviderHealthDao {
+
+    @Query("SELECT * FROM provider_health")
+    suspend fun all(): List<ProviderHealthEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(rows: List<ProviderHealthEntity>)
+}
+
 @Entity(tableName = "saved_locations")
 internal data class SavedLocationEntity(
     @PrimaryKey val id: String,
@@ -251,11 +281,14 @@ internal interface SelectedLocationDao {
         ForecastRecordEntity::class,
         SavedLocationEntity::class,
         RadarSeriesEntity::class,
+        ProviderHealthEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
+
+    abstract fun providerHealth(): ProviderHealthDao
 
     abstract fun forecasts(): ForecastDao
 
@@ -346,6 +379,20 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `provider_health` (" +
+                        "`providerId` TEXT NOT NULL, " +
+                        "`lastSuccessEpochSecond` INTEGER, " +
+                        "`lastFailureEpochSecond` INTEGER, " +
+                        "`consecutiveFailures` INTEGER NOT NULL, " +
+                        "`cooldownUntilEpochSecond` INTEGER, " +
+                        "PRIMARY KEY(`providerId`))",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -361,7 +408,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
             // it would silently throw away everything the app had learned
             // about this location. Every schema change from here needs a
             // migration.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 }

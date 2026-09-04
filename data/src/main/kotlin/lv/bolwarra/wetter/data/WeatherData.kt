@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.db.WetterDatabase
 import lv.bolwarra.wetter.data.location.OpenMeteoGeocoder
 import lv.bolwarra.wetter.data.location.SavedLocationStore
@@ -19,11 +20,13 @@ import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
+import lv.bolwarra.wetter.data.repository.ProviderHealthStore
 import lv.bolwarra.wetter.data.repository.RadarSeriesStore
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.location.PlaceSearch
+import lv.bolwarra.wetter.domain.provider.ProviderHealthRegistry
 import lv.bolwarra.wetter.domain.provider.WeatherProvider
 
 /**
@@ -131,7 +134,21 @@ class WeatherData(
             .distinct()
     }
 
-    private val router by lazy { WeatherProviderRouter(providers) }
+    /** What is known about each provider, remembered across restarts. */
+    private val healthRegistry by lazy { ProviderHealthRegistry() }
+
+    private val healthStore by lazy { ProviderHealthStore(database.providerHealth()) }
+
+    private val router by lazy {
+        // Restored in the background: a cold start must not wait on a disk read
+        // to answer, and anything learned before it lands wins anyway.
+        scope.launch { runCatching { healthStore.restoreInto(healthRegistry) } }
+        WeatherProviderRouter(
+            providers = providers,
+            health = healthRegistry,
+            onHealthChanged = { healthStore.save(healthRegistry) },
+        )
+    }
 
     val repository: WeatherRepository by lazy {
         WeatherRepository(

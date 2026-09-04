@@ -42,6 +42,12 @@ internal class WeatherProviderRouter(
     private val providers: List<WeatherProvider>,
     private val selector: WeatherProviderSelector = ScoringProviderSelector(),
     private val health: ProviderHealthRegistry = ProviderHealthRegistry(),
+    /**
+     * Called after the registry changes, so what was learned survives a
+     * restart. Optional and never awaited for a result: persistence failing is
+     * not a reason to fail a forecast.
+     */
+    private val onHealthChanged: (suspend () -> Unit)? = null,
     private val requirements: ForecastRequirements = ForecastRequirements.Default,
     private val clock: Clock = Clock.systemUTC(),
     private val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
@@ -81,6 +87,7 @@ internal class WeatherProviderRouter(
 
             result.onSuccess { forecast ->
                 health.recordSuccess(provider.id, Instant.now(clock))
+                rememberHealth()
                 return Result.success(extendIfShort(forecast, location, ranked))
             }
 
@@ -93,6 +100,7 @@ internal class WeatherProviderRouter(
                 error = error,
                 retryAfter = result.exceptionOrNull()?.retryAfter(),
             )
+            rememberHealth()
             log("${provider.id} failed: $error")
 
             if (!shouldFailOver(error)) {
@@ -145,6 +153,7 @@ internal class WeatherProviderRouter(
                 error = error,
                 retryAfter = result.exceptionOrNull()?.retryAfter(),
             )
+            rememberHealth()
             log("could not extend with ${candidate.id}: $error")
             return forecast
         }
@@ -188,6 +197,17 @@ internal class WeatherProviderRouter(
             val state = if (score.eligible) "%.1f".format(score.score) else "excluded"
             log("  ${score.provider.id}: $state — ${score.reasons.joinToString("; ")}")
         }
+    }
+
+    /**
+     * Write the registry down, swallowing anything that goes wrong.
+     *
+     * A provider's reputation is worth keeping and worth nothing compared to
+     * the forecast: if the disk is full or the database is locked, the app
+     * forgets what it learned rather than failing the request that taught it.
+     */
+    private suspend fun rememberHealth() {
+        onHealthChanged?.let { runCatching { it() } }
     }
 
     private fun log(message: String) {
