@@ -68,7 +68,4 @@ data class WeatherUiState(
     val loaded: Boolean = false,
 ) {
     val hasForecast: Boolean get() = forecast != null
-
-    /** Whether radar is actually carrying any of the near-term timeline. */
-    val hasRadar: Boolean get() = timeline.any { it.radarShare > 0.0 }
 }

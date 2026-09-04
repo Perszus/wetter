@@ -48,8 +48,24 @@ dashboard. It should read as measured, quiet, and precise.
    filling the rest from the model's cloud cover, is the honest reading; keeping
    the model's word for it because it is tidier is not.
 
-   Its corollary: **say which it was.** A reading is worth more when a reader
-   can tell whether it was seen or computed.
+   This rule is about what the app *does*, never about what it says. See rule 8.
+
+8. **The machinery is our problem, not the reader's.** Somebody who downloads a
+   weather app judges it by whether it matched the weather outside. They do not
+   care which satellite, which model, which sweep, or how the two were weighed
+   against each other, and telling them is not honesty - it is us showing our
+   work in a place reserved for their answer.
+
+   So no provenance labels, no "radar-backed" badges, no note that coverage is
+   thin here, no explanation of how a threshold was chosen or a warning
+   dismissed. Every one of those is a sentence about Wetter appearing on a
+   screen whose whole job is to be a sentence about the sky.
+
+   This does not soften rule 7 by one degree - it is why rule 7 has to be
+   carried properly. The reader has no way to discount a bad reading, because
+   they are not being told which readings to discount. Correctness is the only
+   thing standing between them and a wrong answer, so it gets paid for in the
+   engine and never in the interface.
 
 ## Visual language
 
