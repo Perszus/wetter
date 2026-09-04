@@ -103,6 +103,13 @@ while the far wall at the bottom is turned towards the light and catches it. Sam
 light, same direction, opposite sign. Get the sign wrong and the identical
 gradient makes a dome.
 
+The recess is shallow, so its face sits at the page's own tone and the far wall a
+step above it. That is not a contradiction — the floor of a shallow bowl faces
+the light more squarely than the flat surface around it, so it genuinely catches
+more. **The cue that says "hollow" is the shadow under the near lip**, and that
+is the one thing that must not move. Putting the whole face below the page reads
+as a recess too, and as a dim one: correct, and a shade too careful.
+
 **A shadow is ink, never a surface.** Shading a recess with a tone one step
 darker than the face measured invisible — a surface has no darkness in it to cast
 with. A shadow is an absence of light, so it is drawn in the same ink as the edge

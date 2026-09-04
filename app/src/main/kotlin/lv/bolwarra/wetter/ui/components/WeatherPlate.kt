@@ -186,9 +186,9 @@ fun WeatherPlate(
             Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawPorcelain(
-                        face = colors.surfaceSunken,
+                        face = colors.surface,
                         lip = colors.surfaceShade,
-                        floorCatch = colors.surface,
+                        floorCatch = colors.surfaceRaised,
                         occlusion = colors.hairline,
                     )
                     drawFiredEdge(colors.hairline)
@@ -715,8 +715,15 @@ private fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color, 
     // to a glossy surface; a matte one has no reflection to place and is lit
     // only by how far each part of it is turned towards the light.
     //
-    // Every tone is at or below the page, so the face reads as something the
-    // page has been hollowed into rather than as an object resting on it.
+    // The recess is shallow, so the face sits at the page's own tone and the far
+    // wall goes a step above it. That is not a contradiction: the floor of a
+    // shallow bowl faces the light more squarely than the flat surface around
+    // it does, so it genuinely catches more. The cue that says "hollow" is the
+    // shadow under the near lip, and that is the one thing here that must not
+    // move.
+    //
+    // An earlier version put the whole face below the page. It read as a recess
+    // and also as a dim one - correct, and a shade too careful.
     drawCircle(
         brush = Brush.verticalGradient(
             colorStops = arrayOf(
