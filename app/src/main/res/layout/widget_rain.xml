@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The whole widget is one image and four labels.
+  The whole widget is one image.
 
-  The image carries the plate, the wind and the curve, because RemoteViews has
-  no way to draw an arbitrary shape and a bitmap is the only door. The labels
-  stay real TextViews so they follow the reader's font size, which an upscaled
-  bitmap of type would not.
+  RemoteViews has no way to draw an arbitrary shape, so the curve arrives as a
+  finished bitmap. The hour labels are in it too, which they did not used to be:
+  they were four TextViews of equal weight, and equal cells cannot put text
+  beside an hour rule that is offset from the quarters. When the next whole hour
+  is nearly an hour away the indent needed to reach it is the whole cell, and
+  every label clips at once.
 
-  Four cells of equal weight put each label at its own hour: with the chart
-  spanning the full width, label n starts at n quarters across.
+  Drawing them costs the reader's font-scale setting, which is a real loss and
+  the reason it was not done first. It is the same trade the app's own time axis
+  already makes - see drawTimeAxis in RainCurve.kt - and the picture is rendered
+  at the screen's own density, so the type is not upscaled.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -21,46 +25,4 @@
         android:layout_height="match_parent"
         android:contentDescription="@string/widget_rain_description"
         android:scaleType="fitXY" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="4dp">
-
-        <TextView
-            android:id="@+id/widget_hour_0"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/widget_hour_1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/widget_hour_2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/widget_hour_3"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:textSize="11sp" />
-    </LinearLayout>
 </FrameLayout>

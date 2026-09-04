@@ -62,6 +62,8 @@ internal object RainStrip {
         rates: List<Double>,
         windSpeed: Double?,
         windFrom: Int?,
+        hourOffset: Float,
+        hourLabels: List<String>,
     ): Bitmap {
         val scale = renderScale(widthDp, heightDp, density)
         val width = max(1, (widthDp * scale).toInt())
@@ -86,6 +88,7 @@ internal object RainStrip {
         )
         if (chart.width() > 0f && chart.height() > 0f) {
             drawBands(canvas, chart, scale, colors)
+            drawHours(canvas, chart, scale, colors, hourOffset, hourLabels)
             drawCurve(canvas, chart, scale, colors, rates)
         }
         return bitmap
@@ -227,6 +230,83 @@ internal object RainStrip {
         listOf(RainCurveBands.moderateEdge, RainCurveBands.heavyEdge).forEach { fraction ->
             val y = chart.bottom - chart.height() * fraction
             canvas.drawLine(chart.left, y, chart.right, y, paint)
+        }
+    }
+
+    /**
+     * The clock, as rules down the chart.
+     *
+     * The hour labels used to sit at fixed quarters of the width, which put them
+     * nowhere in particular: the window starts at *now*, so a quarter of the way
+     * along is 23:47, not midnight. They read as shifted because they were.
+     *
+     * These are the real hour boundaries, and the label for each one starts just
+     * to the right of its rule - so the rule is the moment and the text belongs
+     * to it, rather than floating between two of them. Because the window is
+     * exactly four hours, the boundaries stay evenly spaced a quarter apart and
+     * only the offset to the first one changes, which is what lets the labels
+     * stay four equal cells with one shared indent.
+     *
+     * Half hours get a short tick off the floor. They carry no text and are not
+     * meant to be read individually; they are there so the eye can halve the gap
+     * between two hours without measuring it, which is most of what anybody does
+     * with "when does this start".
+     */
+    private fun drawHours(
+        canvas: Canvas,
+        chart: RectF,
+        scale: Float,
+        colors: WetterColors,
+        hourOffset: Float,
+        hourLabels: List<String>,
+    ) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.gridline.toArgb()
+            strokeWidth = HAIRLINE_DP * scale
+        }
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colors.textTertiary.toArgb()
+            textSize = LABEL_DP * scale
+        }
+        val tickHeight = HALF_TICK_DP * scale
+        val baseline = chart.bottom + LABEL_BASELINE_DP * scale
+
+        // Counted in half-hour steps from the first hour boundary, so whether a
+        // mark is on the hour is the parity of the step rather than a modulus of
+        // a float that has been added to itself a dozen times.
+        var step = 0
+        while (hourOffset + step * HALF_HOUR > 0f) step--
+        while (true) {
+            val fraction = hourOffset + step * HALF_HOUR
+            if (fraction >= 1f) break
+            if (fraction > 0f) {
+                val x = chart.left + chart.width() * fraction
+                val onTheHour = step % 2 == 0
+                // The hour is a rule up the whole chart; the half hour hangs
+                // below the floor, where the fill cannot paint over it.
+                canvas.drawLine(
+                    x,
+                    if (onTheHour) chart.top else chart.bottom,
+                    x,
+                    if (onTheHour) chart.bottom else chart.bottom + tickHeight,
+                    paint,
+                )
+
+                // The label belongs to the rule beside it, so it starts just to
+                // its right rather than centred on it. Anything that would run
+                // off the end is dropped: a clipped hour is worse than a missing
+                // one, because a clipped one still looks like a reading.
+                if (onTheHour) {
+                    val hour = hourLabels.getOrNull(step / 2)
+                    if (hour != null) {
+                        val left = x + LABEL_GAP_DP * scale
+                        if (left + text.measureText(hour) <= chart.right) {
+                            canvas.drawText(hour, left, baseline, text)
+                        }
+                    }
+                }
+            }
+            step++
         }
     }
 
@@ -421,10 +501,15 @@ internal object RainStrip {
         (color and 0x00FFFFFF) or ((alpha * 255).toInt().coerceIn(0, 255) shl 24)
 
     /**
-     * About a quarter of a megabyte as ARGB_8888, which leaves the rest of the
-     * Binder transaction for the views and the text.
+     * About 440 KB as ARGB_8888, comfortably inside the roughly one megabyte a
+     * process gets per Binder transaction, with the rest of the update to carry.
+     *
+     * It was a quarter of that when the widget was two cells tall and the hour
+     * labels were real views. One cell is a much smaller picture, so this budget
+     * lets it render at the screen's own density instead of being upscaled -
+     * which is what makes the labels legible now that they are drawn in here.
      */
-    private const val MAX_PIXELS = 64_000f
+    private const val MAX_PIXELS = 110_000f
 
     private const val CHART_INSET_DP = 10f
 
@@ -446,6 +531,17 @@ internal object RainStrip {
     private const val MAX_LABEL_DP = 24f
 
     private const val STROKE_DP = 2.5f
+
+    /** One hour, as a fraction of the four-hour window, and half of one. */
+    private const val HOUR = 0.25f
+    private const val HALF_HOUR = 0.125f
+
+    /** Half hours are a mark off the floor, not a rule up the chart. */
+    private const val HALF_TICK_DP = 5f
+
+    private const val LABEL_DP = 10f
+    private const val LABEL_GAP_DP = 3f
+    private const val LABEL_BASELINE_DP = 13f
     private const val HAIRLINE_DP = 1f
 
     /** Thin and hard, the way a bevel catches light. */

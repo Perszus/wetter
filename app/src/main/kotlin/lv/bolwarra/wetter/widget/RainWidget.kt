@@ -10,13 +10,12 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateFormat
-import android.util.TypedValue
 import android.widget.RemoteViews
-import androidx.compose.ui.graphics.toArgb
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -170,38 +169,47 @@ class RainWidget : AppWidgetProvider() {
                     rates = frame.rates,
                     windSpeed = frame.windSpeed,
                     windFrom = frame.windFrom,
+                    hourOffset = hourOffset(frame),
+                    hourLabels = hourLabels(context, frame),
                 ),
             )
-            labelHours(context, views, colors, frame, size.second)
         }
         manager.updateAppWidget(id, views)
     }
 
     /**
-     * Four clock times under the curve, one per hour of the window.
+     * How far along the window the first whole hour falls, as a fraction of it.
      *
-     * Times rather than "now, +1, +2" because a clock face is what somebody is
-     * comparing against when they decide whether to leave before the rain.
+     * The window opens at *now*, so the hour boundaries inside it are not at
+     * quarters of the width - they are a quarter apart but offset by however far
+     * away the next one is. The labels used to be drawn at fixed quarters, which
+     * put midnight wherever 23:47 plus an hour happened to land, and read as
+     * text that had slipped sideways.
      */
-    private fun labelHours(
-        context: Context,
-        views: RemoteViews,
-        colors: WetterColors,
-        frame: Frame,
-        heightDp: Float,
-    ) {
+    private fun hourOffset(frame: Frame): Float {
+        val next = frame.now.atZone(frame.zone)
+            .truncatedTo(ChronoUnit.HOURS)
+            .plusHours(1)
+            .toInstant()
+        val into = Duration.between(frame.now, next).toMillis().toFloat()
+        return into / WINDOW.toMillis().toFloat()
+    }
+
+    /**
+     * The clock times of those boundaries, in the reader's own 12- or 24-hour
+     * preference. Whether each one has room to be drawn is decided where it is
+     * drawn, against the measured width of the text.
+     */
+    private fun hourLabels(context: Context, frame: Frame): List<String> {
         val pattern = if (DateFormat.is24HourFormat(context)) HOUR_24 else HOUR_12
-        val textSize = if (heightDp < SMALL_HEIGHT_DP) SMALL_LABEL_SP else LABEL_SP
         val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
             .withZone(frame.zone)
-
-        HOUR_LABELS.forEachIndexed { index, viewId ->
-            views.setTextViewText(
-                viewId,
-                formatter.format(frame.now.plus(Duration.ofHours(index.toLong()))),
-            )
-            views.setTextColor(viewId, colors.textTertiary.toArgb())
-            views.setTextViewTextSize(viewId, TypedValue.COMPLEX_UNIT_SP, textSize)
+        val first = frame.now.atZone(frame.zone)
+            .truncatedTo(ChronoUnit.HOURS)
+            .plusHours(1)
+            .toInstant()
+        return (0 until HOURS_IN_WINDOW).map {
+            formatter.format(first.plus(Duration.ofHours(it.toLong())))
         }
     }
 
@@ -302,12 +310,7 @@ class RainWidget : AppWidgetProvider() {
         /** Comfortably inside the receiver's ten seconds. */
         private const val FUSION_BUDGET_MS = 6_000L
 
-        private val HOUR_LABELS = intArrayOf(
-            R.id.widget_hour_0,
-            R.id.widget_hour_1,
-            R.id.widget_hour_2,
-            R.id.widget_hour_3,
-        )
+        private const val HOURS_IN_WINDOW = 4
 
         private const val HOUR_24 = "HH"
         private const val HOUR_12 = "h a"
@@ -315,17 +318,6 @@ class RainWidget : AppWidgetProvider() {
         /** Three cells by one, before anybody resizes it. */
         private const val DEFAULT_WIDTH_DP = 240f
         private const val DEFAULT_HEIGHT_DP = 70f
-
-        /**
-         * Where the labels stop being readable as 11sp.
-         *
-         * Text does not scale with the widget - it is real type, at the reader's
-         * own size - so on a one-cell widget it is a much larger share of the
-         * height than on a two-cell one, and has to give some back.
-         */
-        private const val SMALL_HEIGHT_DP = 90f
-        private const val LABEL_SP = 11f
-        private const val SMALL_LABEL_SP = 9f
 
         private const val FALLBACK_RADIUS_DP = 16f
     }
