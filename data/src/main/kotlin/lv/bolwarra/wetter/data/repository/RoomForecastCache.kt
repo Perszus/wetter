@@ -4,8 +4,11 @@ import android.util.Log
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import lv.bolwarra.wetter.data.db.ForecastDao
 import lv.bolwarra.wetter.data.db.ForecastEntity
@@ -29,19 +32,31 @@ internal class RoomForecastCache(
     private val clock: Clock = Clock.systemUTC(),
 ) : ForecastCache {
 
+    /**
+     * Decoded away from the main thread.
+     *
+     * A forecast is stored as one JSON document covering seven days hour by
+     * hour, so parsing it is not free - and this flow emits on every write,
+     * which is to say every time a refresh lands. Left in the collector's
+     * context that parse happened on the main thread at exactly the moment the
+     * screen was busiest.
+     */
     override fun observe(location: WeatherLocation): Flow<WeatherForecast?> =
-        dao.observe(location.cacheKey()).map { it?.decode() }
+        dao.observe(location.cacheKey())
+            .map { it?.decode() }
+            .flowOn(Dispatchers.Default)
 
     override suspend fun read(location: WeatherLocation): WeatherForecast? =
-        dao.read(location.cacheKey())?.decode()
+        withContext(Dispatchers.Default) { dao.read(location.cacheKey())?.decode() }
 
     override suspend fun write(forecast: WeatherForecast) {
+        val payload = withContext(Dispatchers.Default) { json.encodeToString(forecast.toStored()) }
         dao.write(
             ForecastEntity(
                 cacheKey = forecast.location.cacheKey(),
                 fetchedAtEpochSecond = forecast.fetchedAt.epochSecond,
                 providerId = forecast.provider.id,
-                payload = json.encodeToString(forecast.toStored()),
+                payload = payload,
             ),
         )
         dao.deleteOlderThan(Instant.now(clock).minus(KEEP_FOR).epochSecond)

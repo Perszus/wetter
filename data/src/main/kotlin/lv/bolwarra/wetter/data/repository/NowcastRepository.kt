@@ -3,8 +3,10 @@ package lv.bolwarra.wetter.data.repository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import lv.bolwarra.wetter.domain.forecast.EnsembleSource
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.forecast.ModelEnsemble
@@ -119,7 +121,20 @@ class NowcastRepository internal constructor(
         val frames = source.recentFrames(location.latitude, location.longitude, FRAMES)
             .getOrNull()
             .orEmpty()
-        val nowcast = if (frames.size < 2) null else RadarNowcaster.nowcast(frames, LEADS)
+        // Off the main thread, because this is the heaviest arithmetic in the
+        // app by a wide margin: two block-match passes over the whole grid, then
+        // a bilinear advection of every pixel for each of sixteen steps.
+        //
+        // It was running wherever the caller happened to be, and the caller is a
+        // view model - so on the main thread. The dial's light integrates its
+        // angle in withFrameNanos, so it stalls the instant anything blocks a
+        // frame, and coming back from the background is exactly when this work
+        // happens. The animation stuttering was the arithmetic, not the network.
+        val nowcast = if (frames.size < 2) {
+            null
+        } else {
+            withContext(Dispatchers.Default) { RadarNowcaster.nowcast(frames, LEADS) }
+        }
         val sweepAt = frames.lastOrNull()?.at ?: latest
         cached = Cached(
             location = location,
@@ -274,14 +289,19 @@ class NowcastRepository internal constructor(
         steps: Int = DEFAULT_STEPS,
     ): List<FusedPrecipitation> {
         val radar = radarSeries(forecast.location)
-        return PrecipitationFusion.fuse(
-            hourly = forecast.hourly,
-            radar = radar,
-            from = from,
-            step = step,
-            steps = steps,
-            ensemble = ensemble(forecast.location),
-        )
+        val ensemble = ensemble(forecast.location)
+        // Lighter than the nowcast but still a few hundred interpolations and
+        // agreement calculations per step, and it runs on every clock tick.
+        return withContext(Dispatchers.Default) {
+            PrecipitationFusion.fuse(
+                hourly = forecast.hourly,
+                radar = radar,
+                from = from,
+                step = step,
+                steps = steps,
+                ensemble = ensemble,
+            )
+        }
     }
 
     /**

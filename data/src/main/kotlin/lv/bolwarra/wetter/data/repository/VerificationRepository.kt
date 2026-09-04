@@ -4,6 +4,8 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import lv.bolwarra.wetter.data.db.ForecastRecordDao
 import lv.bolwarra.wetter.data.db.ForecastRecordEntity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
@@ -200,9 +202,13 @@ class VerificationRepository internal constructor(
         variable: VerifiedVariable = VerifiedVariable.TEMPERATURE,
     ): LearnedBias? {
         val since = Instant.now(clock).minus(BiasCorrection.MAX_AGE)
-        val records = dao.verifiedFor(cacheKeyOf(location), since.epochSecond)
-            .map { it.toDomain() }
-        return BiasCorrection.learn(records, variable)
+        val rows = dao.verifiedFor(cacheKeyOf(location), since.epochSecond)
+        // Up to thirty days of records mapped and regressed. Room runs the query
+        // off the main thread but hands the rows back on the caller's, and the
+        // caller is a view model - so the arithmetic landed on the frame clock.
+        return withContext(Dispatchers.Default) {
+            BiasCorrection.learn(rows.map { it.toDomain() }, variable)
+        }
     }
 
     /** How many predictions have been checked so far, across all locations. */
