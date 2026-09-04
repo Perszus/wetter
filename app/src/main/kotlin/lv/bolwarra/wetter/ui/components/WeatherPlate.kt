@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -60,9 +61,12 @@ import lv.bolwarra.wetter.domain.SolarTime
 import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
+import lv.bolwarra.wetter.domain.hazard.Hazard
+import lv.bolwarra.wetter.domain.hazard.HazardSeverity
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.sky.Stargazing
+import lv.bolwarra.wetter.ui.format.formatHazardWindow
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
 import lv.bolwarra.wetter.ui.format.labelRes
@@ -107,6 +111,8 @@ fun WeatherPlate(
      * own, which is what the umbrella used to be given always.
      */
     timeline: List<FusedPrecipitation> = emptyList(),
+    /** Whatever in the next day could hurt somebody, worst first. */
+    hazards: List<Hazard> = emptyList(),
     modifier: Modifier = Modifier,
     /**
      * Which mark is currently explaining itself, held by the caller.
@@ -192,6 +198,16 @@ fun WeatherPlate(
                 }
             }
 
+            if (hazards.isNotEmpty()) {
+                HazardMark(
+                    severity = hazards.first().severity,
+                    modifier = Modifier
+                        .offset(x = outwards, y = -downwards)
+                        .size(MARK_SIZE)
+                        .quietlyClickable { toggle(PlateMark.HAZARD) },
+                )
+            }
+
             if (sky.isWorthIt) {
                 StarsMark(
                     modifier = Modifier
@@ -254,6 +270,9 @@ fun WeatherPlate(
         MarkExplanation(
             mark = explaining,
             sky = sky,
+            hazards = hazards,
+            now = now,
+            zone = zone,
             windSpeedMs = windSpeed,
             windGustMs = windGust,
             onDismiss = { onExplain(null) },
@@ -280,7 +299,7 @@ private fun Modifier.quietlyClickable(onClick: () -> Unit): Modifier = composed 
 }
 
 /** The two marks standing beside the dial, each of which can explain itself. */
-enum class PlateMark { UMBRELLA, WIND, STARS }
+enum class PlateMark { UMBRELLA, WIND, STARS, HAZARD }
 
 /**
  * What the mark you just tapped actually means.
@@ -298,6 +317,9 @@ enum class PlateMark { UMBRELLA, WIND, STARS }
 private fun MarkExplanation(
     mark: PlateMark?,
     sky: Stargazing.Sky,
+    hazards: List<Hazard>,
+    now: Instant,
+    zone: ZoneId,
     windSpeedMs: Double,
     windGustMs: Double,
     onDismiss: () -> Unit,
@@ -320,10 +342,12 @@ private fun MarkExplanation(
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_title)
             PlateMark.WIND -> stringResource(windLevelLabel(windLevel(windSpeedMs)))
             PlateMark.STARS -> stringResource(starsTitle(sky))
+            PlateMark.HAZARD -> stringResource(R.string.hazard_title)
         }
         val body = when (shown) {
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_body)
             PlateMark.WIND -> stringResource(R.string.explain_wind_body)
+            PlateMark.HAZARD -> stringResource(R.string.hazard_body)
             PlateMark.STARS -> if (sky.moonWashed) {
                 stringResource(R.string.explain_stars_body_moon)
             } else {
@@ -356,6 +380,9 @@ private fun MarkExplanation(
                 R.string.explain_stars_reading,
                 (sky.clarity * PERCENT).roundToInt(),
             )
+            // The hazards are listed in full below rather than squeezed into
+            // this one line, so the header stays empty.
+            PlateMark.HAZARD -> null
         }
 
         Column(
@@ -386,6 +413,36 @@ private fun MarkExplanation(
                 }
             }
             Spacer(Modifier.height(spacing.xs))
+            if (shown == PlateMark.HAZARD) {
+                // Every one of them, not just the worst. Somebody deciding
+                // whether to go out needs to know the gale is followed by ice,
+                // and the second line is where that lives.
+                hazards.forEach { hazard ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(hazard.kind.labelRes()),
+                            style = WetterTheme.type.body,
+                            color = if (hazard.severity == HazardSeverity.DANGER) {
+                                colors.warning
+                            } else {
+                                colors.textPrimary
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = formatHazardWindow(hazard, now, zone),
+                            style = WetterTheme.type.meta,
+                            color = colors.textSecondary,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(spacing.s))
+            }
             if (shown == PlateMark.WIND) {
                 // The three bands as a scale, with the one you are in picked out.
                 // A reader wants to know what the lines mean and where they
@@ -977,3 +1034,75 @@ private fun starsTitle(sky: Stargazing.Sky): Int = when {
 
 private const val EXCELLENT_SKY = 0.85f
 private const val GOOD_SKY = 0.6f
+
+/**
+ * The mark for weather that can hurt somebody.
+ *
+ * A triangle, because that shape means exactly one thing everywhere and needs no
+ * key. It is drawn in the palette's warning colour and it is the only other
+ * coloured object on this face besides the umbrella - which is the whole reason
+ * the palette holds the rule that it does. Two loud colours are a hierarchy;
+ * five are wallpaper.
+ *
+ * The bar for putting it up is set high in [lv.bolwarra.wetter.domain.hazard.Hazards]
+ * rather than here. A mark that is up most of the week is furniture.
+ */
+@Composable
+private fun HazardMark(severity: HazardSeverity, modifier: Modifier = Modifier) {
+    val colors = WetterTheme.colors
+    val description = stringResource(R.string.plate_hazard)
+    // A warning still to come is drawn back, one already happening is not. The
+    // difference between "later" and "now" is worth a glance's worth of weight.
+    val colour = if (severity == HazardSeverity.DANGER) {
+        colors.warning
+    } else {
+        colors.warning.copy(alpha = WARNING_AHEAD)
+    }
+
+    Canvas(modifier.semantics { contentDescription = description }) {
+        val width = size.minDimension
+        val height = width * TRIANGLE_RATIO
+        val left = (size.width - width) / 2f
+        val top = (size.height - height) / 2f
+        val corner = width * TRIANGLE_CORNER
+
+        val path = Path().apply {
+            moveTo(left + width / 2f, top)
+            lineTo(left + width, top + height)
+            lineTo(left, top + height)
+            close()
+        }
+        drawPath(path, colour, style = Stroke(width = corner, join = StrokeJoin.Round))
+
+        // The bang: a bar and a dot, both inset from the edges so the triangle
+        // reads first and the mark inside it second.
+        val barTop = top + height * BANG_TOP
+        val barBottom = top + height * BANG_BOTTOM
+        drawLine(
+            colour,
+            Offset(left + width / 2f, barTop),
+            Offset(left + width / 2f, barBottom),
+            strokeWidth = corner,
+            cap = StrokeCap.Round,
+        )
+        drawCircle(
+            colour,
+            radius = corner * 0.6f,
+            center = Offset(
+                left + width / 2f,
+                top + height * BANG_DOT,
+            ),
+        )
+    }
+}
+
+/** A hazard that has not started yet is drawn back this far. */
+private const val WARNING_AHEAD = 0.65f
+
+/** Slightly wider than tall, which is how a road sign reads. */
+private const val TRIANGLE_RATIO = 0.88f
+
+private const val TRIANGLE_CORNER = 0.1f
+private const val BANG_TOP = 0.34f
+private const val BANG_BOTTOM = 0.62f
+private const val BANG_DOT = 0.78f

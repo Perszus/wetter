@@ -3,6 +3,7 @@ package lv.bolwarra.wetter.ui.screens
 import androidx.compose.runtime.Immutable
 import lv.bolwarra.wetter.domain.air.AirQuality
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
+import lv.bolwarra.wetter.domain.hazard.Hazard
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
@@ -44,6 +45,8 @@ data class WeatherUiState(
      * air, and is shown as nothing rather than as a reassuring word.
      */
     val airQuality: AirQuality? = null,
+    /** Whatever in the next day could hurt somebody, worst first. */
+    val hazards: List<Hazard> = emptyList(),
     /**
      * What this place's forecasts have been found to get wrong, once enough
      * records exist to tell. Null for a new location and for the first weeks of

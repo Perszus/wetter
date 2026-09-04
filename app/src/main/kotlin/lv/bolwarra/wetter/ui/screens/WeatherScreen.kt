@@ -170,6 +170,7 @@ fun WeatherScreen(
                 forecast = forecast,
                 now = now,
                 timeline = state.timeline,
+                hazards = state.hazards,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 explaining = explaining,
                 onExplain = { explaining = it },

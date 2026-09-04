@@ -17,6 +17,8 @@ import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.CompassPoint
 import lv.bolwarra.wetter.domain.MoonPhaseName
 import lv.bolwarra.wetter.domain.air.AirQualityBand
+import lv.bolwarra.wetter.domain.hazard.Hazard
+import lv.bolwarra.wetter.domain.hazard.HazardKind
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
@@ -261,6 +263,58 @@ fun formatConcentration(value: Double?): String = when {
  * arrives and how far it climbs are local, set by the shape of a particular
  * coast, and would need a tide gauge to say.
  */
+@StringRes
+fun HazardKind.labelRes(): Int = when (this) {
+    HazardKind.EXTREME_HEAT -> R.string.hazard_heat
+    HazardKind.EXTREME_COLD -> R.string.hazard_cold
+    HazardKind.DAMAGING_WIND -> R.string.hazard_wind
+    HazardKind.TORRENTIAL_RAIN -> R.string.hazard_rain
+    HazardKind.HEAVY_SNOW -> R.string.hazard_snow
+    HazardKind.ICE -> R.string.hazard_ice
+    HazardKind.THUNDERSTORM -> R.string.hazard_thunder
+    HazardKind.EXTREME_UV -> R.string.hazard_uv
+    HazardKind.UNBREATHABLE_AIR -> R.string.hazard_air
+}
+
+/**
+ * When a hazard runs, in the fewest words that stay true.
+ *
+ * An open end is said as an open end. A warning that reads "until 09:00" when
+ * 09:00 is merely where the forecast stopped would be inventing a reprieve.
+ */
+@Composable
+fun formatHazardWindow(hazard: Hazard, now: Instant, zone: ZoneId): String {
+    if (hazard.hasBegunBy(now)) {
+        return if (hazard.until != null) {
+            stringResource(R.string.hazard_now_until, formatTime(hazard.until, zone))
+        } else {
+            stringResource(R.string.hazard_now_open)
+        }
+    }
+
+    // A window on another day has to say so. "13:00 - 16:00" for tomorrow's sun
+    // reads as this afternoon, and this afternoon has already gone - which turns
+    // a warning into a reason to ignore the mark.
+    val start = when (dayDistance(hazard.from, now, zone)) {
+        DayDistance.TODAY -> formatTime(hazard.from, zone)
+        DayDistance.TOMORROW -> stringResource(
+            R.string.hazard_tomorrow,
+            formatTime(hazard.from, zone),
+        )
+        DayDistance.THIS_WEEK, DayDistance.LATER -> stringResource(
+            R.string.hazard_on_day,
+            formatWeekday(hazard.from.atZone(zone).toLocalDate()),
+            formatTime(hazard.from, zone),
+        )
+    }
+
+    return if (hazard.until != null) {
+        stringResource(R.string.hazard_from_until, start, formatTime(hazard.until, zone))
+    } else {
+        stringResource(R.string.hazard_from_open, start)
+    }
+}
+
 @StringRes
 fun TideState.labelRes(): Int = when (this) {
     TideState.SPRING -> R.string.tide_spring

@@ -23,6 +23,7 @@ import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.air.AirQuality
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
+import lv.bolwarra.wetter.domain.hazard.Hazards
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.provider.asWeatherError
@@ -162,6 +163,13 @@ class WeatherViewModel(
             timeline = if (forecast != null) extra.timeline else emptyList(),
             bias = if (forecast != null) extra.bias else null,
             airQuality = if (forecast != null) extra.air else null,
+            // Read off the forecast on screen and the air beside it, so a
+            // warning cannot outlive the forecast that raised it.
+            hazards = if (forecast != null) {
+                Hazards.scan(forecast, extra.air, Instant.now())
+            } else {
+                emptyList()
+            },
         )
     }.stateIn(
         scope = viewModelScope,
