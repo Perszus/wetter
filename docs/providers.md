@@ -287,6 +287,16 @@ That is the whole claim, and it is a narrow one. It is also why the claim
 expires: the shorter the extrapolation, the more of the answer is observation
 and the less is assumption. An hour in, most of it is still the observation.
 
+**And the first half hour is stepped finer.** Zero lead is not *now*: sweeps
+land about every ten minutes, so by the time somebody looks the observation can
+be nine minutes old and the rain has moved on without it. On ten-minute steps
+the nearest value to the present could be five minutes away from it, which is a
+long time in a shower. Five-minute steps for the first thirty minutes put a
+value within two and a half minutes of any instant, and reaching it costs the
+smallest extrapolation the app ever makes — a couple of minutes of drift from a
+sweep that has just landed. It is the most reliable projection available, spent
+on the number people actually read.
+
 **So inside an hour the radar decides.** It is not one opinion of two there; it is
 the only source that has actually looked. It sees where the cloud is, how dense
 it is and which way it is moving, and it looks again every ten minutes. A

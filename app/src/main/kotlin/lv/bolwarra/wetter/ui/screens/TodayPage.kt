@@ -465,7 +465,7 @@ private fun rateNow(
 }
 
 /** How far from "now" a projected sample can sit and still count as now. */
-private val NOW_TOLERANCE: Duration = Duration.ofMinutes(10)
+private val NOW_TOLERANCE: Duration = Duration.ofMinutes(4)
 
 /**
  * What the radar is seeing, named.

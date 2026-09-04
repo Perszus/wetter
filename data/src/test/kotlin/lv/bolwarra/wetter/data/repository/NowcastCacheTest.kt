@@ -336,4 +336,30 @@ class NowcastCacheTest {
 
         assertTrue("should have fetched rather than drawn the past", coldRadar.tileCalls > 0)
     }
+
+    @Test
+    fun `the near steps are fine enough to describe this minute`() {
+        // A sweep lands about every ten minutes, so by the time somebody looks
+        // the observation can be nine minutes old. On ten-minute steps the
+        // closest value to the present could be five minutes away from it,
+        // which is a long time in a shower.
+        val leads = NowcastRepository.LEADS.map { it.toMinutes() }
+
+        val worstGap = leads.zipWithNext { a, b -> if (a < 30) b - a else 0L }.max()
+        assertTrue("near steps are $worstGap minutes apart", worstGap <= 5L)
+
+        // Any instant in the first half hour is within half a step of a value.
+        (0..30).forEach { minute ->
+            val nearest = leads.minOf { kotlin.math.abs(it - minute) }
+            assertTrue("no value within 2.5 min of minute $minute", nearest <= 3L)
+        }
+    }
+
+    @Test
+    fun `the series still reaches two hours`() {
+        assertEquals(120L, NowcastRepository.LEADS.max().toMinutes())
+        // And is strictly increasing, or the projection would double back.
+        val leads = NowcastRepository.LEADS.map { it.toMinutes() }
+        assertEquals(leads.sorted().distinct(), leads)
+    }
 }

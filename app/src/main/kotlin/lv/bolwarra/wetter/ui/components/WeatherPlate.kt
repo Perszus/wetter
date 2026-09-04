@@ -646,7 +646,7 @@ private fun radarRateAt(timeline: List<FusedPrecipitation>, now: Instant): Doubl
 }
 
 /** How far from this moment a projected step can sit and still describe it. */
-private val RADAR_IS_NOW: Duration = Duration.ofMinutes(10)
+private val RADAR_IS_NOW: Duration = Duration.ofMinutes(4)
 
 /**
  * The light's position, turning at the speed of the wind.

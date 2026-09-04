@@ -286,13 +286,35 @@ class NowcastRepository internal constructor(
         const val FRAMES = 3
 
         /**
-         * Now, then ten-minute steps out to two hours.
+         * Five-minute steps for the first half hour, ten-minute steps after.
          *
          * The series starts at zero on purpose. That step is the latest sweep
-         * itself rather than a projection of it - rain that is falling, observed
-         * - and it is the most trustworthy number in the whole timeline.
+         * itself rather than a projection of it - rain that is falling,
+         * observed - and it is the most trustworthy number in the whole
+         * timeline.
+         *
+         * ### Why the near steps are finer
+         *
+         * Because zero is not *now*. Sweeps land about every ten minutes, so by
+         * the time somebody looks, the observation can be nine minutes old and
+         * the rain has moved on without it. On ten-minute steps the closest
+         * thing to the present moment could be five minutes away from it, which
+         * is a long time in a shower.
+         *
+         * Halving the step near the front puts a value within two and a half
+         * minutes of any instant, and getting there costs the smallest
+         * extrapolation this app ever makes - a couple of minutes of drift from
+         * a sweep that has just landed. It is the most reliable projection
+         * available and it is spent on the number people actually read: what is
+         * happening right now.
+         *
+         * It costs six more advection passes per nowcast. That is the trade,
+         * and it is a good one, because the passes are cheap and the minutes
+         * near zero are the ones the app is for.
          */
-        val LEADS: List<Duration> = (0..12).map { Duration.ofMinutes(it * 10L) }
+        val LEADS: List<Duration> =
+            (0..6).map { Duration.ofMinutes(it * 5L) } +
+                (4..12).map { Duration.ofMinutes(it * 10L) }
 
         val STEP: Duration = Duration.ofMinutes(10)
 
