@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import lv.bolwarra.wetter.BuildConfig
 import lv.bolwarra.wetter.WetterApplication
@@ -39,46 +40,64 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
         val location = container.selectedLocation.current()
 
         val outcome = container.repository.refresh(location)
-        outcome.onSuccess { forecast ->
-            log("refreshed ${location.name}")
+        val result = outcome.fold(
+            onSuccess = { forecast ->
+                log("refreshed ${location.name}")
+                // The verification loop rides along on the refresh rather than
+                // having a schedule of its own. It needs exactly what this job
+                // already has - a fresh forecast to write down, and a wake-up
+                // with network - and a second periodic job competing for the
+                // same wake-ups would cost battery to do the same work less
+                // often.
+                runCatching {
+                    // Warm the radar while there is already a wake-up and a
+                    // network. Without this the projection kept on disk is only
+                    // ever as fresh as the last time somebody opened the app,
+                    // which is exactly the moment it is least useful.
+                    container.nowcasts.timeline(forecast, Instant.now())
+                    container.nowcasts.prune()
 
-            // Redraw the home screen while the new forecast is in hand. This is
-            // the only thing that changes what the widget should say, which is
-            // why the widget asks for no schedule of its own.
-            RainWidget.refresh(applicationContext)
-            // The verification loop rides along on the refresh rather than
-            // having a schedule of its own. It needs exactly what this job
-            // already has - a fresh forecast to write down, and a wake-up with
-            // network - and a second periodic job competing for the same
-            // wake-ups would cost battery to do the same work less often.
-            runCatching {
-                // Warm the radar while there is already a wake-up and a network.
-                // Without this the projection kept on disk is only ever as fresh
-                // as the last time somebody opened the app, which is exactly the
-                // moment it is least useful.
-                container.nowcasts.timeline(forecast, java.time.Instant.now())
-                container.nowcasts.prune()
+                    container.verification.record(forecast)
+                    val settled = container.verification.verify(location)
+                    container.verification.prune()
+                    if (settled > 0) log("verified $settled past predictions")
+                }.onFailure {
+                    // Never fail a refresh over bookkeeping. The forecast is on
+                    // disk and the screen is correct; an unverified record
+                    // simply waits for the next run.
+                    log("verification pass did not complete: ${it.message}")
+                }
+                Result.success()
+            },
+            onFailure = { thrown ->
+                val error = thrown.asWeatherError()
+                log("could not refresh ${location.name}: $error")
 
-                container.verification.record(forecast)
-                val settled = container.verification.verify(location)
-                container.verification.prune()
-                if (settled > 0) log("verified $settled past predictions")
-            }.onFailure {
-                // Never fail a refresh over bookkeeping. The forecast is on
-                // disk and the screen is correct; an unverified record simply
-                // waits for the next run.
-                log("verification pass did not complete: ${it.message}")
-            }
-            return Result.success()
-        }
+                // A retry costs a wake-up, so it is only worth asking for one
+                // when the failure was about this moment rather than about this
+                // request. There is another scheduled run along shortly either
+                // way.
+                if (error.isWorthRetrying) Result.retry() else Result.success()
+            },
+        )
 
-        val error = outcome.exceptionOrNull()?.asWeatherError() ?: WeatherError.Unknown()
-        log("could not refresh ${location.name}: $error")
+        // Redraw last, and whatever happened above.
+        //
+        // Both halves of that matter. Last, because the widget reads the same
+        // cache this job has just written, and the radar warm-up above is part
+        // of what it will draw - redrawing before it meant the widget showed the
+        // previous run's projection for another half hour.
+        //
+        // And whatever happened, because the widget is not only a picture of the
+        // forecast, it is a picture of the next four hours *from now*. Time moves
+        // even when the network is down. Redrawing only on success left a phone
+        // in a tunnel showing an axis that began at midnight when it was
+        // half past three - not stale data, which would be honest, but a window
+        // onto hours that had already passed.
+        runCatching { RainWidget.refresh(applicationContext) }
+            .onFailure { log("could not redraw the widget: ${it.message}") }
 
-        // A retry costs a wake-up, so it is only worth asking for one when the
-        // failure was about this moment rather than about this request. There is
-        // another scheduled run along shortly in either case.
-        return if (error.isWorthRetrying) Result.retry() else Result.success()
+        return result
     }
 
     private fun log(message: String) {

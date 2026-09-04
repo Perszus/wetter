@@ -35,16 +35,22 @@
         </activity>
 
         <!--
-          The home-screen widget. Not exported: the system addresses this
-          receiver by component when it broadcasts an update, so nothing outside
-          Wetter ever needs to reach it.
+          The home-screen widget.
+
+          Exported because two of the three actions below are implicit
+          broadcasts, and an unexported receiver never sees those. All three are
+          protected broadcasts that only the system may send, so being reachable
+          costs nothing: the worst another app can do by naming this receiver
+          explicitly is ask it to redraw itself.
         -->
         <receiver
             android:name=".widget.RainWidget"
-            android:exported="false"
+            android:exported="true"
             android:label="@string/widget_rain_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
 
             <meta-data

@@ -51,6 +51,28 @@ import lv.bolwarra.wetter.ui.theme.lightPlate
  */
 class RainWidget : AppWidgetProvider() {
 
+    /**
+     * The clock moved under us, so the picture is wrong rather than merely old.
+     *
+     * A four-hour window labelled in local time stops being true the moment the
+     * zone changes or somebody corrects the clock, and neither event produces new
+     * weather for the periodic refresh to notice. Both are protected broadcasts,
+     * so the only sender is the system.
+     */
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        if (intent.action !in CLOCK_CHANGED) return
+
+        val pending = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            try {
+                refresh(context)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) =
         render(context, manager, appWidgetIds)
 
@@ -311,6 +333,11 @@ class RainWidget : AppWidgetProvider() {
         private const val FUSION_BUDGET_MS = 6_000L
 
         private const val HOURS_IN_WINDOW = 4
+
+        private val CLOCK_CHANGED = setOf(
+            Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+        )
 
         /** Three cells by one, before anybody resizes it. */
         private const val DEFAULT_WIDTH_DP = 240f

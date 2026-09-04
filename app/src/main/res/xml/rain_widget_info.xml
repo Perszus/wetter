@@ -11,10 +11,20 @@
   One row is about 56dp of real height on a phone, which is why the chart's
   insets are proportions rather than fixed dp and the hour labels shrink a step.
 
-  updatePeriodMillis is zero on purpose. The system floor is thirty minutes, and
-  a schedule of its own would wake the device to redraw a curve that has not
-  changed - the forecast refresh already knows when there is something new, and
-  calls RainWidget.refresh then.
+  updatePeriodMillis is the system floor of thirty minutes, and it is a backstop
+  rather than the plan. The forecast refresh calls RainWidget.refresh whenever it
+  runs, which is the update that matters because it has new data in hand.
+
+  But that refresh is a WorkManager job, and WorkManager is the first thing an
+  aggressive OEM battery manager stops - on some phones the app has to be granted
+  autostart by hand before background work runs at all. This alarm belongs to the
+  system, not to us: it starts the process to deliver it even after the app has
+  been force-stopped, so the widget keeps up with the clock even where our own
+  job never runs.
+
+  It costs a wake-up every half hour, deferred while the device dozes. That is
+  the price of a widget that is right when somebody looks at it, and the redraw
+  itself is a cache read.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_rain_description"
@@ -28,5 +38,5 @@
     android:resizeMode="horizontal|vertical"
     android:targetCellHeight="1"
     android:targetCellWidth="3"
-    android:updatePeriodMillis="0"
+    android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen" />
