@@ -425,7 +425,7 @@ private fun MarkExplanation(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = stringResource(hazard.kind.labelRes()),
+                            text = stringResource(hazard.labelRes()),
                             style = WetterTheme.type.body,
                             color = if (hazard.severity == HazardSeverity.DANGER) {
                                 colors.warning

@@ -414,6 +414,29 @@ state can be approximated but something real is lost, and the column says what.
 | `SLEET_LOW_VISIBILITY` | no | - | **visibility** - Open-Meteo publishes it, MET Norway does not |
 | `FREEZING_RAIN_LOW_VISIBILITY` | no | - | **visibility** - Open-Meteo publishes it, MET Norway does not |
 
+## What "extreme weather" covers, and what it cannot
+
+The warning mark reads nine hazards off the forecast: heat, cold, damaging wind,
+torrential rain, heavy snow, ice, thunderstorms, ultraviolet and unhealthy air.
+Wind is judged on the gust against Beaufort's own definitions, so a tropical
+cyclone at your coordinates does raise the mark at its highest level, and above
+Beaufort 12 it is named hurricane-force rather than merely damaging.
+
+What it cannot do is name the storm. Whether a cyclone has a name, where its eye
+is, which category it is and when it makes landfall come from cyclone track
+feeds, and every one of them is regional - the NHC for the Atlantic and eastern
+Pacific, the JTWC elsewhere, MetAlerts for Norway, Meteoalarm for Europe. This
+app takes global sources only, so it has none of them.
+
+There is also a resolution limit worth stating plainly. The forecast gust comes
+from a global model on an 11 km grid, which under-resolves an eyewall: near a
+strong cyclone the number this app shows will be lower than what actually
+arrives. It will tell you the wind is extreme. It will not tell you it is
+Hurricane Whatever, and it will not tell you the worst of it.
+
+Anyone in a cyclone basin needs their national service for that, and this app
+does not pretend otherwise.
+
 ## Where this leaves the image work
 
 Seventy states are reachable today with no new data at all - they need a

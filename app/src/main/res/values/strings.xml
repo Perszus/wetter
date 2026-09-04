@@ -154,6 +154,7 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="hazard_heat">Extreme heat</string>
     <string name="hazard_cold">Extreme cold</string>
     <string name="hazard_wind">Damaging wind</string>
+    <string name="hazard_hurricane">Hurricane-force wind</string>
     <string name="hazard_rain">Torrential rain</string>
     <string name="hazard_snow">Heavy snow</string>
     <string name="hazard_ice">Ice</string>

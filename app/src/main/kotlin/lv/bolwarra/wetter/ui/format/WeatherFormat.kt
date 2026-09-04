@@ -19,6 +19,7 @@ import lv.bolwarra.wetter.domain.MoonPhaseName
 import lv.bolwarra.wetter.domain.air.AirQualityBand
 import lv.bolwarra.wetter.domain.hazard.Hazard
 import lv.bolwarra.wetter.domain.hazard.HazardKind
+import lv.bolwarra.wetter.domain.hazard.Hazards
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
@@ -263,6 +264,21 @@ fun formatConcentration(value: Double?): String = when {
  * arrives and how far it climbs are local, set by the shape of a particular
  * coast, and would need a tide gauge to say.
  */
+/**
+ * What to call a hazard, given how far it goes.
+ *
+ * Only the wind needs the peak. Severity stops at "change the plan" because
+ * there is nothing useful above it, but that covers a gale and a hurricane
+ * alike and those are not the same afternoon - so the word carries the
+ * difference the severity cannot.
+ */
+@StringRes
+fun Hazard.labelRes(): Int = when {
+    kind == HazardKind.DAMAGING_WIND && (peak ?: 0.0) >= Hazards.HURRICANE_MS ->
+        R.string.hazard_hurricane
+    else -> kind.labelRes()
+}
+
 @StringRes
 fun HazardKind.labelRes(): Int = when (this) {
     HazardKind.EXTREME_HEAT -> R.string.hazard_heat

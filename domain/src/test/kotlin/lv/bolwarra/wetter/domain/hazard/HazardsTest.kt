@@ -216,4 +216,24 @@ class HazardsTest {
         val hours = List(40) { index -> hour(index, gust = if (index > 30) 30.0 else 2.0) }
         assertTrue(scan(hours).isEmpty())
     }
+
+    @Test
+    fun `the peak is carried out with the hazard`() {
+        val hours = List(6) { index ->
+            hour(index, gust = if (index == 2) 38.0 else 20.0)
+        }
+        val wind = scan(hours).single()
+        assertEquals(HazardKind.DAMAGING_WIND, wind.kind)
+        assertEquals(HazardSeverity.DANGER, wind.severity)
+        // Severity stops at "change the plan", so without the peak a gale and a
+        // hurricane are the same warning. This is what tells them apart.
+        assertEquals(38.0, wind.peak!!, 1e-9)
+        assertTrue(wind.peak!! >= Hazards.HURRICANE_MS)
+    }
+
+    @Test
+    fun `a gale does not read as a hurricane`() {
+        val gale = scan(List(4) { hour(it, gust = 19.0) }).single()
+        assertTrue(gale.peak!! < Hazards.HURRICANE_MS)
+    }
 }

@@ -42,6 +42,16 @@ data class Hazard(
     val severity: HazardSeverity,
     val from: Instant,
     val until: Instant?,
+    /**
+     * The strongest reading reached during the run, in whatever unit that
+     * hazard is measured in - metres per second for wind, degrees for heat,
+     * millimetres for rain.
+     *
+     * Severity has two levels because two is what a person acts on, but "worth
+     * changing the plan for" covers a gale and a hurricane alike, and those are
+     * not the same afternoon. The peak is what lets the label say which.
+     */
+    val peak: Double? = null,
 ) {
     /** Already happening, as opposed to on its way. */
     fun hasBegunBy(now: Instant): Boolean = !from.isAfter(now)
@@ -77,9 +87,9 @@ object Hazards {
             .sortedBy { it.timestamp }
 
         val found = HazardKind.entries.mapNotNull { kind ->
-            runsOf(hours) { severityOf(kind, it) }
+            runsOf(hours, { severityOf(kind, it) }, { readingOf(kind, it) })
                 .maxByOrNull { it.severity }
-                ?.let { Hazard(kind, it.severity, it.from, it.until) }
+                ?.let { Hazard(kind, it.severity, it.from, it.until, it.peak) }
         }.toMutableList()
 
         // Air quality is not in the hourly series: it comes from a different
@@ -162,6 +172,21 @@ object Hazards {
         HazardKind.UNBREATHABLE_AIR -> null
     }
 
+    /**
+     * The number a hazard is judged on, so the strongest one in a run can be
+     * carried out with it. The same value the severity is taken from, which is
+     * the point - a peak that disagreed with the severity beside it would be
+     * two answers to one question.
+     */
+    fun readingOf(kind: HazardKind, hour: HourlyWeather): Double? = when (kind) {
+        HazardKind.EXTREME_HEAT -> hour.apparentTemperature ?: hour.temperature
+        HazardKind.EXTREME_COLD -> (hour.apparentTemperature ?: hour.temperature)?.let { -it }
+        HazardKind.DAMAGING_WIND -> hour.windGust ?: hour.windSpeed
+        HazardKind.TORRENTIAL_RAIN, HazardKind.HEAVY_SNOW -> hour.precipitation
+        HazardKind.EXTREME_UV -> hour.uvIndex
+        HazardKind.ICE, HazardKind.THUNDERSTORM, HazardKind.UNBREATHABLE_AIR -> null
+    }
+
     private fun byThreshold(value: Double?, warning: Double, danger: Double): HazardSeverity? =
         when {
             value == null -> null
@@ -170,7 +195,12 @@ object Hazards {
             else -> null
         }
 
-    private data class Run(val severity: HazardSeverity, val from: Instant, val until: Instant?)
+    private data class Run(
+        val severity: HazardSeverity,
+        val from: Instant,
+        val until: Instant?,
+        val peak: Double?,
+    )
 
     /**
      * The unbroken stretches where a hazard holds.
@@ -183,23 +213,32 @@ object Hazards {
     private fun runsOf(
         hours: List<HourlyWeather>,
         severity: (HourlyWeather) -> HazardSeverity?,
+        reading: (HourlyWeather) -> Double?,
     ): List<Run> {
         val runs = mutableListOf<Run>()
         var start: Instant? = null
         var worst: HazardSeverity? = null
+        var peak: Double? = null
 
         hours.forEachIndexed { index, hour ->
             val here = severity(hour)
             if (here != null) {
                 if (start == null) start = hour.timestamp
                 worst = maxOf(worst ?: here, here)
-                if (index == hours.lastIndex) runs += Run(worst, start, null)
+                reading(hour)?.let { peak = maxOf(peak ?: it, it) }
+                if (index == hours.lastIndex) runs += Run(worst, start, null, peak)
             } else {
                 val began = start
                 if (began != null) {
-                    runs += Run(worst ?: here ?: HazardSeverity.WARNING, began, hour.timestamp)
+                    runs += Run(
+                        worst ?: HazardSeverity.WARNING,
+                        began,
+                        hour.timestamp,
+                        peak,
+                    )
                     start = null
                     worst = null
+                    peak = null
                 }
             }
         }
@@ -227,6 +266,23 @@ object Hazards {
 
     /** Beaufort 10: trees uprooted, structural damage. */
     const val STORM_MS = 24.5
+
+    /**
+     * Beaufort 12, the top of the scale: hurricane force.
+     *
+     * Not a separate severity - there is nothing above "change the plan" to
+     * escalate to - but it changes what the warning is called. Forty metres per
+     * second described as "damaging wind" understates it to the point of being
+     * misleading, and the word is the part somebody acts on.
+     *
+     * Naming it is all this can do. Whether a hurricane is *named*, where its
+     * eye is and when it makes landfall come from cyclone track feeds that are
+     * all regional - the NHC for the Atlantic, the JTWC elsewhere - and this app
+     * takes global sources only. What it has is the forecast gust at your
+     * coordinates, which a global model at 11 km will under-resolve near an
+     * eyewall. It will say the wind is extreme. It will not say its name.
+     */
+    const val HURRICANE_MS = 32.7
 
     /** mm in the hour: standing water, and drains beginning to lose. */
     const val TORRENT_WARNING_MM = 20.0
