@@ -252,7 +252,14 @@ internal object RainStrip {
      * Because the window is exactly four hours the boundaries stay a quarter
      * apart, and only the offset to the first one changes.
      *
-     * Half hours get a shorter tick and no text. They are not meant to be read
+     * The hour's tick runs all the way down to the text baseline, so it stands
+     * immediately to the left of its own label and the two read as one mark. At
+     * six and four device-independent pixels the two kinds of tick were close
+     * enough in length to be told apart only by looking for it, which is not
+     * something anybody does to a widget; against a tick four times longer,
+     * with a time written beside it, there is nothing to tell apart.
+     *
+     * Half hours keep the short tick and no text. They are not meant to be read
      * individually; they are there so the eye can halve the gap between two
      * hours without measuring it, which is most of what anybody does with "when
      * does this start".
@@ -550,8 +557,12 @@ internal object RainStrip {
     private const val HOUR = 0.25f
     private const val HALF_HOUR = 0.125f
 
-    /** The same proportions the app's own time axis uses. */
-    private const val HOUR_TICK_DP = 6f
+    /**
+     * The hour reaches the baseline of the text it belongs to; the half hour is
+     * a short mark on the line. Tied to [LABEL_BASELINE_DP] rather than given
+     * its own number, so the tick cannot drift away from the type beside it.
+     */
+    private val HOUR_TICK_DP get() = LABEL_BASELINE_DP
     private const val HALF_TICK_DP = 4f
     private const val HOUR_STROKE_DP = 1.8f
     private const val HALF_STROKE_DP = 1.3f
