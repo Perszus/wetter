@@ -5,12 +5,26 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import java.time.ZoneId
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import lv.bolwarra.wetter.data.provider.toWeatherError
+import lv.bolwarra.wetter.domain.location.CoordinateQuery
+import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.location.PlaceSearch
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.WeatherFailure
+
+/**
+ * What the forecast service says about a bare point: its zone and its height.
+ *
+ * The gazetteer cannot answer for a coordinate - it matches names - but the
+ * forecast endpoint resolves both for any point on the earth, including open
+ * ocean. Measured: 56.9496,24.1052 comes back Europe/Riga at 17 m, and
+ * 0,-160 comes back Etc/GMT+11 at 0 m.
+ */
+@Serializable
+internal data class PointResponse(val timezone: String? = null, val elevation: Double? = null)
 
 @Serializable
 internal data class GeocodingResponse(
@@ -59,6 +73,12 @@ internal class OpenMeteoGeocoder(
         // not worth making and the empty answer is not worth showing as one.
         if (trimmed.length < PlaceSearch.MINIMUM_QUERY) return Result.success(emptyList())
 
+        // A coordinate pair is answered directly. The gazetteer matches names
+        // and returns nothing at all for one, which is the correct answer to the
+        // wrong question - somebody who typed a point has already told us where
+        // they mean, and asking a place-name service about it can only fail.
+        CoordinateQuery.parse(trimmed)?.let { return resolve(it) }
+
         return try {
             val response: GeocodingResponse = client.get(baseUrl) {
                 parameter("name", trimmed)
@@ -74,6 +94,60 @@ internal class OpenMeteoGeocoder(
             Result.failure(WeatherFailure(failure.toWeatherError()))
         }
     }
+
+    /**
+     * A typed point, turned into somewhere the app can actually show.
+     *
+     * The zone is fetched rather than assumed, for exactly the reason a
+     * name-matched place with no zone is dropped below: a forecast in the wrong
+     * zone shifts every hour on the timeline while every reading still looks
+     * perfectly plausible. Defaulting to the phone's zone would be wrong for any
+     * point the phone is not standing in, which is most of the reasons to type
+     * one.
+     */
+    private suspend fun resolve(point: Coordinates): Result<List<WeatherLocation>> = try {
+        val answer: PointResponse = client.get(POINT_URL) {
+            parameter("latitude", point.latitude)
+            parameter("longitude", point.longitude)
+            parameter("timezone", "auto")
+            parameter("forecast_days", 1)
+        }.body()
+
+        val zone = answer.timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+        Result.success(
+            if (zone == null) {
+                emptyList()
+            } else {
+                listOf(
+                    WeatherLocation(
+                        // Named by the point itself. Anything else would be
+                        // invented - the nearest settlement is a different place
+                        // with a different forecast, and saying its name here
+                        // would quietly answer a question nobody asked.
+                        name = formatPoint(point),
+                        latitude = point.latitude,
+                        longitude = point.longitude,
+                        zone = zone,
+                        region = null,
+                        country = null,
+                        elevationMetres = answer.elevation,
+                    ),
+                )
+            },
+        )
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Throwable) {
+        Result.failure(WeatherFailure(failure.toWeatherError()))
+    }
+
+    /** Four decimals: about eleven metres, which is finer than any forecast grid. */
+    private fun formatPoint(point: Coordinates): String = String.format(
+        Locale.ROOT,
+        "%.4f, %.4f",
+        point.latitude,
+        point.longitude,
+    )
 
     /**
      * Null for a result the app cannot actually use.
@@ -107,5 +181,8 @@ internal class OpenMeteoGeocoder(
 
         /** The service's own ceiling. */
         const val MAX_LIMIT = 100
+
+        /** The forecast endpoint, asked only for what it knows about a point. */
+        const val POINT_URL = "https://api.open-meteo.com/v1/forecast"
     }
 }

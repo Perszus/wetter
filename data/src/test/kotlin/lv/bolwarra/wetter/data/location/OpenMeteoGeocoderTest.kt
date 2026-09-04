@@ -130,4 +130,36 @@ class OpenMeteoGeocoderTest {
         ).search("bad").getOrThrow()
         assertTrue(found.isEmpty())
     }
+
+    @Test
+    fun `a typed coordinate is answered from the point, not the gazetteer`() = runBlocking {
+        // Trimmed from a real response to 56.9496,24.1052. The gazetteer is not
+        // asked at all - it matches names and returns nothing for a point.
+        val found = geocoder(
+            """
+            {"latitude":56.95,"longitude":24.125,"generationtime_ms":0.02,
+            "utc_offset_seconds":10800,"timezone":"Europe/Riga",
+            "timezone_abbreviation":"GMT+3","elevation":17.0}
+            """.trimIndent(),
+        ).search("56.9496, 24.1052").getOrThrow()
+
+        assertEquals(1, found.size)
+        val point = found.single()
+        assertEquals(56.9496, point.latitude, 1e-6)
+        assertEquals(24.1052, point.longitude, 1e-6)
+        assertEquals(ZoneId.of("Europe/Riga"), point.zone)
+        assertEquals(17.0, point.elevationMetres!!, 1e-6)
+        // Named by the point. Borrowing the nearest settlement's name would
+        // answer a question nobody asked, with a different place's forecast.
+        assertEquals("56.9496, 24.1052", point.name)
+    }
+
+    @Test
+    fun `a point with no zone is no answer at all`() = runBlocking {
+        // Same rule as a named place without one: a forecast in the wrong zone
+        // shifts every hour while every reading still looks plausible.
+        val found = geocoder("""{"latitude":56.95,"longitude":24.125,"elevation":17.0}""")
+            .search("56.9496, 24.1052").getOrThrow()
+        assertTrue(found.isEmpty())
+    }
 }
