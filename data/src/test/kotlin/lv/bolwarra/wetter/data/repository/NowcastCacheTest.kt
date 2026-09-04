@@ -4,6 +4,10 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import lv.bolwarra.wetter.domain.forecast.EnsembleSource
 import lv.bolwarra.wetter.domain.forecast.ModelEnsemble
@@ -361,5 +365,49 @@ class NowcastCacheTest {
         // And is strictly increasing, or the projection would double back.
         val leads = NowcastRepository.LEADS.map { it.toMinutes() }
         assertEquals(leads.sorted().distinct(), leads)
+    }
+
+    @Test
+    fun `a kept projection answers at once and a fresh one is fetched behind it`() = runBlocking {
+        // The point of the background worker: opening must not wait on the
+        // network. But answering from disk and stopping there meant the screen
+        // showed whatever the last run left behind and never improved while
+        // anybody watched - on a layer whose whole argument is that it
+        // re-observes every ten minutes.
+        val sweep = Instant.parse("2026-09-04T12:00:00Z")
+        val clock = TestClock(sweep.plus(Duration.ofMinutes(20)))
+        val radar = FakeRadar(latest = clock.now)
+        val dao = FakeSeriesDao()
+
+        val ahead = sweep.plus(Duration.ofMinutes(40))
+        dao.row = lv.bolwarra.wetter.data.db.RadarSeriesEntity(
+            cacheKey = "56.95,24.11",
+            sweepAtEpochSecond = sweep.epochSecond,
+            payload = "[{\"atEpochSecond\":${ahead.epochSecond},\"leadMinutes\":40," +
+                "\"millimetresPerHour\":2.0,\"confidence\":0.8}]",
+        )
+
+        val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
+        val repository = NowcastRepository(
+            source = radar,
+            ensembles = NoEnsemble,
+            clock = clock,
+            seriesStore = RadarSeriesStore(
+                dao,
+                kotlinx.serialization.json.Json { ignoreUnknownKeys = true },
+            ),
+            scope = scope,
+        )
+
+        repository.timeline(
+            forecast = forecastAt(riga, clock.now),
+            from = clock.now,
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        )
+
+        // A refresh was sent behind the answer rather than waited on.
+        assertTrue("no refresh was requested", radar.tileCalls > 0)
+        scope.cancel()
     }
 }

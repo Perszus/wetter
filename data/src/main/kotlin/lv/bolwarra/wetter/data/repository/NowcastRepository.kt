@@ -3,7 +3,9 @@ package lv.bolwarra.wetter.data.repository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -69,6 +71,12 @@ class NowcastRepository internal constructor(
      * failure to record must never cost somebody their forecast.
      */
     private val verification: VerificationRepository? = null,
+    /**
+     * Where a refresh is sent when the screen has already been answered from
+     * disk. Optional: without it the repository simply behaves as it did, which
+     * is correct but never sharpens while somebody is watching.
+     */
+    private val scope: CoroutineScope? = null,
 ) {
 
     /** Shown wherever radar contributes. Several sources require it. */
@@ -269,7 +277,23 @@ class NowcastRepository internal constructor(
         if (warm == null && store != null) {
             val kept = store.read(cacheKeyOf(location))
             val stillAhead = kept?.samples?.filter { it.at.isAfter(now) }.orEmpty()
-            if (stillAhead.isNotEmpty()) return stillAhead
+            if (stillAhead.isNotEmpty()) {
+                // Answer from what was kept, then go and get a better one.
+                //
+                // Returning here and stopping was the whole of it before, which
+                // meant the screen showed whatever the last background run left
+                // behind and never improved while anybody watched - a projection
+                // half an hour old, on a layer whose entire argument is that it
+                // re-observes every ten minutes. Worse, if no run had happened
+                // for two hours there was nothing still ahead at all and the
+                // open blocked on a full fetch.
+                //
+                // The kept series goes back immediately and the refresh happens
+                // behind it, landing on the next tick of the timeline. Nothing
+                // waits on the network, and the answer still sharpens.
+                scope?.launch { runCatching { nowcast(location) } }
+                return stillAhead
+            }
         }
 
         return nowcast(location)
