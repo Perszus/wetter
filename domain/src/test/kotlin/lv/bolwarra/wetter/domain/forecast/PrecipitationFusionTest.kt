@@ -352,4 +352,74 @@ class PrecipitationFusionTest {
         assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused.radarShare, 1e-6)
         assertTrue("confidence should not be raised to match", fused.confidence < 0.8)
     }
+
+    @Test
+    fun `a well measured motion earns the full hour`() {
+        assertEquals(
+            PrecipitationFusion.RADAR_AUTHORITY,
+            PrecipitationFusion.authorityFor(1f),
+        )
+    }
+
+    @Test
+    fun `a motion that could not be measured earns only the near reach`() {
+        // A flat sheet of drizzle looks the same wherever you slide it, so the
+        // vector is close to a guess. It keeps the reach where advection barely
+        // matters and loses the rest.
+        assertEquals(
+            PrecipitationFusion.LEAST_AUTHORITY,
+            PrecipitationFusion.authorityFor(0f),
+        )
+    }
+
+    @Test
+    fun `the observation itself is never taken away`() {
+        // The difference between this and a quality gate. However badly the
+        // motion was measured, the sample at zero lead is the observed field at
+        // those coordinates and no vector error can corrupt it.
+        val blind = RadarSample(
+            at = start,
+            lead = Duration.ZERO,
+            millimetresPerHour = 5f,
+            confidence = 0.05f,
+            motionQuality = 0f,
+        )
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 0.0),
+            radar = listOf(blind),
+            from = start,
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        ).single()
+
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused.radarShare, 1e-6)
+        assertTrue("the observed five should carry it", fused.millimetresPerHour > 4.5)
+    }
+
+    @Test
+    fun `a badly measured motion loses its reach, not its eyes`() {
+        // Same projection, same confidence, asked about forty minutes out. The
+        // vector cannot be trusted that far, so the model comes back.
+        fun askedAt(quality: Float) = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 0.0),
+            radar = listOf(
+                RadarSample(
+                    at = start.plus(Duration.ofMinutes(40)),
+                    lead = Duration.ofMinutes(40),
+                    millimetresPerHour = 5f,
+                    confidence = 0.5f,
+                    motionQuality = quality,
+                ),
+            ),
+            from = start.plus(Duration.ofMinutes(40)),
+            step = Duration.ofMinutes(10),
+            steps = 1,
+        ).single()
+
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, askedAt(1f).radarShare, 1e-6)
+        assertTrue(
+            "a guessed vector should not reach forty minutes",
+            askedAt(0f).radarShare < PrecipitationFusion.MAX_RADAR_WEIGHT,
+        )
+    }
 }

@@ -31,7 +31,13 @@ data class RadarNowcast(
     fun seriesAt(latitude: Double, longitude: Double): List<RadarSample> =
         steps.mapNotNull { step ->
             step.field.rateAt(latitude, longitude)?.let {
-                RadarSample(step.at, step.lead, it, step.confidence)
+                RadarSample(
+                    at = step.at,
+                    lead = step.lead,
+                    millimetresPerHour = it,
+                    confidence = step.confidence,
+                    motionQuality = RadarNowcaster.matchQualityOf(motion.confidence).toFloat(),
+                )
             }
         }
 }
@@ -41,6 +47,19 @@ data class RadarSample(
     val lead: Duration,
     val millimetresPerHour: Float,
     val confidence: Float,
+    /**
+     * How well the motion behind this projection was measured, 0..1.
+     *
+     * The same value for every sample in one projection, because there is one
+     * motion estimate behind them all. Carried on the sample anyway so that
+     * whatever consumes it - including a projection read back from disk after a
+     * restart - knows how far this field can be carried before the estimate
+     * stops supporting it.
+     *
+     * Distinct from [confidence], which already folds this together with lead
+     * decay and so cannot be untangled again. This is the motion on its own.
+     */
+    val motionQuality: Float = 1f,
 )
 
 /**

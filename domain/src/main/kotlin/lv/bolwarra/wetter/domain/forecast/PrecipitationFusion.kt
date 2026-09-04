@@ -95,6 +95,17 @@ object PrecipitationFusion {
     val RADAR_AUTHORITY: Duration = Duration.ofHours(1)
 
     /**
+     * The shortest the window ever gets, however poorly the motion was measured.
+     *
+     * At zero lead there is no advection at all: the sample is the observed
+     * field at those coordinates, and a motion estimate fifty degrees wrong
+     * cannot corrupt it. The error a bad vector introduces grows with lead and
+     * with speed, so what a poor match should cost is *reach*, not the
+     * observation itself. This is the reach that survives regardless.
+     */
+    val LEAST_AUTHORITY: Duration = Duration.ofMinutes(15)
+
+    /**
      * Confidence attributed to the model when there is nothing to check it
      * against - no ensemble, so no measurement of how hard the hour is.
      */
@@ -195,10 +206,32 @@ object PrecipitationFusion {
      * certain, and a reading two hours out is less certain than one ten minutes
      * out however it was arrived at.
      */
-    private fun radarShareFor(sample: RadarSample): Double = if (sample.lead <= RADAR_AUTHORITY) {
-        MAX_RADAR_WEIGHT
-    } else {
-        sample.confidence.toDouble().coerceIn(0.0, 1.0) * MAX_RADAR_WEIGHT
+    private fun radarShareFor(sample: RadarSample): Double =
+        if (sample.lead <= authorityFor(sample.motionQuality)) {
+            MAX_RADAR_WEIGHT
+        } else {
+            sample.confidence.toDouble().coerceIn(0.0, 1.0) * MAX_RADAR_WEIGHT
+        }
+
+    /**
+     * How far ahead this particular projection is allowed to decide.
+     *
+     * Not *whether* the radar leads - it always leads, being the only source
+     * that looked - but how far the look can be carried before the measurement
+     * behind it stops supporting it.
+     *
+     * A sharp match on a field with edges and cells earns the full hour. A flat
+     * sheet of drizzle looks identical wherever you slide it, so the match is
+     * ambiguous and the vector is close to a guess; that projection keeps only
+     * the reach where advection barely matters. The observation is never taken
+     * away in either case, which is the difference between this and a quality
+     * gate - a gate can hand a near-observation back to a model, and this
+     * cannot.
+     */
+    fun authorityFor(motionQuality: Float): Duration {
+        val quality = motionQuality.toDouble().coerceIn(0.0, 1.0)
+        val span = RADAR_AUTHORITY.toMinutes() - LEAST_AUTHORITY.toMinutes()
+        return LEAST_AUTHORITY.plusMinutes((span * quality).toLong())
     }
 
     fun agreement(a: Double, b: Double): Double {

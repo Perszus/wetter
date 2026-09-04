@@ -14,6 +14,8 @@ private data class StoredSample(
     val leadMinutes: Long,
     val millimetresPerHour: Float,
     val confidence: Float,
+    /** Defaulted, so series stored before the reach depended on it still read back. */
+    val motionQuality: Float = 1f,
 )
 
 /**
@@ -51,6 +53,7 @@ internal class RadarSeriesStore(private val dao: RadarSeriesDao, private val jso
                     lead = Duration.ofMinutes(it.leadMinutes),
                     millimetresPerHour = it.millimetresPerHour,
                     confidence = it.confidence,
+                    motionQuality = it.motionQuality,
                 )
             },
         )
@@ -64,6 +67,7 @@ internal class RadarSeriesStore(private val dao: RadarSeriesDao, private val jso
                     leadMinutes = it.lead.toMinutes(),
                     millimetresPerHour = it.millimetresPerHour,
                     confidence = it.confidence,
+                    motionQuality = it.motionQuality,
                 )
             },
         )

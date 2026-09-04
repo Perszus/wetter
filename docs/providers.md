@@ -323,13 +323,23 @@ the confidence carried alongside each point still says so. That is where the
 sharpening lives now: as a shower approaches, the answer does not become *more
 radar*, it becomes more certain.
 
-The cost of this is deliberate and worth writing down. A projection built on
-almost no echo — the Dublin case — leads inside the window where it used to hand
-back to the model, reporting a low confidence while it does. The judgement is
-that a thin look at the real sky beats a fresh look at an old model. Shortening
-the window from two hours to one narrows that exposure: the case where the
-motion estimate is worth least is also the case where it is trusted alone for
-the shortest time.
+**The window's length is earned.** A bad motion estimate does not corrupt the
+whole hour evenly. At zero lead there is no advection at all — the sample is the
+observed field at those coordinates, and a vector fifty degrees wrong cannot
+touch it. The error a bad vector introduces grows with lead and with speed. So
+what a poor match costs is *reach*, not the observation:
+
+| Match quality | Radar decides for |
+|---|---|
+| sharp — a field with edges and cells | the full hour |
+| ambiguous — a flat sheet with nothing to track | 15 minutes |
+
+scaling linearly between. This is deliberately not a quality gate. A gate asks
+*whether* radar leads and can therefore hand a near-observation back to a model
+that has not looked; this asks only how far the look can be carried, and the
+observation itself is never taken away. The Dublin case — a thin, structureless
+field whose vector came out fifty degrees wrong — now keeps its first quarter
+hour and loses the rest, which is exactly the part it could not support.
 
 Two properties of that split are worth keeping:
 
