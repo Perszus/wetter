@@ -28,8 +28,28 @@ data class RadarNowcast(
      * know, and the fusion layer must be able to tell that from a forecast of no
      * rain.
      */
-    fun seriesAt(latitude: Double, longitude: Double): List<RadarSample> =
-        steps.mapNotNull { step ->
+    fun seriesAt(latitude: Double, longitude: Double): List<RadarSample> {
+        // Say nothing at all where the radar is not watching.
+        //
+        // The tile source draws "no echo" and "outside coverage" identically, so
+        // an empty pixel over Lagos looks exactly like an empty pixel over a dry
+        // afternoon in Riga. Inside the window the radar now carries 95% of the
+        // answer, which means reading the first as dry would confidently
+        // override a model that is forecasting rain, in precisely the places
+        // with no radar to correct it.
+        //
+        // Echo somewhere in the neighbourhood is the evidence that the composite
+        // covers this place. With it, a dry reading here is a real observation
+        // of dry. Without it, there is no observation - and no observation must
+        // never be dressed as one.
+        // Every step, not just the nearest: rain approaching from beyond the
+        // neighbourhood is exactly the case worth catching, and silencing it
+        // because the first frame happened to be empty would be the same
+        // mistake in the other direction.
+        val observing = steps.any { it.field.hasEchoNear(latitude, longitude, COVERAGE_RADIUS) }
+        if (!observing) return emptyList()
+
+        return steps.mapNotNull { step ->
             step.field.rateAt(latitude, longitude)?.let {
                 RadarSample(
                     at = step.at,
@@ -40,6 +60,20 @@ data class RadarNowcast(
                 )
             }
         }
+    }
+
+    private companion object {
+        /**
+         * How far to look for evidence that the composite covers this place.
+         *
+         * Sixty-four pixels is one motion block, about forty kilometres at the
+         * zoom and latitudes used here - roughly the scale over which a single
+         * radar's footprint is continuous. Wide enough that a shower passing
+         * beside you still counts as the radar watching, narrow enough that rain
+         * in the next country does not.
+         */
+        const val COVERAGE_RADIUS = 64
+    }
 }
 
 data class RadarSample(

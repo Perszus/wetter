@@ -417,6 +417,45 @@ trustworthy; the exact millimetres are not. The fusion weights them accordingly,
 and the two constants to revisit are `MIN_DBZ` and `MAX_DBZ`, once the
 verification store holds enough observed rain to fit against something measured.
 
+### Where the radar actually reaches
+
+The composite is global in address and regional in fact. Sampling a nine-tile
+block at zoom 5 around fifteen cities on one September afternoon, the share of
+pixels carrying any echo at all came out:
+
+| | |
+|---|---|
+| Rīga 14.4% · New York 12.4% · London 11.3% | dense |
+| Sydney 6.3% · Reykjavík 5.6% · Tokyo 5.5% | usable |
+| Ulaanbaatar 3.2% · Delhi 1.5% · São Paulo 1.4% · Jakarta 1.1% · Cairo 1.1% | thin |
+| La Paz 0.1% · Nairobi 0.1% · **Lagos 0.0%** · **mid-Atlantic 0.0%** | none |
+
+One afternoon confounds coverage with weather — a dry day over a well-covered
+country also reads low. The ordering is the finding, not the numbers, and the
+ordering is that most of the world is in the bottom two rows.
+
+That matters more than it looks, because **the tile source draws "no echo" and
+"outside coverage" as the same fully transparent pixel** (`RainViewerPalette`).
+Inside the authority window radar now carries 95% of the answer, so reading that
+pixel as *dry* would have Wetter confidently contradict a model forecasting rain
+in exactly the places with no radar to correct it. The failure would not be a
+wrong number; it would be a confident one, shown to somebody standing in the
+rain.
+
+**So a dry pixel only counts as an observation when there is echo near it.**
+`RadarNowcast.seriesAt` returns nothing at all unless some step has echo within
+64 px of the point — one motion block, about 40 km at the zoom used here. Rain
+passing a few tens of kilometres away is proof the radar is watching, and a dry
+reading beside it is real evidence worth acting on. Nothing anywhere near is not
+evidence of anything, and the model keeps the answer to itself.
+
+The check runs across every step rather than the nearest one, so a shower still
+approaching from beyond the neighbourhood is not silenced — that being the one
+thing a nowcast exists to say.
+
+The model layer needs none of this: both providers are global, and Open-Meteo's
+ensemble members simply drop out where they do not reach.
+
 ## Air quality
 
 Not weather, and not fetched with it. Open-Meteo's air quality service is a

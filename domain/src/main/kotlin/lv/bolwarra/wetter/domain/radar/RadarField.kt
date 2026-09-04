@@ -91,6 +91,39 @@ class RadarField(
         return sampleAt(point).takeUnless { it.isNoEcho() }
     }
 
+    /**
+     * Whether anything at all is falling within [radius] pixels of a point.
+     *
+     * This is how the engine tells "the radar looked and saw nothing" from "the
+     * radar is not looking here", on a source that draws both as an empty pixel.
+     *
+     * The distinction cannot be made from one pixel and does not need to be. A
+     * dry pixel with rain a few tens of kilometres away is a real observation of
+     * dry - the radar is plainly watching this area and reporting nothing here,
+     * which is exactly the case worth having. A dry pixel with nothing anywhere
+     * near it says only that this part of the composite is empty, and an empty
+     * composite is what a country with no radar looks like.
+     *
+     * Reading the second case as dry is the failure this app can least afford:
+     * not a wrong number but a confident one, delivered to somebody standing in
+     * the rain in a place the composite has never covered.
+     */
+    fun hasEchoNear(latitude: Double, longitude: Double, radius: Int): Boolean {
+        val point = geometry.pointOf(latitude, longitude) ?: return false
+        val centreX = point.x.toInt()
+        val centreY = point.y.toInt()
+
+        for (y in (centreY - radius)..(centreY + radius)) {
+            if (y < 0 || y >= height) continue
+            for (x in (centreX - radius)..(centreX + radius)) {
+                if (x < 0 || x >= width) continue
+                val value = values[y * width + x]
+                if (!value.isNoEcho() && value > 0f) return true
+            }
+        }
+        return false
+    }
+
     /** The share of the grid the radar actually saw, 0..1. */
     fun coverage(): Float {
         if (values.isEmpty()) return 0f
