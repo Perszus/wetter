@@ -186,4 +186,31 @@ class NowcastScoringTest {
         assertEquals(0, settled)
         assertNull(dao.rows.single().observed)
     }
+
+    @Test
+    fun `every lead gets settled, not just the ones a wake-up lands on`() = runBlocking {
+        // The background worker wakes every thirty minutes. Settling only
+        // against the newest sweep would score leads 30, 60, 90 and 120 and
+        // nothing else - never the near leads, which is where the app puts its
+        // weight. Each fetch carries two hours of frames, so one run can settle
+        // them all.
+        val dao = FakeRecordDao()
+        val repository = repository(dao)
+        repository.recordNowcast(riga, sweep, samples(5L to 1f, 10L to 2f, 15L to 3f, 30L to 4f))
+
+        // Half an hour later, the frames covering that stretch arrive together.
+        listOf(5L, 10L, 15L, 30L).forEach { minute ->
+            repository.settleFromRadar(
+                location = riga,
+                observedAt = sweep.plus(Duration.ofMinutes(minute)),
+                observed = 0.5,
+            )
+        }
+
+        assertEquals(4, dao.rows.size)
+        assertTrue(
+            "every claim should be settled: " + dao.rows.map { it.observed },
+            dao.rows.all { it.observed != null },
+        )
+    }
 }

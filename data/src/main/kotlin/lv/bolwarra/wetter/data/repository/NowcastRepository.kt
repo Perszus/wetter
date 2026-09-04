@@ -148,12 +148,29 @@ class NowcastRepository internal constructor(
         val scorer = verification
         if (nowcast != null && sweepAt != null && scorer != null) {
             runCatching {
-                series.firstOrNull { it.lead.isZero }?.let { observation ->
-                    scorer.settleFromRadar(
-                        location = location,
-                        observedAt = sweepAt,
-                        observed = observation.millimetresPerHour.toDouble(),
-                    )
+                // Settled against every frame in hand, not just the newest.
+                //
+                // Each fetch brings back two hours of sweeps, and every one is
+                // an observation at a known time. Marking only the latest meant
+                // a claim was settled only when a sweep happened to land on the
+                // minute it was about - and the background worker wakes every
+                // thirty minutes, so in ordinary use the only leads ever scored
+                // would have been 30, 60, 90 and 120. The near leads, which is
+                // where this app now puts its weight, would never have been
+                // checked at all.
+                //
+                // One run now settles every outstanding claim of the last two
+                // hours, at every lead. Nothing can settle itself: claims are
+                // future-dated from their sweep and frames are never newer than
+                // the sweep they came with.
+                frames.forEach { frame ->
+                    frame.rateAt(location.latitude, location.longitude)?.let { observed ->
+                        scorer.settleFromRadar(
+                            location = location,
+                            observedAt = frame.at,
+                            observed = observed.toDouble(),
+                        )
+                    }
                 }
                 scorer.recordNowcast(location, sweepAt, series)
             }
