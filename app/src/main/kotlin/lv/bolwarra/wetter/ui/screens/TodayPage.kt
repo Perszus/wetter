@@ -31,6 +31,7 @@ import lv.bolwarra.wetter.domain.Psychrometrics
 import lv.bolwarra.wetter.domain.air.AirQuality
 import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
+import lv.bolwarra.wetter.domain.dominantKind
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
@@ -91,13 +92,25 @@ fun TodayPage(
     // that starts at 20:00.
     val ahead = forecast.hourly.window(now, TIMELINE_HOURS + 1)
 
+    // What the window is made of, or - when nothing is coming - what would fall
+    // if it did, so the tile still has an honest word on it in a dry January.
+    val falling = ahead.dominantKind().takeIf { it != PrecipitationKind.NONE }
+        ?: PrecipitationKind.likelyAt(forecast.conditionsAt(now).temperature)
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.m),
     ) {
         if (ahead.isNotEmpty()) {
             Tile(
-                label = stringResource(R.string.tile_rain),
+                // Named for what is actually going to fall. A chart headed
+                // "rain" during a January cold snap is wrong in the way that
+                // matters most: it is the one word on the tile somebody reads
+                // without looking at anything else.
+                label = stringResource(
+                    R.string.tile_precipitation,
+                    stringResource(falling.labelRes()),
+                ),
                 // The rate right now, not the six-hour total. The total read as a
                 // current measurement sitting beside a live chart - it would say
                 // "2.1 mm" through a dry window because of rain due at five - and
@@ -119,7 +132,7 @@ fun TodayPage(
             }
         }
 
-        AdvancedTile(forecast, now, bias, air)
+        AdvancedTile(forecast, now, bias, air, falling)
     }
 }
 
@@ -142,6 +155,8 @@ private fun AdvancedTile(
     now: Instant,
     bias: LearnedBias?,
     air: AirQuality?,
+    /** So the drawer asks about the same thing the chart above it is drawing. */
+    falling: PrecipitationKind,
 ) {
     val zone = forecast.location.zone
     val current = forecast.conditionsAt(now)
@@ -248,7 +263,10 @@ private fun AdvancedTile(
                         formatPercent(hour?.cloudHigh),
                     ),
                     Metric(
-                        stringResource(R.string.metric_chance_of_rain),
+                        stringResource(
+                            R.string.metric_chance_of,
+                            stringResource(falling.labelRes()).lowercase(),
+                        ),
                         formatPercent(hour?.precipitationProbability),
                     ),
                     Metric(
@@ -463,19 +481,8 @@ private fun radarKind(
     now: Instant,
 ): PrecipitationKind {
     spell?.kind?.takeIf { it != PrecipitationKind.NONE }?.let { return it }
-    val temperature = forecast.conditionsAt(now).temperature ?: return PrecipitationKind.RAIN
-    return when {
-        temperature <= SNOW_CEILING_C -> PrecipitationKind.SNOW
-        temperature <= MIXED_CEILING_C -> PrecipitationKind.MIXED
-        else -> PrecipitationKind.RAIN
-    }
+    return PrecipitationKind.likelyAt(forecast.conditionsAt(now).temperature)
 }
-
-/** At or below this, falling water reaches the ground frozen. */
-private const val SNOW_CEILING_C = 0.5
-
-/** Between the two, either is possible and neither is worth asserting. */
-private const val MIXED_CEILING_C = 2.5
 
 private const val PERCENT = 100
 

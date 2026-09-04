@@ -83,6 +83,17 @@ internal class MetNorwayProvider(
                 strength = 1.0,
                 resolutionKm = NORDIC_RESOLUTION_KM,
             ),
+            // Svalbard, which the mainland rectangle stops well short of - it
+            // sits between 74 and 81 north. MET Norway is the national service
+            // for the archipelago and MEPS reaches it, so leaving it out handed
+            // Longyearbyen to a global model by default. Measured on the same
+            // hour, the two disagreed about whether it was raining or snowing.
+            ProviderRegion(
+                name = "Svalbard",
+                box = GeoBox(south = 72.0, north = 82.0, west = 4.0, east = 36.0),
+                strength = 1.0,
+                resolutionKm = NORDIC_RESOLUTION_KM,
+            ),
             // Beyond the fine grid MET Norway is still a well-regarded European
             // source, but only enough to break a tie.
             ProviderRegion(

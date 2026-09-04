@@ -148,6 +148,11 @@ data class HourlyWeather(
      * liquid-equivalent figure with no rain/snow split, so a naive "wet means
      * rain" would paint a January blizzard in the rain colour for every user in
      * the Nordics — the exact region that provider is chosen for.
+     *
+     * A measured split is taken as given: a provider that troubled to separate
+     * rain from snow has said something this hour's temperature cannot improve
+     * on. Only the fallback is corrected, because that is where a condition
+     * code can say "rain" over a temperature of minus four.
      */
     val kind: PrecipitationKind
         get() {
@@ -158,9 +163,15 @@ data class HourlyWeather(
                 wetSnow -> PrecipitationKind.SNOW
                 wetRain -> PrecipitationKind.RAIN
                 !intensity.isWet -> PrecipitationKind.NONE
-                else -> condition.precipitationKind
+                else -> appearance.precipitationKind
             }
         }
+
+    /**
+     * The condition as it should be shown: the provider's word, named for what
+     * the temperature says would actually reach the ground.
+     */
+    val appearance: WeatherCondition get() = condition.appropriateFor(temperature)
 }
 
 data class DailyWeather(

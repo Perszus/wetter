@@ -19,9 +19,10 @@ class PrecipitationKindTest {
         rain: Double? = null,
         snowfall: Double? = null,
         condition: WeatherCondition = WeatherCondition.UNKNOWN,
+        temperature: Double = -3.0,
     ) = HourlyWeather(
         timestamp = Instant.parse("2026-01-14T09:00:00Z"),
-        temperature = -3.0,
+        temperature = temperature,
         precipitationProbability = null,
         precipitation = precipitation,
         rain = rain,
@@ -69,7 +70,12 @@ class PrecipitationKindTest {
             hour(2.0, condition = WeatherCondition.SNOW_SHOWERS).kind,
         )
         assertEquals(PrecipitationKind.MIXED, hour(2.0, condition = WeatherCondition.SLEET).kind)
-        assertEquals(PrecipitationKind.RAIN, hour(2.0, condition = WeatherCondition.RAIN).kind)
+        // With a temperature to match: this helper's hours are at minus three by
+        // default, where a rain code is now read as snow on purpose.
+        assertEquals(
+            PrecipitationKind.RAIN,
+            hour(2.0, condition = WeatherCondition.RAIN, temperature = 8.0).kind,
+        )
         assertEquals(
             PrecipitationKind.RAIN,
             hour(2.0, condition = WeatherCondition.THUNDERSTORM).kind,
@@ -89,5 +95,81 @@ class PrecipitationKindTest {
             PrecipitationKind.NONE,
             hour(0.05, condition = WeatherCondition.SNOW).kind,
         )
+    }
+
+    @Test
+    fun `what would fall is decided by temperature, with a band of doubt`() {
+        assertEquals(PrecipitationKind.SNOW, PrecipitationKind.likelyAt(-4.0))
+        assertEquals(PrecipitationKind.SNOW, PrecipitationKind.likelyAt(0.5))
+        // Near freezing neither answer is worth asserting, because what decides
+        // it is the warm layer the flake falls through and not the screen-level
+        // reading we have.
+        assertEquals(PrecipitationKind.MIXED, PrecipitationKind.likelyAt(1.0))
+        assertEquals(PrecipitationKind.MIXED, PrecipitationKind.likelyAt(2.5))
+        assertEquals(PrecipitationKind.RAIN, PrecipitationKind.likelyAt(2.6))
+        assertEquals(PrecipitationKind.RAIN, PrecipitationKind.likelyAt(15.0))
+    }
+
+    @Test
+    fun `no temperature falls back to rain rather than inventing winter`() {
+        assertEquals(PrecipitationKind.RAIN, PrecipitationKind.likelyAt(null))
+    }
+
+    @Test
+    fun `rain below freezing is shown as snow`() {
+        // Providers do publish this - usually a coarse grid averaging a valley
+        // floor with the ridge above it. "Rain" over minus four is the kind of
+        // contradiction that costs a reader their trust in the whole screen.
+        assertEquals(WeatherCondition.SNOW, WeatherCondition.RAIN.appropriateFor(-4.0))
+        assertEquals(WeatherCondition.SNOW_GRAINS, WeatherCondition.DRIZZLE.appropriateFor(-4.0))
+        assertEquals(
+            WeatherCondition.SNOW_SHOWERS,
+            WeatherCondition.RAIN_SHOWERS.appropriateFor(-4.0),
+        )
+    }
+
+    @Test
+    fun `near freezing it says sleet rather than choosing`() {
+        assertEquals(WeatherCondition.SLEET, WeatherCondition.RAIN.appropriateFor(1.5))
+    }
+
+    @Test
+    fun `snow is never turned into rain`() {
+        // The reverse correction would be wrong more often: a provider saying
+        // snow at plus three has looked at the depth of the warm layer, which
+        // is what decides it and is not something this app can see.
+        assertEquals(WeatherCondition.SNOW, WeatherCondition.SNOW.appropriateFor(8.0))
+        assertEquals(WeatherCondition.SLEET, WeatherCondition.SLEET.appropriateFor(8.0))
+    }
+
+    @Test
+    fun `freezing rain keeps its name, which is the warning`() {
+        assertEquals(
+            WeatherCondition.FREEZING_RAIN,
+            WeatherCondition.FREEZING_RAIN.appropriateFor(-3.0),
+        )
+        assertEquals(
+            WeatherCondition.FREEZING_DRIZZLE,
+            WeatherCondition.FREEZING_DRIZZLE.appropriateFor(-3.0),
+        )
+    }
+
+    @Test
+    fun `a dry condition is left alone`() {
+        assertEquals(WeatherCondition.OVERCAST, WeatherCondition.OVERCAST.appropriateFor(-10.0))
+        assertEquals(WeatherCondition.FOG, WeatherCondition.FOG.appropriateFor(-10.0))
+    }
+
+    @Test
+    fun `a measured rain and snow split beats the temperature`() {
+        // A provider that troubled to separate them has said something this
+        // hour's screen temperature cannot improve on.
+        val warmSnow = hour(
+            precipitation = 2.0,
+            snowfall = 2.0,
+            condition = WeatherCondition.RAIN,
+            temperature = 4.0,
+        )
+        assertEquals(PrecipitationKind.SNOW, warmSnow.kind)
     }
 }

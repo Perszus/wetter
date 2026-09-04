@@ -98,7 +98,8 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="domain_month">Month</string>
 
     <!-- Tile headings -->
-    <string name="tile_rain">Rain · next 6 hours</string>
+    <string name="tile_precipitation">%1$s · next 6 hours</string>
+    <string name="metric_chance_of">Chance of %1$s</string>
     <string name="tile_next_rain">Next rain</string>
     <string name="tile_daylight">Sun</string>
     <string name="tile_air">Air</string>

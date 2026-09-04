@@ -156,7 +156,7 @@ private fun List<HourlyWeather>.toSpell(openEnded: Boolean): PrecipitationSpell 
  * spell is the part worth knowing about, and mixed is already the more cautious
  * of the two readings.
  */
-private fun List<HourlyWeather>.dominantKind(): PrecipitationKind {
+fun List<HourlyWeather>.dominantKind(): PrecipitationKind {
     val kinds = map { it.kind }.filter { it != PrecipitationKind.NONE }
     val hasSnow = PrecipitationKind.SNOW in kinds
     val hasRain = PrecipitationKind.RAIN in kinds
