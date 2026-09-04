@@ -71,7 +71,14 @@ dashboard. It should read as measured, quiet, and precise.
 
    The two exceptions are the reader's own business rather than ours: no network
    (their connection, which they may want to do something about) and no location
-   chosen yet (we are waiting on them).
+   chosen yet (we are waiting on them). Neither mentions a provider, because
+   **no screen in Wetter mentions a provider at all.** Where something cannot be
+   shown, show what can be shown and say nothing about why.
+
+   The single exception is the Sources block in About, and only because the
+   RainViewer and MET Norway licences require the credit. It sits behind a tap,
+   phrased as attribution and as the evidence for rule 4's no-backend claim -
+   never as an explanation of a reading or an excuse for a failure.
 
    This does not soften rule 7 by one degree - it is why rule 7 has to be
    carried properly. The reader has no way to discount a bad reading, because

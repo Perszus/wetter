@@ -222,7 +222,7 @@ It appears only for rain at that level between now and midnight, and goes once t
 
     <string name="tile_month_pending">Month</string>
     <string name="month_pending">Not built yet.</string>
-    <string name="month_pending_detail">No service forecasts a month. This page will show how the month has gone so far against its long-run normal, with the fortnight of forecast that remains.</string>
+    <string name="month_pending_detail">How the month has gone so far against its long-run normal, with the fortnight of forecast that remains.</string>
 
     <!-- About -->
     <string name="about_version">Version %1$s</string>
