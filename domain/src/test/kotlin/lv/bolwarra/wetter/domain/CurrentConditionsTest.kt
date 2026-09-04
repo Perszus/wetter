@@ -34,6 +34,8 @@ class CurrentConditionsTest {
         condition = WeatherCondition.CLEAR,
         windSpeed = wind,
         windGust = null,
+        apparentTemperature = null,
+        uvIndex = null,
         cloudCover = 20,
         isDay = true,
     )

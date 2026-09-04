@@ -1,6 +1,7 @@
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.compose.runtime.Immutable
+import lv.bolwarra.wetter.domain.air.AirQuality
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
@@ -37,6 +38,12 @@ data class WeatherUiState(
      * say about. Empty simply means the model is on its own.
      */
     val timeline: List<FusedPrecipitation> = emptyList(),
+    /**
+     * What is in the air here. Null where the service has nothing for this
+     * place, or has not answered yet - which is a different thing from clean
+     * air, and is shown as nothing rather than as a reassuring word.
+     */
+    val airQuality: AirQuality? = null,
     /**
      * What this place's forecasts have been found to get wrong, once enough
      * records exist to tell. Null for a new location and for the first weeks of

@@ -46,6 +46,8 @@ class HourlySeriesTest {
             condition = if (mm != null && mm > 0.0) condition else WeatherCondition.OVERCAST,
             windSpeed = null,
             windGust = null,
+            apparentTemperature = null,
+            uvIndex = null,
             cloudCover = null,
             isDay = hour in 7..18,
         )

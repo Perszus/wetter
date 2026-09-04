@@ -77,6 +77,8 @@ object SampleWeather {
             // A gap at index 12: providers do return nulls, and the timeline has
             // to survive one without leaving a hole.
             precipitationProbability = if (index == 12) null else (mm * 22).toInt().coerceIn(0, 96),
+            // A degree or so under the air temperature, as damp March wind is.
+            apparentTemperature = temperatureSeries[index] - 1.2,
             precipitation = mm,
             rain = mm,
             snowfall = 0.0,
@@ -87,6 +89,12 @@ object SampleWeather {
             },
             windSpeed = 4.0 + (index % 5),
             windGust = 7.5 + (index % 5) * 1.4,
+            // A March arc: nothing before dawn, a low peak at noon.
+            uvIndex = if (localHour in 8..17) {
+                (3.0 - kotlin.math.abs(localHour - 13) * 0.5).coerceAtLeast(0.0)
+            } else {
+                0.0
+            },
             cloudCover = 70 + (index % 4) * 8,
             isDay = localHour in 7..18,
         )

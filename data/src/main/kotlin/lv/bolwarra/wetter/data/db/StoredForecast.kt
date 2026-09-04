@@ -71,6 +71,8 @@ internal data class StoredCurrent(
 internal data class StoredHour(
     val timestampEpochSecond: Long,
     val temperature: Double?,
+    /** Defaulted, so forecasts cached before it existed still read back. */
+    val apparentTemperature: Double? = null,
     val precipitationProbability: Int?,
     val precipitation: Double?,
     val rain: Double?,
@@ -79,6 +81,9 @@ internal data class StoredHour(
     val windSpeed: Double?,
     /** Defaulted, so forecasts cached before gusts existed still read back. */
     val windGust: Double? = null,
+    /** Defaulted, so forecasts cached before these existed still read back. */
+    /** Defaulted, so forecasts cached before it existed still read back. */
+    val uvIndex: Double? = null,
     val cloudCover: Int?,
     val isDay: Boolean,
 )
@@ -150,6 +155,7 @@ private fun CurrentWeather.toStored() = StoredCurrent(
 private fun HourlyWeather.toStored() = StoredHour(
     timestampEpochSecond = timestamp.epochSecond,
     temperature = temperature,
+    apparentTemperature = apparentTemperature,
     precipitationProbability = precipitationProbability,
     precipitation = precipitation,
     rain = rain,
@@ -157,6 +163,7 @@ private fun HourlyWeather.toStored() = StoredHour(
     condition = condition.name,
     windSpeed = windSpeed,
     windGust = windGust,
+    uvIndex = uvIndex,
     cloudCover = cloudCover,
     isDay = isDay,
 )
@@ -223,6 +230,7 @@ private fun StoredCurrent.toDomain() = CurrentWeather(
 private fun StoredHour.toDomain() = HourlyWeather(
     timestamp = Instant.ofEpochSecond(timestampEpochSecond),
     temperature = temperature,
+    apparentTemperature = apparentTemperature,
     precipitationProbability = precipitationProbability,
     precipitation = precipitation,
     rain = rain,
@@ -230,6 +238,7 @@ private fun StoredHour.toDomain() = HourlyWeather(
     condition = condition.toCondition(),
     windSpeed = windSpeed,
     windGust = windGust,
+    uvIndex = uvIndex,
     cloudCover = cloudCover,
     isDay = isDay,
 )

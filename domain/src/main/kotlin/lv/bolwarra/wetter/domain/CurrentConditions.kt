@@ -63,7 +63,7 @@ fun WeatherForecast.conditionsAt(instant: Instant): CurrentWeather {
         temperature = row.temperature,
         // Derived from temperature, wind and humidity. Kept, it would be the old
         // hour's answer sitting next to the new hour's temperature.
-        apparentTemperature = null,
+        apparentTemperature = row.apparentTemperature,
         condition = row.condition,
         isDay = row.isDay,
         precipitation = row.precipitation,

@@ -72,3 +72,41 @@ private fun MetricCell(metric: Metric, modifier: Modifier = Modifier) {
 }
 
 private const val COLUMNS = 2
+
+/**
+ * A named cluster of readings inside a tile.
+ *
+ * A dozen metrics in one grid is a wall: somebody looking for the pressure has
+ * to read the humidity, the gust and the moon on the way past. A heading every
+ * few rows lets the eye skip three quarters of it, which is the whole reason
+ * the drawer can afford to be generous about what goes in.
+ *
+ * The rule underneath separates groups without boxing them - a tile of boxes
+ * inside a tile reads as clutter, and the heading already does the work.
+ */
+@Composable
+fun MetricGroup(
+    label: String,
+    modifier: Modifier = Modifier,
+    /** The last group draws no rule, having nothing to be separated from. */
+    last: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val colors = WetterTheme.colors
+    val spacing = WetterTheme.spacing
+
+    Column(modifier.fillMaxWidth()) {
+        Text(
+            text = label.uppercase(),
+            style = WetterTheme.type.sectionLabel,
+            color = colors.textTertiary,
+        )
+        Spacer(Modifier.height(spacing.s))
+        content()
+        if (!last) {
+            Spacer(Modifier.height(spacing.l))
+            HairlineRule()
+            Spacer(Modifier.height(spacing.l))
+        }
+    }
+}

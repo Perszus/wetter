@@ -51,6 +51,7 @@ data class OpenMeteoCurrent(
 data class OpenMeteoHourly(
     val time: List<String> = emptyList(),
     @SerialName("temperature_2m") val temperature: List<Double?> = emptyList(),
+    @SerialName("apparent_temperature") val apparentTemperature: List<Double?> = emptyList(),
     @SerialName("precipitation_probability") val precipitationProbability: List<Int?> = emptyList(),
     val precipitation: List<Double?> = emptyList(),
     val rain: List<Double?> = emptyList(),
@@ -60,6 +61,7 @@ data class OpenMeteoHourly(
     @SerialName("cloud_cover") val cloudCover: List<Int?> = emptyList(),
     @SerialName("wind_speed_10m") val windSpeed: List<Double?> = emptyList(),
     @SerialName("wind_gusts_10m") val windGust: List<Double?> = emptyList(),
+    @SerialName("uv_index") val uvIndex: List<Double?> = emptyList(),
     @SerialName("is_day") val isDay: List<Int?> = emptyList(),
 )
 

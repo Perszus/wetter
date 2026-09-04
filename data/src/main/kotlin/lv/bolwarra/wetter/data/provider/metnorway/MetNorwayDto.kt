@@ -56,6 +56,9 @@ data class MetNorwayInstantDetails(
     @SerialName("cloud_area_fraction") val cloudAreaFraction: Double? = null,
     @SerialName("wind_speed") val windSpeed: Double? = null,
     @SerialName("wind_speed_of_gust") val windGust: Double? = null,
+    @SerialName("ultraviolet_index_clear_sky") val uvIndex: Double? = null,
+    @SerialName("dew_point_temperature") val dewPoint: Double? = null,
+    @SerialName("apparent_air_temperature") val apparentTemperature: Double? = null,
     @SerialName("wind_from_direction") val windFromDirection: Double? = null,
 )
 

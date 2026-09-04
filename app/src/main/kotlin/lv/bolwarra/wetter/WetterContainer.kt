@@ -4,6 +4,7 @@ import android.content.Context
 import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.repository.AirQualityRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
@@ -31,6 +32,9 @@ class WetterContainer(context: Context) {
 
     /** The record of what was forecast against what actually happened. */
     val verification: VerificationRepository get() = weatherData.verification
+
+    /** What is in the air here. */
+    val airQuality: AirQualityRepository get() = weatherData.airQuality
 
     val selectedLocation: SelectedLocationStore get() = weatherData.selectedLocation
 

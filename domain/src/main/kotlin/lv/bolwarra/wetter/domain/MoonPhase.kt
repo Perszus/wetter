@@ -67,7 +67,15 @@ object MoonPhase {
     private const val BINS = 8
 }
 
-/** Ordered from new through full and back, one eighth of the cycle each. */
+/**
+ * Ordered from new through full and back, one eighth of the cycle each.
+ *
+ * The constant names keep the astronomical vocabulary because that is what the
+ * cycle positions are called, but what is *shown* describes the shape in the
+ * sky. "Last quarter" tells you where the moon is in its orbit and nothing about
+ * what you would see if you looked up - and it is a half moon, which is the one
+ * thing the phrase does not say.
+ */
 enum class MoonPhaseName {
     NEW,
     WAXING_CRESCENT,

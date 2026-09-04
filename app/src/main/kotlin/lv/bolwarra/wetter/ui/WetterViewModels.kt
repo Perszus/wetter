@@ -23,6 +23,7 @@ object WetterViewModels {
                 container.repository,
                 container.nowcasts,
                 container.verification,
+                container.airQuality,
                 container.selectedLocation,
             )
         }

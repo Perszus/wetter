@@ -37,6 +37,8 @@ internal fun testForecast(location: WeatherLocation, at: Instant) = WeatherForec
             condition = WeatherCondition.OVERCAST,
             windSpeed = 4.0,
             windGust = null,
+            apparentTemperature = null,
+            uvIndex = null,
             cloudCover = null,
             isDay = true,
         )

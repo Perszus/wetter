@@ -17,9 +17,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.repository.AirQualityRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
+import lv.bolwarra.wetter.domain.air.AirQuality
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
@@ -39,6 +41,7 @@ class WeatherViewModel(
     private val repository: WeatherRepository,
     private val nowcasts: NowcastRepository,
     private val verification: VerificationRepository,
+    private val airQuality: AirQualityRepository,
     private val selectedLocation: SelectedLocationStore,
 ) : ViewModel() {
 
@@ -54,6 +57,7 @@ class WeatherViewModel(
     private data class Derived(
         val timeline: List<FusedPrecipitation> = emptyList(),
         val bias: LearnedBias? = null,
+        val air: AirQuality? = null,
     )
 
     /**
@@ -122,8 +126,17 @@ class WeatherViewModel(
         held.value?.let { runCatching { verification.learnedBias(it.location) }.getOrNull() }
     }
 
-    private val derived: Flow<Derived> = combine(timelines, biases) { timeline, bias ->
-        Derived(timeline = timeline, bias = bias)
+    /**
+     * What is in the air. Re-read when the forecast changes rather than on
+     * the timeline's cadence: the source publishes hourly values, and the
+     * repository would answer from its own cache either way.
+     */
+    private val air: Flow<AirQuality?> = forecasts.map { held ->
+        held.value?.let { runCatching { airQuality.airQuality(it.location) }.getOrNull() }
+    }
+
+    private val derived: Flow<Derived> = combine(timelines, biases, air) { timeline, bias, air ->
+        Derived(timeline = timeline, bias = bias, air = air)
     }
 
     val state: StateFlow<WeatherUiState> = combine(
@@ -148,6 +161,7 @@ class WeatherViewModel(
             // last city's rain over the new one's name.
             timeline = if (forecast != null) extra.timeline else emptyList(),
             bias = if (forecast != null) extra.bias else null,
+            airQuality = if (forecast != null) extra.air else null,
         )
     }.stateIn(
         scope = viewModelScope,

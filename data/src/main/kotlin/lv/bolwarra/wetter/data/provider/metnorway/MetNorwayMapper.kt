@@ -69,10 +69,11 @@ internal object MetNorwayMapper {
         return CurrentWeather(
             observedAt = at,
             temperature = details?.airTemperature ?: hourly.firstOrNull()?.temperature,
-            // MET Norway does not publish an apparent temperature. Inventing one
-            // from wind and humidity would be a different quantity wearing the
-            // same label, so the field stays empty and the row is not drawn.
-            apparentTemperature = null,
+            // It does publish one, on the complete endpoint this provider already
+            // calls. A comment here claimed otherwise and the field was left
+            // empty, so "feels like" was blank across the whole region this
+            // provider is chosen for.
+            apparentTemperature = details?.apparentTemperature,
             condition = weatherConditionFromMetSymbol(nextHour?.summary?.symbolCode)
                 .ifUnknown { hourly.firstOrNull()?.condition ?: WeatherCondition.UNKNOWN },
             isDay = SolarTime.isDaylight(at, location.latitude, location.longitude),
@@ -98,6 +99,7 @@ internal object MetNorwayMapper {
             HourlyWeather(
                 timestamp = parsed.at,
                 temperature = details.airTemperature,
+                apparentTemperature = details.apparentTemperature,
                 precipitationProbability = nextHour.details.probabilityOfPrecipitation
                     ?.roundToInt()
                     ?.coerceIn(0, 100),
@@ -111,6 +113,7 @@ internal object MetNorwayMapper {
                 condition = weatherConditionFromMetSymbol(nextHour.summary.symbolCode),
                 windSpeed = details.windSpeed,
                 windGust = details.windGust,
+                uvIndex = details.uvIndex,
                 cloudCover = details.cloudAreaFraction?.roundToInt()?.coerceIn(0, 100),
                 isDay = SolarTime.isDaylight(parsed.at, location.latitude, location.longitude),
             )

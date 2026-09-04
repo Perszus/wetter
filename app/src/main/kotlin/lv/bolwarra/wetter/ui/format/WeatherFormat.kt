@@ -2,6 +2,8 @@ package lv.bolwarra.wetter.ui.format
 
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -14,6 +16,7 @@ import kotlin.math.roundToInt
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.CompassPoint
 import lv.bolwarra.wetter.domain.MoonPhaseName
+import lv.bolwarra.wetter.domain.air.AirQualityBand
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
@@ -210,4 +213,51 @@ fun MoonPhaseName.labelRes(): Int = when (this) {
     MoonPhaseName.WANING_GIBBOUS -> R.string.moon_waning_gibbous
     MoonPhaseName.LAST_QUARTER -> R.string.moon_last_quarter
     MoonPhaseName.WANING_CRESCENT -> R.string.moon_waning_crescent
+}
+
+/**
+ * Which band a UV index falls in.
+ *
+ * The number alone is only meaningful to somebody who already knows the scale:
+ * "7" is a hat and shade, "2" is nothing, and nothing about the digits says so.
+ * The bands are the WHO's, which is what almost every country's public advice is
+ * written against - so this reads the same in Riga and in Nairobi.
+ */
+@StringRes
+fun uvBandLabel(index: Double): Int = when (index.roundToInt()) {
+    in Int.MIN_VALUE..2 -> R.string.uv_low
+    in 3..5 -> R.string.uv_moderate
+    in 6..7 -> R.string.uv_high
+    in 8..10 -> R.string.uv_very_high
+    else -> R.string.uv_extreme
+}
+
+/** The index rounded, for pairing with [uvBandLabel]. */
+fun formatUvIndex(index: Double): String = index.roundToInt().toString()
+
+/**
+ * A pollutant concentration, in micrograms per cubic metre.
+ *
+ * One decimal below ten and none above it. Below ten the difference between 3
+ * and 3.9 is a third of the reading; above a hundred a decimal is noise from a
+ * model with an 11 km grid.
+ */
+@Composable
+fun formatConcentration(value: Double?): String = when {
+    value == null -> NO_READING
+    value < 10.0 -> stringResource(
+        R.string.concentration,
+        String.format(Locale.getDefault(), "%.1f", value),
+    )
+    else -> stringResource(R.string.concentration, value.roundToInt().toString())
+}
+
+@StringRes
+fun AirQualityBand.labelRes(): Int = when (this) {
+    AirQualityBand.GOOD -> R.string.air_good
+    AirQualityBand.FAIR -> R.string.air_fair
+    AirQualityBand.MODERATE -> R.string.air_moderate
+    AirQualityBand.POOR -> R.string.air_poor
+    AirQualityBand.VERY_POOR -> R.string.air_very_poor
+    AirQualityBand.EXTREMELY_POOR -> R.string.air_extremely_poor
 }

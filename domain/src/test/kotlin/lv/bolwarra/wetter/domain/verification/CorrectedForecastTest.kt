@@ -47,6 +47,8 @@ class CorrectedForecastTest {
                 condition = WeatherCondition.CLEAR,
                 windSpeed = 2.0,
                 windGust = null,
+                apparentTemperature = null,
+                uvIndex = null,
                 cloudCover = 10,
                 isDay = false,
             )

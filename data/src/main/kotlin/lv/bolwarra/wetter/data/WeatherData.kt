@@ -12,10 +12,12 @@ import lv.bolwarra.wetter.data.network.WetterHttpClient
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
 import lv.bolwarra.wetter.data.provider.metar.MetarObservationSource
 import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
+import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoAirQuality
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
+import lv.bolwarra.wetter.data.repository.AirQualityRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.RadarSeriesStore
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
@@ -105,12 +107,26 @@ class WeatherData(
         )
     }
 
+    /**
+     * What is in the air, which is not weather and is not fetched with it.
+     * Its own host, its own models, its own cadence.
+     */
+    private val airQualitySource by lazy { OpenMeteoAirQuality(httpClient) }
+
+    val airQuality: AirQualityRepository by lazy { AirQualityRepository(airQualitySource) }
+
     /** Every required credit, for the About section. */
     val attributions: List<String> by lazy {
-        providers.map { it.attribution } +
-            radarSource.attribution +
-            observationSource.attribution +
-            placeSearch.attribution
+        (
+            providers.map { it.attribution } +
+                radarSource.attribution +
+                observationSource.attribution +
+                placeSearch.attribution +
+                airQualitySource.attribution
+            )
+            // Open-Meteo answers for the forecast, the geocoder and the air.
+            // One service should be credited once.
+            .distinct()
     }
 
     private val router by lazy { WeatherProviderRouter(providers) }

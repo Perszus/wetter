@@ -112,8 +112,9 @@ internal class OpenMeteoProvider(
                 "weather_code,pressure_msl,wind_speed_10m,wind_gusts_10m,wind_direction_10m"
 
         private const val HOURLY_VARIABLES =
-            "temperature_2m,precipitation_probability,precipitation,rain,snowfall,weather_code," +
-                "cloud_cover,wind_speed_10m,wind_gusts_10m,is_day"
+            "temperature_2m,apparent_temperature,precipitation_probability,precipitation," +
+                "rain,snowfall,weather_code," +
+                "cloud_cover,wind_speed_10m,wind_gusts_10m,uv_index,is_day"
 
         private const val DAILY_VARIABLES =
             "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum," +

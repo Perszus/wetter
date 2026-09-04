@@ -344,6 +344,47 @@ trustworthy; the exact millimetres are not. The fusion weights them accordingly,
 and the two constants to revisit are `MIN_DBZ` and `MAX_DBZ`, once the
 verification store holds enough observed rain to fit against something measured.
 
+## Air quality
+
+Not weather, and not fetched with it. Open-Meteo's air quality service is a
+separate host backed by different models — Copernicus CAMS, 40 km globally and
+11 km over Europe — so it lives behind its own `AirQualitySource` for the same
+reason radar does: it answers a different question on its own cadence, and a
+weather provider failing must not take it down with it.
+
+Coverage was checked rather than assumed. Riga, Nairobi, Delhi, São Paulo,
+Sydney and Longyearbyen all return values, so this is not a European feature
+that degrades elsewhere.
+
+### Why there is no AQI
+
+An air quality index is a national instrument. The European AQI, the US AQI,
+India's NAQI and China's take the same micrograms and return different verdicts,
+because each encodes what its own regulator decided was acceptable. Open-Meteo
+will compute the European and US indices anywhere on Earth, which is precisely
+the trap: a Delhi reading judged by European thresholds is not a measurement, it
+is an opinion imported from 6,000 km away.
+
+So Wetter reports the concentration and bands it against the one threshold set
+that is not national — the WHO's 2021 global air quality guidelines. The bands
+are the guideline value and its four interim targets, which exist because most
+of the world is a long way above the guideline and needed a ladder rather than a
+pass/fail line. The same air reads the same everywhere.
+
+### The 24-hour mean
+
+The WHO's PM2.5 threshold is defined on a 24-hour mean, so a 24-hour mean is
+what gets banded. `past_hours=24` costs one parameter on a request already being
+made, and it is the difference between "the air here is bad" and "somebody had a
+bonfire an hour ago". The current hour is still shown as the number; the mean
+only decides the word. Where fewer than 18 of the 24 hours came back, no mean is
+claimed and the current hour stands in.
+
+Nothing is persisted. The source publishes hourly values, and unlike a forecast
+there is nothing here worth showing stale — "the air was clean when you last
+opened this" is not an answer to "is the air clean". A 30-minute in-memory cache
+is the whole of it.
+
 ## Debugging a decision
 
 In debug builds the router logs its ranking and the reason each provider scored

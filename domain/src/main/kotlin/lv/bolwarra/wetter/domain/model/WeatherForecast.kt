@@ -82,6 +82,15 @@ data class HourlyWeather(
     val timestamp: Instant,
     /** °C, or null when the provider did not say. A gap in the curve, not a zero. */
     val temperature: Double?,
+    /**
+     * What the air feels like, wind and humidity included.
+     *
+     * On the hourly row and not only on the current snapshot, because "now"
+     * is resolved against this series: the snapshot goes stale inside the hour
+     * and every other reading on the screen moves on without it. Both
+     * providers publish this hour by hour, so it is not a regional luxury.
+     */
+    val apparentTemperature: Double?,
     /** percent, 0..100 */
     val precipitationProbability: Int?,
     /** mm expected in this hour — rain plus snow's liquid equivalent. */
@@ -97,6 +106,14 @@ data class HourlyWeather(
     val windGust: Double?,
     /** percent, 0..100 */
     val cloudCover: Int?,
+    /**
+     * Clear-sky UV index for this hour.
+     *
+     * Both sources quote it for a clear sky, which makes it a ceiling rather
+     * than a reading: under overcast the real figure is lower. The ceiling is
+     * the part that decides whether anybody needs to think about it.
+     */
+    val uvIndex: Double?,
     /** Whether the sun is up during this hour, for the night wash on the timeline. */
     val isDay: Boolean,
 ) {

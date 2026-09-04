@@ -113,6 +113,8 @@ class FakeWeatherProvider(
                     condition = WeatherCondition.OVERCAST,
                     windSpeed = null,
                     windGust = null,
+                    apparentTemperature = null,
+                    uvIndex = null,
                     cloudCover = null,
                     isDay = true,
                 )

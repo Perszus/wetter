@@ -89,11 +89,13 @@ object OpenMeteoMapper {
                 temperature = hourly.temperature.at(index),
                 precipitationProbability = hourly.precipitationProbability.at(index),
                 precipitation = hourly.precipitation.at(index),
+                apparentTemperature = hourly.apparentTemperature.at(index),
                 rain = hourly.rain.at(index),
                 snowfall = hourly.snowfall.at(index),
                 condition = weatherConditionFromWmoCode(hourly.weatherCode.at(index)),
                 windSpeed = hourly.windSpeed.at(index),
                 windGust = hourly.windGust.at(index),
+                uvIndex = hourly.uvIndex.at(index),
                 cloudCover = hourly.cloudCover.at(index),
                 isDay = hourly.isDay.at(index)?.let { it == 1 } ?: true,
             )

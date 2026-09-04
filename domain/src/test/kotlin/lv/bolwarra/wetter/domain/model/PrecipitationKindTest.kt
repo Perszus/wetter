@@ -29,6 +29,8 @@ class PrecipitationKindTest {
         condition = condition,
         windSpeed = null,
         windGust = null,
+        apparentTemperature = null,
+        uvIndex = null,
         cloudCover = null,
         isDay = true,
     )
