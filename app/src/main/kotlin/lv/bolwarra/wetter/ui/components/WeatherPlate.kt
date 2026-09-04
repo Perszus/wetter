@@ -54,6 +54,7 @@ import java.time.ZoneId
 import kotlin.math.sin
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.conditionsAt
+import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.formatTemperature
@@ -94,6 +95,12 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 fun WeatherPlate(
     forecast: WeatherForecast,
     now: Instant,
+    /**
+     * The fused precipitation timeline, so the umbrella and the chart below
+     * it are reading the same rain. Empty simply means the model is on its
+     * own, which is what the umbrella used to be given always.
+     */
+    timeline: List<FusedPrecipitation> = emptyList(),
     modifier: Modifier = Modifier,
     /**
      * Which mark is currently explaining itself, held by the caller.
@@ -118,7 +125,7 @@ fun WeatherPlate(
     // simply reports one figure rather than a nonsensical one.
     val windGust = (current.windGust ?: windSpeed).coerceAtLeast(windSpeed)
     val beamAngle = rememberBeamAngle(windSpeed)
-    val showUmbrella = forecast.umbrellaWeatherToday(now)
+    val showUmbrella = forecast.umbrellaWeatherToday(now, timeline)
 
     fun toggle(mark: PlateMark) {
         onExplain(if (explaining == mark) null else mark)
@@ -450,15 +457,40 @@ private fun windLevelLabel(level: Int) = when (level) {
  *
  * From now rather than across the whole calendar day: a shower that finished
  * this morning is not a reason to carry an umbrella this afternoon.
+ *
+ * Radar counts, and has to. The model publishes one figure for a whole hour, so
+ * a ten-minute downpour arrives as a mild average and never reaches moderate -
+ * which meant the curve could be drawn plainly above the moderate guide with no
+ * umbrella beside it, the chart and the mark disagreeing about the same rain.
  */
-private fun WeatherForecast.umbrellaWeatherToday(now: Instant): Boolean {
+private fun WeatherForecast.umbrellaWeatherToday(
+    now: Instant,
+    timeline: List<FusedPrecipitation>,
+): Boolean {
     val zone = location.zone
     val today = now.atZone(zone).toLocalDate()
-    return hourly.any { hour ->
-        !hour.timestamp.isBefore(now) &&
-            hour.timestamp.atZone(zone).toLocalDate() == today &&
-            hour.intensity >= PrecipitationIntensity.MODERATE
-    }
+
+    fun isToday(at: Instant) = !at.isBefore(now) && at.atZone(zone).toLocalDate() == today
+
+    // Two steps in a row, not one. The threshold is a rate, and the model
+    // applies it to a whole hour while the projection applies it to ten minutes
+    // - so taking a single radar step at face value would raise the mark for a
+    // burst the model would have averaged away, and put it back to being up
+    // most days. Twenty minutes of moderate rain is a shower either way.
+    val projected = timeline
+        .filter { isToday(it.at) }
+        .windowed(SUSTAINED_STEPS, partialWindows = false)
+        .any { window ->
+            window.all {
+                PrecipitationIntensity.ofRate(it.millimetresPerHour) >=
+                    PrecipitationIntensity.MODERATE
+            }
+        }
+
+    return projected ||
+        hourly.any {
+            isToday(it.timestamp) && it.intensity >= PrecipitationIntensity.MODERATE
+        }
 }
 
 /**
@@ -779,6 +811,9 @@ private val WAVE_STROKE = 2.dp
  * The previous values claimed to be these boundaries and were not; they were 3
  * and 5, which put "strong" at a fresh breeze.
  */
+/** Consecutive projected steps that must be moderate before the mark goes up. */
+private const val SUSTAINED_STEPS = 2
+
 private const val MODERATE_WIND_MS = 6.0
 private const val STRONG_WIND_MS = 11.0
 

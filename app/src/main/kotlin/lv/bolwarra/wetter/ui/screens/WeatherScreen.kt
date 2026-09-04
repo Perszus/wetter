@@ -169,6 +169,7 @@ fun WeatherScreen(
             WeatherPlate(
                 forecast = forecast,
                 now = now,
+                timeline = state.timeline,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 explaining = explaining,
                 onExplain = { explaining = it },
