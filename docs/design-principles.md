@@ -34,6 +34,22 @@ dashboard. It should read as measured, quiet, and precise.
    somebody chooses to use it.
 6. **Free software, buildable from source**, with no proprietary dependency and
    nothing that F-Droid cannot reproduce.
+7. **Most evidence, least speculation.** Where two sources disagree, the one
+   that actually looked wins. Radar sees the rain that is falling; a model
+   computed its next two hours before breakfast and cannot improve on them as
+   the hour approaches. This is why the near term is radar-led and why the
+   hand-over happens where the projection stops being an observation and starts
+   being a guess of its own (docs/providers.md).
+
+   The rule cuts both ways and that is the hard half. When the radar says
+   nothing is falling, the screen may not say it is raining — even if a model
+   does, and even though radar cannot see the sky and so cannot say what to put
+   there instead. Naming what is *not* happening from an observation, and
+   filling the rest from the model's cloud cover, is the honest reading; keeping
+   the model's word for it because it is tidier is not.
+
+   Its corollary: **say which it was.** A reading is worth more when a reader
+   can tell whether it was seen or computed.
 
 ## Visual language
 

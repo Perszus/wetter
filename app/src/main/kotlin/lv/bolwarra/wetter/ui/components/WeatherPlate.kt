@@ -49,6 +49,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.cos
@@ -56,6 +57,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.MoonPhase
+import lv.bolwarra.wetter.domain.ObservedCondition
 import lv.bolwarra.wetter.domain.SolarTime
 import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
@@ -143,6 +145,20 @@ fun WeatherPlate(
     // tell a veil of cirrus from a lid of stratus, and for this question that
     // is the only distinction that matters.
     val hour = forecast.hourly.at(now)
+
+    // The one word on this face, taken from whatever actually looked.
+    //
+    // It used to be the provider's symbol for the hour while everything under it
+    // on the same screen - the chart, the rate, the bar saying when it stops -
+    // had already moved to the radar. The most prominent word on the page was
+    // the least evidenced thing on it, and it could contradict the chart
+    // directly beneath it.
+    val seen = ObservedCondition.of(
+        reported = current.condition,
+        observedRate = radarRateAt(timeline, now),
+        temperature = current.temperature,
+        cloudCover = hour?.cloudCover,
+    )
     val sky = Stargazing.assess(
         cloudLow = hour?.cloudLow,
         cloudMedium = hour?.cloudMedium,
@@ -270,7 +286,7 @@ fun WeatherPlate(
                 }
                 Spacer(Modifier.height(spacing.xs))
                 Text(
-                    text = stringResource(current.condition.labelRes()),
+                    text = stringResource(seen.labelRes()),
                     style = WetterTheme.type.title,
                     color = colors.textSecondary,
                     textAlign = TextAlign.Center,
@@ -612,6 +628,25 @@ private fun WeatherForecast.umbrellaWeatherToday(
             isToday(it.timestamp) && it.intensity >= PrecipitationIntensity.MODERATE
         }
 }
+
+/**
+ * What the radar says is falling at this moment, or null where it has nothing.
+ *
+ * Null and zero mean different things here and the distinction is the whole
+ * point: zero is an observation that nothing is falling, null is the absence of
+ * an observation. Only the first may contradict the provider.
+ */
+private fun radarRateAt(timeline: List<FusedPrecipitation>, now: Instant): Double? {
+    val nearest = timeline
+        .filter { it.radarShare > 0.0 }
+        .minByOrNull { Duration.between(it.at, now).abs() }
+        ?: return null
+    return nearest.takeIf { Duration.between(it.at, now).abs() <= RADAR_IS_NOW }
+        ?.millimetresPerHour
+}
+
+/** How far from this moment a projected step can sit and still describe it. */
+private val RADAR_IS_NOW: Duration = Duration.ofMinutes(10)
 
 /**
  * The light's position, turning at the speed of the wind.
