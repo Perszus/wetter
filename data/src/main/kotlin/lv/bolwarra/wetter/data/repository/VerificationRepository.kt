@@ -3,7 +3,6 @@ package lv.bolwarra.wetter.data.repository
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import lv.bolwarra.wetter.data.db.ForecastRecordDao
@@ -163,6 +162,32 @@ class VerificationRepository internal constructor(
      * @return how many were settled. Zero is the normal answer when there is
      *   nothing new to check, or when no station near enough had anything to say.
      */
+    /**
+     * Marks past predictions against what the aerodromes actually reported.
+     *
+     * ### The hour that could never match
+     *
+     * This used to bucket the reports by their own truncated hour and then ask
+     * [LocalEstimate] for an estimate *at the start* of that hour. Every report
+     * in a bucket is by construction at or after the hour it was bucketed into,
+     * and LocalEstimate rejects observations from the future - a reading cannot
+     * describe a moment before it was taken. So every candidate was filtered out
+     * and the answer was always null.
+     *
+     * It settled nothing, ever, and did it silently: a fetch that works, a
+     * grouping that looks reasonable, and a count of zero that reads like "no
+     * observations yet". Measured on a phone after sixteen hours: 119 model
+     * predictions due, 119 unsettled, while the radar half - which never went
+     * through this path - had scored 186.
+     *
+     * The tell is in the data rather than the code. METAR is issued at twenty
+     * and fifty minutes past; across forty consecutive reports around Riga, the
+     * number landing exactly on the hour was zero. Nothing could have matched.
+     *
+     * So the estimate is now asked for at the moment actually being verified,
+     * and LocalEstimate does what it was built to do: take the most recent
+     * report at or before that moment, within the two hours it considers fresh.
+     */
     suspend fun verify(location: WeatherLocation): Int {
         val now = Instant.now(clock)
         val earliest = now.minus(BiasCorrection.MAX_AGE)
@@ -177,14 +202,11 @@ class VerificationRepository internal constructor(
         ).getOrElse { return 0 }
         if (history.isEmpty()) return 0
 
-        val byHour = history.groupBy { it.at.truncatedTo(ChronoUnit.HOURS) }
         var settled = 0
 
         pending.forEach { record ->
-            val hour = Instant.ofEpochSecond(record.validAtEpochSecond)
-                .truncatedTo(ChronoUnit.HOURS)
-            val reports = byHour[hour] ?: return@forEach
-            val observed = observedValue(record.variable, reports, location, hour)
+            val validAt = Instant.ofEpochSecond(record.validAtEpochSecond)
+            val observed = observedValue(record.variable, history, location, validAt)
                 ?: return@forEach
             dao.markVerified(record.id, observed)
             settled++

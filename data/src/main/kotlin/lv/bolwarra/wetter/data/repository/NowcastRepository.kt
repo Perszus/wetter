@@ -245,17 +245,52 @@ class NowcastRepository internal constructor(
      */
     suspend fun ensemble(location: WeatherLocation): ModelEnsemble? = ensembleMutex.withLock {
         val now = Instant.now(clock)
-        val held = cachedEnsemble
-        if (held != null &&
-            held.location.sameGrid(location) &&
-            Duration.between(held.at, now) < ENSEMBLE_FRESH_FOR
-        ) {
+        val held = cachedEnsemble?.takeIf { it.location.sameGrid(location) }
+        if (held != null && Duration.between(held.at, now) < ENSEMBLE_FRESH_FOR) {
             return@withLock held.ensemble
         }
-        val fetched = ensembles.ensemble(location).getOrNull()?.takeUnless { it.isEmpty }
-        cachedEnsemble = CachedEnsemble(location, now, fetched)
-        fetched
+
+        // Never make the first chart wait on this.
+        //
+        // This cache lives in memory, so it is empty in every fresh process -
+        // which means it was empty on every cold open, and the first timeline
+        // could not be built until an ensemble had been fetched over the
+        // network. That was the pause between tapping the icon and the curve
+        // appearing, on a screen whose forecast was already on disk.
+        //
+        // What the ensemble contributes is agreement between models, which is
+        // how confident the timeline is entitled to be. It is not the rate. A
+        // chart built without it is right about the weather and merely less
+        // sure of itself, and it stops being less sure a tick later - so the
+        // stale answer goes back now and the fetch happens behind it, exactly
+        // as radarSeries does with a kept projection.
+        if (!ensembleRefreshing) {
+            ensembleRefreshing = true
+            scope?.launch {
+                try {
+                    val fetched = ensembles.ensemble(location).getOrNull()
+                        ?.takeUnless { it.isEmpty }
+                    ensembleMutex.withLock {
+                        cachedEnsemble = CachedEnsemble(location, Instant.now(clock), fetched)
+                    }
+                } finally {
+                    ensembleRefreshing = false
+                }
+            } ?: run {
+                // No scope means no background: a worker calling in has nowhere
+                // to hand this off to, and there is nothing waiting on a frame,
+                // so it is fetched here.
+                ensembleRefreshing = false
+                val fetched = ensembles.ensemble(location).getOrNull()?.takeUnless { it.isEmpty }
+                cachedEnsemble = CachedEnsemble(location, now, fetched)
+                return@withLock fetched
+            }
+        }
+        held?.ensemble
     }
+
+    /** Guards against a tick a second queueing a fetch each time. */
+    private var ensembleRefreshing = false
 
     /**
      * What the radar says about a place, from whatever is quickest to hand.
