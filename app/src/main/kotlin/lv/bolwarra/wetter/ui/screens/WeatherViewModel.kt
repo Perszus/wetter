@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
@@ -136,7 +137,26 @@ class WeatherViewModel(
         held.value?.let { runCatching { airQuality.airQuality(it.location) }.getOrNull() }
     }
 
-    private val derived: Flow<Derived> = combine(timelines, biases, air) { timeline, bias, air ->
+    /**
+     * The three derived things, each arriving on its own.
+     *
+     * `combine` waits for every source to emit once before it emits at all, so
+     * these three were gated on the slowest of them - and one of them is an air
+     * quality request over the network. On a cold start that held the rain
+     * timeline off the screen for twenty to thirty seconds while the chart drew
+     * the provider's raw hourly rows instead: a flat, dry evening, on the night
+     * six of seven models forecast rain.
+     *
+     * Nothing here needs any of the others. Starting each with the value that
+     * means "not yet" lets the combine emit immediately and again as each part
+     * lands, so the timeline appears the moment it exists rather than when the
+     * air quality does.
+     */
+    private val derived: Flow<Derived> = combine(
+        timelines.onStart { emit(emptyList()) },
+        biases.onStart { emit(null) },
+        air.onStart { emit(null) },
+    ) { timeline, bias, air ->
         Derived(timeline = timeline, bias = bias, air = air)
     }
 

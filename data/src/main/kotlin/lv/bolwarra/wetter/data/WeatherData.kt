@@ -21,6 +21,7 @@ import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
+import lv.bolwarra.wetter.data.repository.EnsembleStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.ProviderHealthStore
 import lv.bolwarra.wetter.data.repository.RadarSeriesStore
@@ -109,6 +110,7 @@ class WeatherData(
             source = radarSource,
             ensembles = OpenMeteoEnsemble(httpClient),
             seriesStore = RadarSeriesStore(database.radarSeries(), WetterHttpClient.json),
+            ensembleStore = EnsembleStore(database.ensembles(), WetterHttpClient.json),
             // So every projection is scored against the sweep that answers it.
             verification = verification,
             // So a screen answered from disk still goes and fetches a fresher

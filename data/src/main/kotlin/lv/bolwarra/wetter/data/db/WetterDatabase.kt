@@ -178,6 +178,36 @@ internal data class RadarSeriesEntity(
     val payload: String,
 )
 
+/**
+ * The last ensemble for a place, kept so a cold start has models to average.
+ *
+ * The forecast and the radar projection were both already on disk; this was
+ * not, and it was the only one of the three that mattered for everything past
+ * the first hour. So every fresh process drew that stretch from the single
+ * chosen provider until a fetch came back - which is exactly when a wet evening
+ * several models agreed on could render as flat and dry.
+ */
+@Entity(tableName = "model_ensembles")
+internal data class EnsembleEntity(
+    @PrimaryKey val cacheKey: String,
+    val fetchedAtEpochSecond: Long,
+    val payload: String,
+)
+
+@Dao
+internal interface EnsembleDao {
+
+    @Query("SELECT * FROM model_ensembles WHERE cacheKey = :cacheKey")
+    suspend fun read(cacheKey: String): EnsembleEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(ensemble: EnsembleEntity)
+
+    /** Runs publish hourly; a day-old spread describes nothing worth drawing. */
+    @Query("DELETE FROM model_ensembles WHERE fetchedAtEpochSecond < :cutoffEpochSecond")
+    suspend fun deleteOlderThan(cutoffEpochSecond: Long)
+}
+
 @Dao
 internal interface RadarSeriesDao {
 
@@ -313,9 +343,10 @@ internal interface SelectedLocationDao {
         ForecastRecordEntity::class,
         SavedLocationEntity::class,
         RadarSeriesEntity::class,
+        EnsembleEntity::class,
         ProviderHealthEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -331,6 +362,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
     abstract fun savedLocations(): SavedLocationDao
 
     abstract fun radarSeries(): RadarSeriesDao
+
+    abstract fun ensembles(): EnsembleDao
 
     companion object {
 
@@ -440,6 +473,19 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /** Somewhere to keep the ensemble, so a cold start never waits for one. */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `model_ensembles` (" +
+                        "`cacheKey` TEXT NOT NULL, " +
+                        "`fetchedAtEpochSecond` INTEGER NOT NULL, " +
+                        "`payload` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`cacheKey`))",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -461,6 +507,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
                 MIGRATION_3_4,
                 MIGRATION_4_5,
                 MIGRATION_5_6,
+                MIGRATION_6_7,
             )
             .build()
     }

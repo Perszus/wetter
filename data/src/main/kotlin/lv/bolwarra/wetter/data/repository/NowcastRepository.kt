@@ -64,6 +64,7 @@ class NowcastRepository internal constructor(
      * behaviour can be tested without a database.
      */
     private val seriesStore: RadarSeriesStore? = null,
+    private val ensembleStore: EnsembleStore? = null,
     /**
      * Where the projection is held to its word.
      *
@@ -214,7 +215,11 @@ class NowcastRepository internal constructor(
 
     /** Drop projections too old to contain anything still ahead. */
     suspend fun prune() {
-        seriesStore?.prune(Instant.now(clock).minus(KEEP_FOR))
+        val now = Instant.now(clock)
+        seriesStore?.prune(now.minus(KEEP_FOR))
+        // A day, not three hours: an ensemble is hourly and a stale one is still
+        // a better first frame than no models at all.
+        ensembleStore?.prune(now.minus(ENSEMBLE_KEEP_FOR))
     }
 
     /**
@@ -289,43 +294,60 @@ class NowcastRepository internal constructor(
             return@withLock held.ensemble
         }
 
-        // Never make the first chart wait on this.
+        // Off disk before anything else, so a fresh process has models to take a
+        // median over from the first frame it draws.
         //
-        // This cache lives in memory, so it is empty in every fresh process -
-        // which means it was empty on every cold open, and the first timeline
-        // could not be built until an ensemble had been fetched over the
-        // network. That was the pause between tapping the icon and the curve
-        // appearing, on a screen whose forecast was already on disk.
-        //
-        // What the ensemble contributes is agreement between models, which is
-        // how confident the timeline is entitled to be. It is not the rate. A
-        // chart built without it is right about the weather and merely less
-        // sure of itself, and it stops being less sure a tick later - so the
-        // stale answer goes back now and the fetch happens behind it, exactly
-        // as radarSeries does with a kept projection.
+        // This is the whole of what used to make an opening chart wait. The
+        // forecast and the radar projection were both kept across a restart and
+        // this was not, so every cold start filled everything past the first
+        // hour from the one chosen provider until a fetch came back - which is
+        // exactly how a wet evening six of seven models agreed on rendered flat
+        // and dry.
+        val kept = held ?: ensembleStore?.read(cacheKeyOf(location))?.let {
+            CachedEnsemble(location, it.fetchedAt, it.ensemble)
+        }
+        if (kept != null && kept !== held) cachedEnsemble = kept
+
+        val fresh = kept != null && Duration.between(kept.at, now) < ENSEMBLE_FRESH_FOR
+        if (fresh) return@withLock kept?.ensemble
+
+        // Nothing current: hand back whatever was kept and go and get a new one,
+        // rather than making the caller wait. Nothing here is on a frame's
+        // critical path that a slightly older spread would spoil.
         if (!ensembleRefreshing) {
             ensembleRefreshing = true
-            scope?.launch {
-                try {
-                    val fetched = ensembles.ensemble(location).getOrNull()
-                        ?.takeUnless { it.isEmpty }
-                    ensembleMutex.withLock {
-                        cachedEnsemble = CachedEnsemble(location, Instant.now(clock), fetched)
+            val background = scope
+            if (background != null) {
+                background.launch {
+                    try {
+                        fetchEnsemble(location)
+                    } finally {
+                        ensembleRefreshing = false
                     }
+                }
+            } else {
+                // No scope means no background - a worker calling in has nowhere
+                // to hand this off to and nothing waiting on a frame, so it is
+                // fetched here and kept for everything that comes after.
+                try {
+                    return@withLock fetchEnsemble(location)
                 } finally {
                     ensembleRefreshing = false
                 }
-            } ?: run {
-                // No scope means no background: a worker calling in has nowhere
-                // to hand this off to, and there is nothing waiting on a frame,
-                // so it is fetched here.
-                ensembleRefreshing = false
-                val fetched = ensembles.ensemble(location).getOrNull()?.takeUnless { it.isEmpty }
-                cachedEnsemble = CachedEnsemble(location, now, fetched)
-                return@withLock fetched
             }
         }
-        held?.ensemble
+        kept?.ensemble
+    }
+
+    /** Fetch, keep in memory, and write to disk so the next start has it. */
+    private suspend fun fetchEnsemble(location: WeatherLocation): ModelEnsemble? {
+        val fetched = ensembles.ensemble(location).getOrNull()?.takeUnless { it.isEmpty }
+        val at = Instant.now(clock)
+        cachedEnsemble = CachedEnsemble(location, at, fetched)
+        if (fetched != null) {
+            runCatching { ensembleStore?.write(cacheKeyOf(location), at, fetched) }
+        }
+        return fetched
     }
 
     /** Guards against a tick a second queueing a fetch each time. */
@@ -370,6 +392,27 @@ class NowcastRepository internal constructor(
             }
         }
 
+        // Nothing kept and worth drawing. Answer with no radar at all rather
+        // than holding the screen while twenty tiles are fetched and decoded.
+        //
+        // This was the last thing in the app that made anybody wait. The chart
+        // cannot draw a fused timeline until this returns, and until it has one
+        // it falls back to the provider's raw hourly rows - so a cold start
+        // showed a single model's evening, flat and dry, for as long as the
+        // radar took. Every input for the models is already on disk; there is no
+        // reason for the one input that is not to hold the other two hostage.
+        //
+        // The models answer now and radar sharpens the near term on the next
+        // tick, which is the same bargain radarSeries already strikes when it
+        // has something kept.
+        val background = scope
+        if (background != null) {
+            background.launch { runCatching { nowcast(location) } }
+            return emptyList()
+        }
+
+        // No scope means a worker, which has nothing waiting on a frame and is
+        // the reason the fetch happens at all.
         return nowcast(location)
             ?.seriesAt(location.latitude, location.longitude)
             .orEmpty()
@@ -491,6 +534,15 @@ class NowcastRepository internal constructor(
 
         /** Model runs publish hourly, so anything fresher gets the same numbers. */
         val ENSEMBLE_FRESH_FOR: Duration = Duration.ofHours(1)
+
+        /**
+         * How long a kept ensemble is worth opening with.
+         *
+         * Far longer than it is worth trusting. A spread from this morning is
+         * not current and is still an enormously better first frame than one
+         * provider alone, which is the alternative it replaced.
+         */
+        val ENSEMBLE_KEEP_FOR: Duration = Duration.ofDays(1)
 
         /** What FRAMES alone already covers, so no catching up is needed. */
         private val ROUTINE_REACH: Duration = Duration.ofMinutes(30)
