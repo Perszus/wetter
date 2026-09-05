@@ -307,10 +307,32 @@ overhead when we can see it.
 
 | Lead | Radar | Why |
 |---|---|---|
-| 0 – 1 h | 95% | The window where the sky is being watched rather than predicted. |
-| the next 20 min | eased between | The projection does not stop being an observation at a stroke. |
-| after that | confidence × 95% | The field has been carried further than the motion behind it justifies. |
-| 3 h+ | in practice <25% | Extrapolation is spent. The model is all there is. |
+| 0 – 1 h | 80% | The window where the sky is being watched rather than predicted. The remaining fifth is the models', for the snow, the drizzle under the beam and the coverage holes radar structurally cannot see. |
+| the next 20 min | eased to nothing | The projection does not stop being an observation at a stroke. |
+| after that | 0% | Extrapolation is spent, and a spent extrapolation gets no vote. |
+
+**Past its window radar is out, not merely quieter.** It used to fade to
+`confidence × 95%`, which sounds like a gentle retreat and is not one: two hours
+out that still left radar carrying about a third of the answer. Measured on a wet
+evening in Riga, a dry projection at that weight held the whole evening down to
+zero while six of seven models forecast rain.
+
+**And past that window no single model decides either.** The provider chosen for
+a place is one deterministic run, wrong in ways nothing in its own output
+reveals. That same evening the chosen provider reported 0.0 mm for every hour
+after the next, symbol "cloudy", while the seven-model ensemble the app was
+*already downloading* had ECMWF at 1.3, UKMO at 1.7 and DMI at 1.9 over the same
+hours — used only to tint a confidence number. The screen drew a flat dry evening
+in the rain, with the contradicting evidence already on the device.
+
+So the provider is a vote rather than the verdict: the model term is the **median
+across the ensemble members and the provider together**. Genuinely together — a
+median over seven values and a median over those seven plus an eighth are
+different ranks of a different list, which is why the member values are carried
+rather than just their summary. A median rather than a mean because it ignores
+*how* wrong an outlier is: one model forecasting a deluge cannot carry the hour
+any more than one forecasting nothing can empty it, and on this evidence both
+happen.
 
 The hand-over is eased with a smoothstep rather than dropped at the boundary. A
 step in the weighting is a step in the answer, and nothing in the sky steps at

@@ -61,11 +61,17 @@ data class FusedPrecipitation(
 object PrecipitationFusion {
 
     /**
-     * The most the radar is ever allowed, even at zero lead with a perfect
-     * match. The remainder is the model's standing share, for everything radar
-     * structurally cannot see.
+     * What radar carries inside its own window; the models keep the rest.
+     *
+     * Radar sees precipitation, not the sky - it misses snow it cannot detect,
+     * misses what falls below the beam, and on this source cannot even say where
+     * its coverage ends. A fifth left with the models is what stops those gaps
+     * emptying the answer rather than merely degrading it.
+     *
+     * Past the window this goes to zero rather than to some smaller share, so
+     * the whole of the answer is the models agreeing among themselves.
      */
-    const val MAX_RADAR_WEIGHT = 0.95
+    const val MAX_RADAR_WEIGHT = 0.80
 
     /**
      * How far ahead the radar simply decides.
@@ -153,9 +159,9 @@ object PrecipitationFusion {
 
         return (0 until steps).map { index ->
             val at = from.plus(step.multipliedBy(index.toLong()))
-            val modelRate = interpolate(rows, at)
             val sample = nearest(samples, at)
             val modelConfidence = ensemble?.precipitationAgreement(at) ?: MODEL_CONFIDENCE
+            val modelRate = modelRateAt(rows, ensemble, at)
 
             when {
                 sample == null && modelRate == null -> FusedPrecipitation(at, 0.0, 0.0, 0.0, 0)
@@ -217,7 +223,6 @@ object PrecipitationFusion {
      * out however it was arrived at.
      */
     private fun radarShareFor(sample: RadarSample): Double {
-        val confidence = sample.confidence.toDouble().coerceIn(0.0, 1.0)
         val authority = authorityFor(sample.motionQuality)
         val past = sample.lead.toMillis() - authority.toMillis()
 
@@ -242,7 +247,19 @@ object PrecipitationFusion {
             }
         }
 
-        return MAX_RADAR_WEIGHT * (1.0 + (confidence - 1.0) * eased)
+        // Radar leads its window, then leaves entirely.
+        //
+        // It used to fade to `MAX_RADAR_WEIGHT * confidence` instead of to
+        // nothing, which sounds like a gentle retreat and is not one: at two
+        // hours out that still left radar carrying about a third of the answer.
+        // A projection that has run out of things to say says zero, and a third
+        // of zero is a third of the way to a dry evening - so a wet night with
+        // six of seven models forecasting rain drew as flat and empty, held down
+        // by an extrapolation nobody should still have been listening to.
+        //
+        // Past its window radar is out, and what remains is what the models
+        // agree on between themselves.
+        return MAX_RADAR_WEIGHT * (1.0 - eased)
     }
 
     /**
@@ -260,6 +277,47 @@ object PrecipitationFusion {
      * gate - a gate can hand a near-observation back to a model, and this
      * cannot.
      */
+    /**
+     * What the models say, rather than what one of them says.
+     *
+     * The provider chosen for a place is a single deterministic run, and a
+     * single run is wrong in ways nothing in its own output reveals. Measured on
+     * a wet evening in Riga: the app's chosen provider gave 0.0 mm for every
+     * hour after the next, symbol "cloudy", while the seven-model ensemble the
+     * app was *already downloading* had six of seven wet over the same hours -
+     * ECMWF at 1.3, UKMO at 1.7, DMI at 1.9. The screen showed a flat dry
+     * evening, in the rain, with the contradicting evidence already on the
+     * device and used only to tint a confidence number.
+     *
+     * That is the app's own rule inverted: one source was overruling six on the
+     * strength of being the one we asked first.
+     *
+     * So the provider becomes a vote rather than the verdict. The value is the
+     * median across the ensemble members *and* the provider - the provider is
+     * genuinely in there, not blended in afterwards, because a median over seven
+     * values and a median over those seven plus an eighth are different ranks of
+     * a different list.
+     *
+     * A median rather than a mean on purpose. It is the statistic that ignores
+     * how wrong an outlier is: one model forecasting a deluge cannot drag the
+     * hour upward any more than one forecasting nothing can drag it down, and on
+     * this evidence both failures happen.
+     *
+     * With no ensemble - offline, or a place none of them cover - this is the
+     * provider alone, exactly as before.
+     */
+    private fun modelRateAt(
+        rows: List<HourlyWeather>,
+        ensemble: ModelEnsemble?,
+        at: Instant,
+    ): Double? {
+        val provider = interpolate(rows, at)
+        val members = ensemble?.at(at)?.precipitation?.values.orEmpty()
+        if (members.isEmpty()) return provider
+        if (provider == null) return ModelAgreement.consensusOf(members)
+        return ModelAgreement.consensusOf(members + provider)
+    }
+
     fun authorityFor(motionQuality: Float): Duration {
         val quality = motionQuality.toDouble().coerceIn(0.0, 1.0)
         val span = RADAR_AUTHORITY.toMinutes() - LEAST_AUTHORITY.toMinutes()

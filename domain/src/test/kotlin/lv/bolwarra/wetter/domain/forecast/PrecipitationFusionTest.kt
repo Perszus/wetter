@@ -56,10 +56,10 @@ class PrecipitationFusionTest {
             steps = 1,
         )
         assertEquals(1, fused.size)
-        assertTrue("radar share was ${fused[0].radarShare}", fused[0].radarShare > 0.8)
+        assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused[0].radarShare, 1e-6)
         assertTrue(
             "fused rate was ${fused[0].millimetresPerHour}",
-            fused[0].millimetresPerHour > 6.0,
+            fused[0].millimetresPerHour > 5.0,
         )
     }
 
@@ -80,7 +80,9 @@ class PrecipitationFusionTest {
             steps = 1,
         )
         assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused[0].radarShare, 1e-6)
-        assertTrue("the radar's nine should carry it", fused[0].millimetresPerHour > 8.0)
+        // Four fifths of the radar's nine; the models keep the rest for what
+        // radar structurally cannot see.
+        assertTrue("the radar's nine should carry it", fused[0].millimetresPerHour > 7.0)
         assertTrue("a thin estimate must not read as certain", fused[0].confidence < 0.4)
     }
 
@@ -308,8 +310,8 @@ class PrecipitationFusionTest {
 
         val early = fused.first { it.at == start }
         assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, early.radarShare, 1e-6)
-        // 95% of nothing plus 5% of the model's four.
-        assertEquals(0.2, early.millimetresPerHour, 1e-6)
+        // 80% of nothing plus the models' fifth of four.
+        assertEquals(0.8, early.millimetresPerHour, 1e-6)
     }
 
     @Test
@@ -330,10 +332,12 @@ class PrecipitationFusionTest {
         )
 
         val point = fused.single()
-        // Beyond the window the projection has been carried further than the
-        // motion behind it can justify, so its confidence weighs it again.
-        assertTrue(point.radarShare < PrecipitationFusion.MAX_RADAR_WEIGHT)
-        assertEquals(0.4 * PrecipitationFusion.MAX_RADAR_WEIGHT, point.radarShare, 1e-6)
+        // Past its window radar is out, not merely quieter. It used to keep
+        // `confidence * MAX_RADAR_WEIGHT` here - about a third of the answer at
+        // two hours - which is how a dry projection held down a wet evening the
+        // models agreed on.
+        assertEquals(0.0, point.radarShare, 1e-6)
+        assertEquals("the models alone decide out here", 4.0, point.millimetresPerHour, 1e-6)
     }
 
     @Test
@@ -393,7 +397,7 @@ class PrecipitationFusionTest {
         ).single()
 
         assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, fused.radarShare, 1e-6)
-        assertTrue("the observed five should carry it", fused.millimetresPerHour > 4.5)
+        assertTrue("the observed five should carry it", fused.millimetresPerHour > 3.9)
     }
 
     @Test
@@ -448,9 +452,8 @@ class PrecipitationFusionTest {
         val biggestJump = walk.zipWithNext { a, b -> kotlin.math.abs(b - a) }.max()
 
         // What the boundary used to do in a single minute: the whole distance
-        // between full authority and the confidence-weighted blend.
-        val theStepItReplaced =
-            PrecipitationFusion.MAX_RADAR_WEIGHT - 0.3 * PrecipitationFusion.MAX_RADAR_WEIGHT
+        // between full authority and none.
+        val theStepItReplaced = PrecipitationFusion.MAX_RADAR_WEIGHT
 
         // A smoothstep cannot be flat - its steepest point is 1.5 times the
         // average slope, which over a twenty minute fade is about 0.05 a minute.
@@ -469,7 +472,17 @@ class PrecipitationFusionTest {
         // separates an eased hand-over from a merely shorter one.
         val slopes = walk.zipWithNext { a, b -> b - a }
         val biggestBend = slopes.zipWithNext { a, b -> kotlin.math.abs(b - a) }.max()
-        assertTrue("biggest bend in the slope was $biggestBend", biggestBend < 0.01)
+
+        // Derived rather than picked. Smoothstep's second derivative peaks at
+        // 6 times the range over the square of the fade, so the bound moves
+        // correctly if either the weight or the fade is ever changed - which is
+        // exactly what happened to the number that used to sit here.
+        val fadeMinutes = PrecipitationFusion.AUTHORITY_FADE.toMinutes().toDouble()
+        val steepestBend = 6.0 * theStepItReplaced / (fadeMinutes * fadeMinutes)
+        assertTrue(
+            "biggest bend in the slope was $biggestBend, allowed $steepestBend",
+            biggestBend <= steepestBend + 1e-6,
+        )
     }
 
     @Test
@@ -492,12 +505,10 @@ class PrecipitationFusionTest {
 
         // Full authority right up to the boundary.
         assertEquals(PrecipitationFusion.MAX_RADAR_WEIGHT, shareAt(60), 1e-6)
-        // And fully handed over once the fade is spent.
-        assertEquals(0.3 * PrecipitationFusion.MAX_RADAR_WEIGHT, shareAt(80), 1e-6)
+        // And gone entirely once the fade is spent - not reduced, gone. Past
+        // here the answer is the models agreeing among themselves.
+        assertEquals(0.0, shareAt(80), 1e-6)
         // Halfway through, halfway between - smoothstep is symmetric there.
-        val middle =
-            0.5 *
-                (PrecipitationFusion.MAX_RADAR_WEIGHT + 0.3 * PrecipitationFusion.MAX_RADAR_WEIGHT)
-        assertEquals(middle, shareAt(70), 1e-6)
+        assertEquals(0.5 * PrecipitationFusion.MAX_RADAR_WEIGHT, shareAt(70), 1e-6)
     }
 }

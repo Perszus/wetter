@@ -315,8 +315,14 @@ class NowcastCacheTest {
 
         assertEquals(0, coldRadar.tileCalls)
         assertTrue(timeline.all { !it.at.isBefore(later.now) })
-        // The tail of it is still ahead, so radar still contributes something.
-        assertTrue(timeline.any { it.radarShare > 0.0 })
+
+        // And it contributes no weight, which is the point rather than a
+        // shortfall. Radar leads its own window and is out past it, and every
+        // sample still ahead in a ninety-minute-old projection was carried at
+        // least that far from the sweep behind it. The tail is drawn from the
+        // models instead, and the fetch launched behind this call replaces the
+        // whole thing on the next tick.
+        assertTrue(timeline.all { it.radarShare == 0.0 })
     }
 
     @Test

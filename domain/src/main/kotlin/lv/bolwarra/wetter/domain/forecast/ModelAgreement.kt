@@ -15,6 +15,15 @@ data class ModelSpread(
     val highest: Double,
     /** How many models actually answered for this hour. */
     val models: Int,
+    /**
+     * What each model actually said, so a caller can put another value among
+     * them and take the median of the lot.
+     *
+     * The summary alone cannot do that. A median over seven values and a median
+     * over those seven plus an eighth are different ranks of a different list,
+     * and there is no way to get the second from the first.
+     */
+    val values: List<Double> = emptyList(),
 ) {
     /**
      * 0..1, how much the consensus deserves to be believed.
@@ -96,6 +105,7 @@ object ModelAgreement {
         return ModelSpread(
             at = at,
             consensus = consensus,
+            values = values.sorted(),
             spread = spreadOf(values),
             lowest = values.min(),
             highest = values.max(),
