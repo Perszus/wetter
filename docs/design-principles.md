@@ -86,6 +86,40 @@ dashboard. It should read as measured, quiet, and precise.
    thing standing between them and a wrong answer, so it gets paid for in the
    engine and never in the interface.
 
+9. **The finest the sky will give us, as fast as it will give it.** This is a
+   precision instrument, not a shovel for a playground.
+
+   **Resolution.** The unit is a point in time. If a source can tell us the
+   second, we take the second; if not the minute; if not the minute, two
+   minutes - and so on down, taking the finest thing that genuinely exists.
+   Never coarser because it is tidier to compute.
+
+   **A source's publishing cadence is not the app's unit.** This is where it
+   actually goes wrong, and it has gone wrong twice. One provider publishes on
+   the hour, and "the hour" crept out of that provider and into the arithmetic,
+   then into the drawing - first as a staircase of hourly steps, then as a curve
+   through hourly middles. An hour is not a thing the weather does. It is where
+   one source happened to put a number. Every source is a line through time;
+   read every line at the moment being answered and combine there
+   (`PrecipitationFusion`).
+
+   **Speed.** Fetch the moment data can exist, keep it where a cold start can
+   reach it, and never make the reader wait for it. Everything on disk, nothing
+   on the critical path, each part arriving on its own rather than behind the
+   slowest. A screen that is right in thirty seconds was wrong for thirty
+   seconds.
+
+   **The guard, and it is the important half.** Precision is not the appearance
+   of precision. Finer *stamping* is not finer *information*: Open-Meteo will
+   serve these models at quarter-hour stamps and the values repeat unchanged
+   within each hour - measured, not assumed. Fetching that would quadruple the
+   payload to learn nothing, and drawing it as though it were quarter-hourly
+   truth would be a lie told in high resolution. So: take the finest signal that
+   is real, interpolate honestly between the points a source actually gave, and
+   never manufacture detail to fill a gap. Radar is currently the only source
+   that genuinely re-observes inside the hour, which is why it leads the first
+   one.
+
 ## Visual language
 
 The app should feel elegant, quiet, technical and highly legible. Specifically,
