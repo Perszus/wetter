@@ -33,12 +33,12 @@ import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.dominantKind
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
+import lv.bolwarra.wetter.domain.forecast.ObservedSpell
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
-import lv.bolwarra.wetter.domain.nextPrecipitation
 import lv.bolwarra.wetter.domain.sky.StarWatch
 import lv.bolwarra.wetter.domain.sky.Stargazing
 import lv.bolwarra.wetter.domain.sky.Tides
@@ -502,7 +502,10 @@ private fun NextRainBar(
 ) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
-    val spell = forecast.hourly.nextPrecipitation(now)
+    // Read from the same series the curve above is drawn from, so the sentence
+    // and the picture cannot disagree. See ObservedSpell for what went wrong
+    // when this was the provider's hourly rows and the chart was radar.
+    val spell = ObservedSpell.next(timeline, forecast.hourly, now)
 
     // The model's hourly row is an average over sixty minutes, so a shower that
     // the radar can see arriving can sit under the trace threshold in it. When
