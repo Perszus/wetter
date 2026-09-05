@@ -5,6 +5,7 @@ import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.map.MapTileSource
+import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.VerificationRepository
@@ -41,6 +42,9 @@ class WetterContainer(context: Context) {
 
     /** Finding a place by name, and the places already kept. */
     val placeSearch: PlaceSearch get() = weatherData.placeSearch
+
+    /** What a dropped pin is called, when it is called anything. */
+    val reverseGeocoder: PhotonReverseGeocoder get() = weatherData.reverseGeocoder
 
     /** The basemap behind a dropped pin. */
     val basemap: MapTileSource get() = weatherData.basemap

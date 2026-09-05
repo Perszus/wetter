@@ -19,8 +19,10 @@ import lv.bolwarra.wetter.data.location.BuiltInLocations
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.map.MapTileSource
+import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.location.Coordinates
+import lv.bolwarra.wetter.domain.location.PlaceName
 import lv.bolwarra.wetter.domain.location.PlaceSearch
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.ui.map.BasemapLoader
@@ -79,7 +81,14 @@ class LocationsViewModel(
     private val placeSearch: PlaceSearch,
     private val savedLocations: SavedLocationStore,
     private val repository: WeatherRepository,
+    private val reverseGeocoder: PhotonReverseGeocoder,
     basemap: MapTileSource,
+    /**
+     * Told when the chosen place changes, so the home screen stops showing the
+     * last one. Passed in rather than reached for, because a view model with a
+     * Context in it is a view model that cannot be tested without one.
+     */
+    private val onPlaceChanged: suspend () -> Unit = {},
 ) : ViewModel() {
 
     /** Tiles for the pin picker, cached for as long as this screen lives. */
@@ -168,7 +177,10 @@ class LocationsViewModel(
      */
     fun select(location: WeatherLocation) {
         selectedLocation.select(location)
-        viewModelScope.launch { savedLocations.save(location) }
+        viewModelScope.launch {
+            savedLocations.save(location)
+            onPlaceChanged()
+        }
     }
 
     /**
@@ -187,21 +199,29 @@ class LocationsViewModel(
      * cache key - which is coordinates only - so the request made under the
      * provisional zone is not wasted.
      */
-    fun savePin(at: Coordinates) {
+    fun savePin(at: Coordinates, name: PlaceName?) {
         viewModelScope.launch {
             val provisional = WeatherLocation(
-                name = at.format(),
+                name = name?.label ?: at.format(),
                 latitude = at.latitude,
                 longitude = at.longitude,
                 zone = ZoneId.systemDefault(),
+                region = name?.region,
+                country = name?.country,
             )
             val resolved = repository.refresh(provisional).getOrNull()?.location ?: provisional
             val point = provisional.copy(zone = resolved.zone)
 
             savedLocations.save(point)
             selectedLocation.select(point)
+            // The home screen is looking at the place that was selected a
+            // moment ago, and will not find out on its own until its next tick.
+            onPlaceChanged()
         }
     }
+
+    /** What is at a point, or null. Called when the map settles, never mid-drag. */
+    suspend fun nameOf(at: Coordinates): PlaceName? = reverseGeocoder.nameOf(at)
 
     /** Forget a kept place. Never touches which one is selected. */
     fun remove(location: WeatherLocation) {

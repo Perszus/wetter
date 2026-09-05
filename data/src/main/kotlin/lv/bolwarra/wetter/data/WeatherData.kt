@@ -17,6 +17,7 @@ import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoAirQuality
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
+import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
@@ -166,6 +167,9 @@ class WeatherData(
     }
 
     /** Finding a place by name. */
+    /** What is at a dropped pin, when anything is. */
+    val reverseGeocoder: PhotonReverseGeocoder by lazy { PhotonReverseGeocoder(httpClient) }
+
     /** Tiles for the map a pin is dropped on. Not weather; see MapTileSource. */
     val basemap: MapTileSource by lazy { MapTileSource(httpClient) }
 

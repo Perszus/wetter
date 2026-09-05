@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.delay
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.location.Coordinates
+import lv.bolwarra.wetter.domain.location.PlaceName
 import lv.bolwarra.wetter.ui.components.ScreenTitle
 import lv.bolwarra.wetter.ui.map.MapPicker
 import lv.bolwarra.wetter.ui.map.TileLoader
@@ -52,12 +55,27 @@ fun PinPicker(
     start: Coordinates,
     tiles: TileLoader,
     onCancel: () -> Unit,
-    onConfirm: (Coordinates) -> Unit,
+    onConfirm: (Coordinates, PlaceName?) -> Unit,
+    nameOf: suspend (Coordinates) -> PlaceName?,
     modifier: Modifier = Modifier,
 ) {
     val spacing = WetterTheme.spacing
     val colors = WetterTheme.colors
     var chosen by remember { mutableStateOf(start) }
+    var name by remember { mutableStateOf<PlaceName?>(null) }
+
+    // Asked once the map has been still for a moment, never during a drag.
+    //
+    // The lookup runs against a volunteer-run server, and a pin dragged across
+    // a city would otherwise fire one request per frame at it. Restarting on
+    // every change and pausing first means exactly one request per place
+    // somebody actually stops on - and the name clears the instant the map
+    // moves, so what is on screen is never a label for somewhere else.
+    LaunchedEffect(chosen) {
+        name = null
+        delay(SETTLE_MS)
+        name = nameOf(chosen)
+    }
 
     Column(
         modifier = modifier
@@ -79,13 +97,34 @@ fun PinPicker(
 
         Spacer(Modifier.height(spacing.m))
 
-        // The coordinate, always visible while aiming. It is the only feedback
-        // there is that the map has moved to somewhere deliberate rather than
-        // somewhere it drifted to, and it is what will be kept.
+        // The address when there is one, the coordinate when there is not.
+        //
+        // The coordinate is always shown underneath either way: it is the real
+        // identity of the place - the thing the forecast is actually fetched
+        // for - and a street name is a description of it that most of the earth
+        // does not have.
+        val place = name
+        if (place != null) {
+            Text(
+                text = place.label,
+                style = WetterTheme.type.body,
+                color = colors.textPrimary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            val under = listOfNotNull(place.region, place.country).joinToString(", ")
+            if (under.isNotEmpty()) {
+                Text(
+                    text = under,
+                    style = WetterTheme.type.meta,
+                    color = colors.textTertiary,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
         Text(
             text = chosen.format(),
-            style = WetterTheme.type.body,
-            color = colors.textSecondary,
+            style = if (place == null) WetterTheme.type.body else WetterTheme.type.meta,
+            color = colors.textTertiary,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -103,7 +142,7 @@ fun PinPicker(
                     color = colors.textTertiary,
                 )
             }
-            TextButton(onClick = { onConfirm(chosen) }) {
+            TextButton(onClick = { onConfirm(chosen, name) }) {
                 Text(
                     text = stringResource(R.string.locations_pin_confirm),
                     style = WetterTheme.type.body,
@@ -114,3 +153,6 @@ fun PinPicker(
         Spacer(Modifier.height(spacing.m))
     }
 }
+
+/** Long enough that a drag is one lookup, short enough to feel immediate. */
+private const val SETTLE_MS = 700L

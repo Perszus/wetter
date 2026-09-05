@@ -238,33 +238,44 @@ tighter control of the numerals the whole design leans on. Not decided.
 In memory today. If real use shows the app repeatedly waking to a provider that
 has been down for hours, it should persist.
 
-**Street addresses, and a pin on a map.** *(parked — to be implemented)*
+**Street addresses, and a pin on a map.** *(shipped)*
 
-Both are wanted. Neither is blocked on effort; both are blocked on taking a
-provider, and the groundwork is measured so it does not have to be re-derived.
+Both are in. What unparked them was re-reading the terms rather than any new
+effort — the note below was wrong on the point that mattered.
 
-*Addresses.* The place search is a gazetteer of settlements. Asked for
-"Brīvības iela 32, Rīga" it returns **zero** results — this is not a ranking
-problem, it is the wrong kind of service. Two candidates were measured against
-that query:
+*The map.* This said OpenStreetMap's own tiles forbid app use, leaving MapTiler,
+Stadia or Protomaps: a key, possibly a bill, and a native library that would
+dominate the APK. The policy says something narrower. It prohibits **bulk
+downloading**, defined as "pre-emptive fetching of tiles other than those a user
+is actively viewing", and offline-download features; it requires a "distinct,
+stable User-Agent naming your app", which every request here already carries,
+and attribution shown on the map rather than behind a toggle. Interactive
+viewing is contemplated, not forbidden.
 
-| | address | reverse | terms |
-|---|---|---|---|
-| Photon (komoot) | resolves, with house numbers | yes | free, built for autocomplete, one volunteer-run instance with no availability promise |
-| Nominatim (OSM) | resolves | yes | policy forbids autocomplete use and caps at one request a second — using it the way a search box behaves would be a breach |
+So the constraint is on behaviour and the code is written to it: `visibleTiles`
+returns exactly what the viewport covers and never a ring around it to smooth
+panning, which is the one obvious kindness that would breach it. No dependency
+either — the app already owns Web Mercator for the radar and already draws on a
+canvas, so the picker is a few hundred lines rather than a rendering engine. The
+residual exposure is scale, not conduct: a popular app is heavy however politely
+it behaves, and the answer then is to pay somebody, which is one class to change.
 
-Photon is the only one whose terms fit how a search box works. Reverse
-geocoding matters because it is what turns a dropped pin into a name.
+CARTO was the alternative worth measuring and is now out for the opposite reason
+to the one recorded below: their basemaps grew an API key requirement.
 
-*The map.* A pin needs a basemap, which means a map library and a tile
-provider. OpenStreetMap's own tiles forbid app use, so it is MapTiler, Stadia
-or Protomaps — a key, possibly a bill, and a native library that would dominate
-the APK. That cuts against three things this app has held to: keyless
-providers, a small download, and F-Droid's reproducible builds. It is a real
-decision, not a dependency to add quietly.
+*Addresses.* Photon, as recorded. Measured again against Nominatim on real
+points: both resolve a pin in Mežaparks to a house number on Stendera iela, and
+Nominatim is about three times faster and slightly richer. Photon is used anyway,
+because latency is not the constraint — Nominatim's policy is built around a hard
+rate cap and forbids interactive type-and-see use, while Photon exists for
+exactly that. It is one volunteer-run instance with no promise of being up, so
+nothing depends on an answer arriving: a point is identified by its coordinates
+and merely *described* by its address.
 
-*Shipped in the meantime.* The search box accepts a coordinate pair, which is
-the exact answer both features are ultimately for, and needs no new service.
+It is asked once the map has been still for 700 ms, never during a drag. A pin
+dragged across a city would otherwise fire one lookup per frame at a donated
+server, which is what gets an app blocked — a question of manners rather than of
+rate limits.
 
 **How precipitation probability should be shown.**
 Intensity drives bar height. Probability could be opacity, a second mark, or

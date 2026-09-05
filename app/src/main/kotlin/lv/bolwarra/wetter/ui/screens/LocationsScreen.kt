@@ -65,9 +65,10 @@ fun LocationsRoute(
         PinPicker(
             start = Coordinates(selected.latitude, selected.longitude),
             tiles = viewModel.tiles,
+            nameOf = viewModel::nameOf,
             onCancel = { pinning = false },
-            onConfirm = { point ->
-                viewModel.savePin(point)
+            onConfirm = { point, name ->
+                viewModel.savePin(point, name)
                 pinning = false
                 onBack()
             },
