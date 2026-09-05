@@ -149,6 +149,16 @@ data class ModelReading(
      * that and nothing else.
      */
     val chanceOfRain: Double?,
+    /**
+     * What each model said about precipitation this hour, by position, with a
+     * null where a model did not answer.
+     *
+     * Position is the model, and it means the same model in every reading. That
+     * is the difference between this and [ModelSpread.values], which is compacted
+     * and sorted for statistics: from these one can follow a single model across
+     * the hours, which is what taking a median *at a moment* requires.
+     */
+    val precipitationByModel: List<Double?> = emptyList(),
 )
 
 /** Several models' worth of forecast, hour by hour. */

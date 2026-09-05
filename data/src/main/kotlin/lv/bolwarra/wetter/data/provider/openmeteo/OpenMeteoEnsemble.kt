@@ -77,12 +77,16 @@ internal class OpenMeteoEnsemble(
         val readings = times.mapIndexed { index, epochSeconds ->
             val at = Instant.ofEpochSecond(epochSeconds)
             val temperatureValues = temperatures.mapNotNull { it.getOrNull(index) }
-            val precipitationValues = precipitations.mapNotNull { it.getOrNull(index) }
+            // Aligned, nulls and all: position is the model, and the fusion
+            // follows one model across the hours to interpolate its own trace.
+            val precipitationByModel = precipitations.map { it.getOrNull(index) }
+            val precipitationValues = precipitationByModel.filterNotNull()
             ModelReading(
                 at = at,
                 temperature = ModelAgreement.summarise(at, temperatureValues),
                 precipitation = ModelAgreement.summarise(at, precipitationValues),
                 chanceOfRain = ModelAgreement.probabilityOfPrecipitation(precipitationValues),
+                precipitationByModel = precipitationByModel,
             )
         }
         return ModelEnsemble(readings)

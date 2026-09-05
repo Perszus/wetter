@@ -14,6 +14,8 @@ private data class StoredHour(
     val atEpochSecond: Long,
     /** What each model said, which is what a median has to be taken over. */
     val precipitation: List<Double> = emptyList(),
+    /** By position, nulls kept, so a model can be followed across the hours. */
+    val byModel: List<Double?> = emptyList(),
     val temperature: List<Double> = emptyList(),
     val chanceOfRain: Double? = null,
 )
@@ -47,6 +49,7 @@ internal class EnsembleStore(private val dao: EnsembleDao, private val json: Jso
                 temperature = ModelAgreement.summarise(at, hour.temperature),
                 precipitation = ModelAgreement.summarise(at, hour.precipitation),
                 chanceOfRain = hour.chanceOfRain,
+                precipitationByModel = hour.byModel.ifEmpty { hour.precipitation },
             )
         }
         return Kept(
@@ -60,6 +63,7 @@ internal class EnsembleStore(private val dao: EnsembleDao, private val json: Jso
             StoredHour(
                 atEpochSecond = reading.at.epochSecond,
                 precipitation = reading.precipitation?.values.orEmpty(),
+                byModel = reading.precipitationByModel,
                 temperature = reading.temperature?.values.orEmpty(),
                 chanceOfRain = reading.chanceOfRain,
             )

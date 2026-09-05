@@ -52,6 +52,9 @@ class ModelMedianTest {
                     members.toList(),
                 ),
                 chanceOfRain = null,
+                // By position, because the fusion follows one source across
+                // time to read its own line at a moment.
+                precipitationByModel = members.toList(),
             )
         },
     )
@@ -63,6 +66,67 @@ class ModelMedianTest {
      */
     private fun rateAt(hour: Long, fused: List<FusedPrecipitation>) =
         fused.first { it.at == start.plus(Duration.ofHours(hour)) }.millimetresPerHour
+
+    @Test
+    fun `three sources, one moment, the middle one`() {
+        // The whole rule, at the size it can be checked by eye. Three sources
+        // say 2.0, 1.5 and 1.0 about a quarter to six; the answer for a quarter
+        // to six is 1.5, because it is the middle one.
+        //
+        // A point in time, not an hour. The hour is only where a source happened
+        // to put a number and is not a thing the weather does.
+        val quarterToSix = start.plus(Duration.ofMinutes(45))
+        val fused = PrecipitationFusion.fuse(
+            hourly = emptyList(),
+            radar = emptyList(),
+            from = quarterToSix,
+            step = Duration.ofMinutes(5),
+            steps = 1,
+            ensemble = ensemble(2.0, 1.5, 1.0),
+        )
+
+        assertEquals(1.5, fused.single().millimetresPerHour, 1e-6)
+    }
+
+    @Test
+    fun `the middle is read at the moment, not averaged out of the interval`() {
+        // Where the two orderings part company. One source falls from 4 to 0
+        // across the interval, another sits at 3, a third climbs 0 to 4. At the
+        // halfway point they read 2, 3 and 2, so the middle is 2.
+        //
+        // Taking a middle at each end first and drawing a line through those
+        // would give 3 both ends and therefore 3 in between - a value no source
+        // holds at that moment, which is the one thing a median should never
+        // produce.
+        val falling = listOf(4.0, 0.0)
+        val flat = listOf(3.0, 3.0)
+        val rising = listOf(0.0, 4.0)
+        val readings = (0..1).map { hour ->
+            val at = start.plus(Duration.ofHours(hour.toLong()))
+            val members = listOf(falling[hour], flat[hour], rising[hour])
+            ModelReading(
+                at = at,
+                temperature = null,
+                precipitation = ModelAgreement.summarise(at, members),
+                chanceOfRain = null,
+                precipitationByModel = members,
+            )
+        }
+
+        val halfway = PrecipitationFusion.fuse(
+            hourly = emptyList(),
+            radar = emptyList(),
+            from = start.plus(Duration.ofMinutes(30)),
+            step = Duration.ofMinutes(5),
+            steps = 1,
+            ensemble = ModelEnsemble(readings),
+        ).single().millimetresPerHour
+
+        assertTrue(
+            "the middle at the moment was $halfway, not the middle of the ends",
+            halfway < 2.9,
+        )
+    }
 
     @Test
     fun `six models saying rain outvote the one saying none`() {
@@ -161,6 +225,7 @@ class ModelMedianTest {
                         List(7) { rate },
                     ),
                     chanceOfRain = null,
+                    precipitationByModel = List(7) { rate },
                 )
             },
         )

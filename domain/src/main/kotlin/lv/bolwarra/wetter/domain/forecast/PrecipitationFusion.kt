@@ -156,15 +156,15 @@ object PrecipitationFusion {
         if (steps <= 0 || step.isZero || step.isNegative) return emptyList()
         val rows = hourly.sortedBy { it.timestamp }
         val samples = radar.sortedBy { it.at }
-        // Built once for the whole fusion rather than per step: the median at
-        // each hour the models report, with the provider counted among them.
-        val consensus = modelAnchors(rows, ensemble)
+        // Every source as a line through time. Built once, because a line does
+        // not depend on which point of it is being read.
+        val traces = modelTraces(ensemble)
 
         return (0 until steps).map { index ->
             val at = from.plus(step.multipliedBy(index.toLong()))
             val sample = nearest(samples, at)
             val modelConfidence = ensemble?.precipitationAgreement(at) ?: MODEL_CONFIDENCE
-            val modelRate = curveAt(consensus, at) ?: interpolate(rows, at)
+            val modelRate = medianAt(traces, rows, at)
 
             when {
                 sample == null && modelRate == null -> FusedPrecipitation(at, 0.0, 0.0, 0.0, 0)
@@ -309,62 +309,82 @@ object PrecipitationFusion {
      * With no ensemble - offline, or a place none of them cover - this is the
      * provider alone, exactly as before.
      */
-    private fun modelAnchors(
-        rows: List<HourlyWeather>,
-        ensemble: ModelEnsemble?,
-    ): List<Pair<Instant, Double>> {
-        val readings = ensemble?.readings
-            ?.filter { it.precipitation != null && it.precipitation.values.isNotEmpty() }
-            ?.sortedBy { it.at }
-            .orEmpty()
+    /**
+     * Every source as a line through time.
+     *
+     * The unit of this app is a point in time, not an hour. An hour is only
+     * where a particular source happens to have put a number; it is not a thing
+     * the weather does, and nothing downstream should inherit it. So each source
+     * becomes a continuous line that can be read at any moment, and the hours it
+     * was published at survive only as the points that line passes through.
+     *
+     * Monotone specifically: the line passes through every value the source
+     * actually gave and cannot overshoot between them, so it never dips below
+     * zero on the way from a dry point to a wet one and never invents a peak
+     * higher than anything the source forecast.
+     */
+    private fun modelTraces(ensemble: ModelEnsemble?): List<Trace> {
+        val readings = ensemble?.readings?.sortedBy { it.at }.orEmpty()
+        if (readings.isEmpty()) return emptyList()
 
-        return readings.mapNotNull { reading ->
-            val members = reading.precipitation?.values ?: return@mapNotNull null
-            val provider = interpolate(rows, reading.at)
-            val all = if (provider != null) members + provider else members
-            ModelAgreement.consensusOf(all)?.let { reading.at to it }
+        val sources = readings.maxOf { it.precipitationByModel.size }
+        return (0 until sources).mapNotNull { source ->
+            val points = readings.mapNotNull { reading ->
+                reading.precipitationByModel.getOrNull(source)?.let { reading.at to it }
+            }
+            if (points.size < 2) null else Trace(points)
+        }
+    }
+
+    /** One source's forecast as a line, with the tangents it is drawn through. */
+    private class Trace(private val points: List<Pair<Instant, Double>>) {
+        private val values = points.map { it.second.toFloat() }
+        private val tangents = MonotoneCurve.tangents(values)
+
+        /** What this source says at a moment, or null where it does not reach. */
+        fun valueAt(at: Instant): Double? {
+            val after = points.indexOfFirst { it.first.isAfter(at) }
+            if (after == 0) return null
+            if (after < 0) {
+                val last = points.last()
+                return last.second.takeIf {
+                    Duration.between(last.first, at) <= Duration.ofHours(1)
+                }
+            }
+            val before = points[after - 1]
+            val next = points[after]
+            val span = Duration.between(before.first, next.first).toMillis().toDouble()
+            if (span <= 0) return before.second
+            val into = Duration.between(before.first, at).toMillis().toDouble()
+            return MonotoneCurve.valueAt(values, tangents, after - 1, (into / span).toFloat())
+                .toDouble()
         }
     }
 
     /**
-     * The consensus at a moment, curved through the hours rather than stepped
-     * between them.
+     * The middle of what every source says about one moment.
      *
-     * A lot happens in an hour and the models only speak once in each. Holding
-     * their median flat until the next one turned the chart into a staircase -
-     * one level per hour, no shape, the middle value and nothing else - which is
-     * both ugly and a claim nobody made. No model says the rain is constant from
-     * eight to nine and then changes at the stroke; that was an artefact of
-     * asking them only on the hour and drawing the answer as though it applied
-     * to the whole of it.
+     * Three sources saying 2.0, 1.5 and 1.0 for a quarter to six make 1.5 for a
+     * quarter to six, because it is the middle one. That is the whole rule, and
+     * it is applied to the moment being drawn rather than to some interval the
+     * moment falls in.
      *
-     * The provider's own hours were already drawn through a monotone curve, so
-     * the same one is used here - and monotone specifically, because it passes
-     * through every anchor and cannot overshoot between them. A curve between a
-     * dry hour and a wet one never dips below zero on the way, and never invents
-     * a peak higher than any hour the models actually forecast.
+     * The order matters and was wrong before. Taking a middle for each hour and
+     * drawing a line through those middles is a different operation, because a
+     * median is not linear: the middle of the averages is not the average of the
+     * middles. Reading every line at the point and taking the middle there means
+     * the answer is always a value some source actually holds at that moment,
+     * which is the property a median is picked for.
+     *
+     * The chosen provider is one of the sources rather than something applied
+     * afterwards, so with an even number of them the answer is the mean of the
+     * middle two, exactly as a median is.
      */
-    private fun curveAt(anchors: List<Pair<Instant, Double>>, at: Instant): Double? {
-        if (anchors.isEmpty()) return null
-        val after = anchors.indexOfFirst { it.first.isAfter(at) }
-        if (after == 0) return null
-        if (after < 0) {
-            val last = anchors.last()
-            return last.second.takeIf {
-                Duration.between(last.first, at) <= Duration.ofHours(1)
-            }
-        }
-
-        val before = anchors[after - 1]
-        val next = anchors[after]
-        val span = Duration.between(before.first, next.first).toMillis().toDouble()
-        if (span <= 0) return before.second
-        val into = Duration.between(before.first, at).toMillis().toDouble()
-
-        val values = anchors.map { it.second.toFloat() }
-        val tangents = MonotoneCurve.tangents(values)
-        return MonotoneCurve.valueAt(values, tangents, after - 1, (into / span).toFloat())
-            .toDouble()
+    private fun medianAt(traces: List<Trace>, rows: List<HourlyWeather>, at: Instant): Double? {
+        val provider = interpolate(rows, at)
+        val voices = traces.mapNotNull { it.valueAt(at) }
+        if (voices.isEmpty()) return provider
+        return ModelAgreement.consensusOf(if (provider != null) voices + provider else voices)
     }
 
     fun authorityFor(motionQuality: Float): Duration {
