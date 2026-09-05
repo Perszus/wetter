@@ -156,12 +156,15 @@ object PrecipitationFusion {
         if (steps <= 0 || step.isZero || step.isNegative) return emptyList()
         val rows = hourly.sortedBy { it.timestamp }
         val samples = radar.sortedBy { it.at }
+        // Built once for the whole fusion rather than per step: the median at
+        // each hour the models report, with the provider counted among them.
+        val consensus = modelAnchors(rows, ensemble)
 
         return (0 until steps).map { index ->
             val at = from.plus(step.multipliedBy(index.toLong()))
             val sample = nearest(samples, at)
             val modelConfidence = ensemble?.precipitationAgreement(at) ?: MODEL_CONFIDENCE
-            val modelRate = modelRateAt(rows, ensemble, at)
+            val modelRate = curveAt(consensus, at) ?: interpolate(rows, at)
 
             when {
                 sample == null && modelRate == null -> FusedPrecipitation(at, 0.0, 0.0, 0.0, 0)
@@ -306,16 +309,62 @@ object PrecipitationFusion {
      * With no ensemble - offline, or a place none of them cover - this is the
      * provider alone, exactly as before.
      */
-    private fun modelRateAt(
+    private fun modelAnchors(
         rows: List<HourlyWeather>,
         ensemble: ModelEnsemble?,
-        at: Instant,
-    ): Double? {
-        val provider = interpolate(rows, at)
-        val members = ensemble?.at(at)?.precipitation?.values.orEmpty()
-        if (members.isEmpty()) return provider
-        if (provider == null) return ModelAgreement.consensusOf(members)
-        return ModelAgreement.consensusOf(members + provider)
+    ): List<Pair<Instant, Double>> {
+        val readings = ensemble?.readings
+            ?.filter { it.precipitation != null && it.precipitation.values.isNotEmpty() }
+            ?.sortedBy { it.at }
+            .orEmpty()
+
+        return readings.mapNotNull { reading ->
+            val members = reading.precipitation?.values ?: return@mapNotNull null
+            val provider = interpolate(rows, reading.at)
+            val all = if (provider != null) members + provider else members
+            ModelAgreement.consensusOf(all)?.let { reading.at to it }
+        }
+    }
+
+    /**
+     * The consensus at a moment, curved through the hours rather than stepped
+     * between them.
+     *
+     * A lot happens in an hour and the models only speak once in each. Holding
+     * their median flat until the next one turned the chart into a staircase -
+     * one level per hour, no shape, the middle value and nothing else - which is
+     * both ugly and a claim nobody made. No model says the rain is constant from
+     * eight to nine and then changes at the stroke; that was an artefact of
+     * asking them only on the hour and drawing the answer as though it applied
+     * to the whole of it.
+     *
+     * The provider's own hours were already drawn through a monotone curve, so
+     * the same one is used here - and monotone specifically, because it passes
+     * through every anchor and cannot overshoot between them. A curve between a
+     * dry hour and a wet one never dips below zero on the way, and never invents
+     * a peak higher than any hour the models actually forecast.
+     */
+    private fun curveAt(anchors: List<Pair<Instant, Double>>, at: Instant): Double? {
+        if (anchors.isEmpty()) return null
+        val after = anchors.indexOfFirst { it.first.isAfter(at) }
+        if (after == 0) return null
+        if (after < 0) {
+            val last = anchors.last()
+            return last.second.takeIf {
+                Duration.between(last.first, at) <= Duration.ofHours(1)
+            }
+        }
+
+        val before = anchors[after - 1]
+        val next = anchors[after]
+        val span = Duration.between(before.first, next.first).toMillis().toDouble()
+        if (span <= 0) return before.second
+        val into = Duration.between(before.first, at).toMillis().toDouble()
+
+        val values = anchors.map { it.second.toFloat() }
+        val tangents = MonotoneCurve.tangents(values)
+        return MonotoneCurve.valueAt(values, tangents, after - 1, (into / span).toFloat())
+            .toDouble()
     }
 
     fun authorityFor(motionQuality: Float): Duration {

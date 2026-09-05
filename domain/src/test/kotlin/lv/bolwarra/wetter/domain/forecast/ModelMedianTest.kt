@@ -56,6 +56,11 @@ class ModelMedianTest {
         },
     )
 
+    /**
+     * The tolerance is 1e-6 rather than exact: the consensus is drawn through
+     * the same Float monotone curve the provider's own hours use, so a value
+     * lands within a rounding of itself rather than on it.
+     */
     private fun rateAt(hour: Long, fused: List<FusedPrecipitation>) =
         fused.first { it.at == start.plus(Duration.ofHours(hour)) }.millimetresPerHour
 
@@ -74,7 +79,7 @@ class ModelMedianTest {
 
         // Provider plus members, sorted: 0, 0, 0.4, 0.7, 0.7, 1.3, 1.7, 1.9.
         // Eight values, so the median is the mean of the middle two.
-        assertEquals(0.7, rateAt(0, fused), 1e-9)
+        assertEquals(0.7, rateAt(0, fused), 1e-6)
         assertTrue("a wet evening must not draw as dry", rateAt(0, fused) > 0.1)
     }
 
@@ -93,7 +98,7 @@ class ModelMedianTest {
         )
 
         // 0, 1, 2, 3 -> 1.5. The members alone would have said 2.0.
-        assertEquals(1.5, rateAt(0, fused), 1e-9)
+        assertEquals(1.5, rateAt(0, fused), 1e-6)
     }
 
     @Test
@@ -123,7 +128,7 @@ class ModelMedianTest {
             ensemble = null,
         )
 
-        assertEquals(0.4, rateAt(0, fused), 1e-9)
+        assertEquals(0.4, rateAt(0, fused), 1e-6)
     }
 
     @Test
@@ -137,7 +142,53 @@ class ModelMedianTest {
             ensemble = ensemble(0.5, 0.5, 0.5),
         )
 
-        assertEquals(0.5, rateAt(0, fused), 1e-9)
+        assertEquals(0.5, rateAt(0, fused), 1e-6)
+    }
+
+    @Test
+    fun `the hour has a shape, not a step`() {
+        // A lot happens in an hour and the models only speak once in each.
+        // Holding their median flat until the next one drew the chart as a
+        // staircase - one level per hour, the middle value and nothing else -
+        // which is a claim no model made.
+        val rising = ModelEnsemble(
+            readings = listOf(0.0, 3.0, 0.0).mapIndexed { hour, rate ->
+                ModelReading(
+                    at = start.plus(Duration.ofHours(hour.toLong())),
+                    temperature = null,
+                    precipitation = ModelAgreement.summarise(
+                        start.plus(Duration.ofHours(hour.toLong())),
+                        List(7) { rate },
+                    ),
+                    chanceOfRain = null,
+                )
+            },
+        )
+
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(0.0, 3.0, 0.0),
+            radar = emptyList(),
+            from = start,
+            step = Duration.ofMinutes(10),
+            steps = 12,
+            ensemble = rising,
+        )
+
+        val withinTheHour = fused.take(7).map { it.millimetresPerHour }
+        assertTrue(
+            "the hour should climb, not step: $withinTheHour",
+            withinTheHour.distinct().size > 3,
+        )
+        assertTrue(
+            "and climb in order: $withinTheHour",
+            withinTheHour.zipWithNext().all { (a, b) -> b >= a - 1e-6 },
+        )
+        // Monotone, so it cannot overshoot: nothing between two anchors may
+        // exceed the wetter of them or fall below the drier.
+        assertTrue(
+            "no invented peak: $withinTheHour",
+            withinTheHour.all { it <= 3.0 + 1e-6 && it >= -1e-6 },
+        )
     }
 
     @Test
@@ -152,6 +203,6 @@ class ModelMedianTest {
             ensemble = ensemble(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
         )
 
-        assertEquals(0.0, rateAt(0, fused), 1e-9)
+        assertEquals(0.0, rateAt(0, fused), 1e-6)
     }
 }
