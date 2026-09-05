@@ -207,15 +207,26 @@ class NowcastRepository internal constructor(
     }
 
     /**
-     * Two nearby places share a kept projection, matching how the in-memory
-     * cache already treats them.
+     * Which kept series belongs to a place, to about a hundred metres.
+     *
+     * This is not the same question the in-memory cache asks, and rounding it
+     * the same way was wrong. That cache holds a *projection* - a field over a
+     * whole block of tiles - so two places a kilometre apart may share one and
+     * still each be sampled at their own coordinates by `seriesAt`. What this
+     * key addresses is the opposite: a list of samples already taken at one
+     * point, with no way to re-aim it.
+     *
+     * At two decimals - about 1.1 km - a pin moved a few streets kept the same
+     * key, so opening the app drew the *previous* pin's radar until the fetch
+     * behind it finished. Exactly the "somewhere near you" the map was added to
+     * get away from.
+     *
+     * Three decimals is roughly 110 m, comfortably inside the kilometre a radar
+     * pixel already averages over, so two points that still collide are reading
+     * the same pixel and their samples are genuinely interchangeable. Anything
+     * further apart now gets its own row.
      */
-    private fun cacheKeyOf(location: WeatherLocation): String = String.format(
-        java.util.Locale.ROOT,
-        "%.2f,%.2f",
-        location.latitude,
-        location.longitude,
-    )
+    private fun cacheKeyOf(location: WeatherLocation): String = keyOf(location)
 
     /**
      * Whether it is worth troubling the source at all.
@@ -375,6 +386,17 @@ class NowcastRepository internal constructor(
             kotlin.math.abs(longitude - other.longitude) < GRID_TOLERANCE_DEGREES
 
     companion object {
+        /**
+         * The filing rule itself, on the companion so a test can hold it to
+         * this without an instance and its half-dozen collaborators.
+         */
+        internal fun keyOf(location: WeatherLocation): String = String.format(
+            java.util.Locale.ROOT,
+            "%.3f,%.3f",
+            location.latitude,
+            location.longitude,
+        )
+
         /**
          * Three sweeps: two for the motion, a third so the intensity trend has
          * something to be measured across.
