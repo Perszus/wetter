@@ -93,6 +93,26 @@ class CoordinateQueryTest {
     }
 
     @Test
+    fun `a point named by its coordinates can be typed back in`() {
+        // A pin dropped on a field is named with Coordinates.format, and that
+        // label is the only handle the place has. If the search box could not
+        // read its own naming back, a kept point would be unfindable the moment
+        // it was removed from the list.
+        listOf(
+            Coordinates(56.9496, 24.1052),
+            Coordinates(-33.8688, 151.2093),
+            Coordinates(64.1466, -21.9426),
+            Coordinates(0.0, 0.0),
+        ).forEach { point ->
+            val label = point.format()
+            val parsed = parsed(label)
+            assertNotNull("$label did not parse", parsed)
+            assertEquals(label, point.latitude, parsed!!.latitude, 1e-4)
+            assertEquals(label, point.longitude, parsed.longitude, 1e-4)
+        }
+    }
+
+    @Test
     fun `nonsense is nonsense`() {
         assertNull(parsed(""))
         assertNull(parsed("   "))

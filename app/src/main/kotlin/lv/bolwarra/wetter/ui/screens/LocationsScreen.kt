@@ -23,10 +23,14 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.HairlineRule
@@ -54,6 +59,22 @@ fun LocationsRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
+    var pinning by rememberSaveable { mutableStateOf(false) }
+
+    if (pinning) {
+        PinPicker(
+            start = Coordinates(selected.latitude, selected.longitude),
+            tiles = viewModel.tiles,
+            onCancel = { pinning = false },
+            onConfirm = { point ->
+                viewModel.savePin(point)
+                pinning = false
+                onBack()
+            },
+            modifier = modifier,
+        )
+        return
+    }
 
     LocationsScreen(
         state = state,
@@ -65,6 +86,7 @@ fun LocationsRoute(
             onBack()
         },
         onRemove = viewModel::remove,
+        onPinOnMap = { pinning = true },
         onBack = onBack,
         modifier = modifier,
     )
@@ -86,6 +108,7 @@ fun LocationsScreen(
     onClearQuery: () -> Unit,
     onSelect: (WeatherLocation) -> Unit,
     onRemove: (WeatherLocation) -> Unit,
+    onPinOnMap: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -107,7 +130,20 @@ fun LocationsScreen(
             onClear = onClearQuery,
             onSubmit = { keyboard?.hide() },
         )
-        Spacer(Modifier.height(spacing.m))
+        Spacer(Modifier.height(spacing.s))
+
+        // Under the search box rather than behind a menu, because it answers
+        // the question the search box just failed at. A gazetteer knows
+        // settlements; somebody looking for their own street finds nothing and
+        // needs to be told, here, that there is another way to say where.
+        TextButton(onClick = onPinOnMap) {
+            Text(
+                text = stringResource(R.string.locations_pin_on_map),
+                style = WetterTheme.type.body,
+                color = colors.textSecondary,
+            )
+        }
+        Spacer(Modifier.height(spacing.s))
 
         // Deduplicated by the same function that keys the list, so the two
         // cannot disagree about what one place is - which is exactly how this
@@ -292,6 +328,7 @@ private fun LocationsPreview() {
             onClearQuery = {},
             onSelect = {},
             onRemove = {},
+            onPinOnMap = {},
             onBack = {},
         )
     }

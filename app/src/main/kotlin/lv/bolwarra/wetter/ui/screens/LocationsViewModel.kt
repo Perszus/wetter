@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.time.ZoneId
 import java.util.Locale
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -17,8 +18,13 @@ import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.BuiltInLocations
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.map.MapTileSource
+import lv.bolwarra.wetter.data.repository.WeatherRepository
+import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.location.PlaceSearch
 import lv.bolwarra.wetter.domain.model.WeatherLocation
+import lv.bolwarra.wetter.ui.map.BasemapLoader
+import lv.bolwarra.wetter.ui.map.TileLoader
 
 /** What the locations screen is showing. */
 /**
@@ -72,7 +78,12 @@ class LocationsViewModel(
     private val selectedLocation: SelectedLocationStore,
     private val placeSearch: PlaceSearch,
     private val savedLocations: SavedLocationStore,
+    private val repository: WeatherRepository,
+    basemap: MapTileSource,
 ) : ViewModel() {
+
+    /** Tiles for the pin picker, cached for as long as this screen lives. */
+    val tiles: TileLoader = BasemapLoader(basemap)
 
     private val query = MutableStateFlow("")
     private val searching = MutableStateFlow(false)
@@ -158,6 +169,38 @@ class LocationsViewModel(
     fun select(location: WeatherLocation) {
         selectedLocation.select(location)
         viewModelScope.launch { savedLocations.save(location) }
+    }
+
+    /**
+     * Keep the exact point somebody put a pin on.
+     *
+     * A coordinate has no timezone, and [WeatherLocation] needs one because
+     * "18:00" on a forecast means 18:00 *there*. Nothing on the device knows
+     * which zone an arbitrary point is in - that is a map of political
+     * boundaries, not arithmetic - so the answer comes from the one request the
+     * app was about to make anyway: Open-Meteo resolves the zone from the
+     * coordinates and the forecast comes back carrying it.
+     *
+     * The device's own zone stands in until that lands, and is corrected rather
+     * than kept: a pin dropped across a border would otherwise read every hour
+     * of its forecast against the wrong clock forever. Both spellings share a
+     * cache key - which is coordinates only - so the request made under the
+     * provisional zone is not wasted.
+     */
+    fun savePin(at: Coordinates) {
+        viewModelScope.launch {
+            val provisional = WeatherLocation(
+                name = at.format(),
+                latitude = at.latitude,
+                longitude = at.longitude,
+                zone = ZoneId.systemDefault(),
+            )
+            val resolved = repository.refresh(provisional).getOrNull()?.location ?: provisional
+            val point = provisional.copy(zone = resolved.zone)
+
+            savedLocations.save(point)
+            selectedLocation.select(point)
+        }
     }
 
     /** Forget a kept place. Never touches which one is selected. */

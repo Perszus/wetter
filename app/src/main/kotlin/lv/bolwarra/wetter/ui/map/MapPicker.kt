@@ -133,25 +133,51 @@ fun MapPicker(
     }
 }
 
-/** Where the point being chosen is, which is always the middle. */
+/**
+ * Where the point being chosen is, which is always the middle.
+ *
+ * Drawn in fixed black and white rather than in any palette tone, and this is
+ * the whole reason it needs a comment. The app's tones are solved for contrast
+ * against its own plate, and the first version used `textPrimary` - which in
+ * dark mode is very nearly white, and which was therefore invisible against a
+ * basemap that is light whatever theme the phone is in. A map is not our
+ * surface: it is somebody else's picture, mostly pale, with dark roads and
+ * black labels running through it, and nothing that varies with our theme can
+ * be relied on to show up on it.
+ *
+ * So the mark carries its own contrast: a white ring with a dark ring inside it,
+ * which reads on pale fields, on grey streets and on the black of a label.
+ */
 @Composable
 private fun BoxScope.Crosshair(density: Float) {
-    val colors = WetterTheme.colors
     androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
         val centre = androidx.compose.ui.geometry.Offset(
             this.size.width / 2f,
             this.size.height / 2f,
         )
+        val stroke = PIN_STROKE_DP * density
         val radius = PIN_RADIUS_DP * density
+
         // A ring rather than a filled dot: the point being chosen is the ground
         // underneath, and a solid marker hides the thing it is marking.
         drawCircle(
-            color = colors.textPrimary,
+            color = androidx.compose.ui.graphics.Color.White,
+            radius = radius + stroke,
+            center = centre,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke * 2f),
+        )
+        drawCircle(
+            color = PIN_INK,
             radius = radius,
             center = centre,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(width = PIN_STROKE_DP * density),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = stroke),
         )
-        drawCircle(color = colors.textPrimary, radius = PIN_DOT_DP * density, center = centre)
+        drawCircle(
+            color = androidx.compose.ui.graphics.Color.White,
+            radius = PIN_DOT_DP * density + stroke * 0.6f,
+            center = centre,
+        )
+        drawCircle(color = PIN_INK, radius = PIN_DOT_DP * density, center = centre)
     }
 }
 
@@ -309,6 +335,9 @@ private const val MAX_ZOOM = 17
 
 private const val ZOOM_IN_AT = 1.15f
 private const val ZOOM_OUT_AT = 0.87f
+
+/** Not quite black, so it reads as ink on a map rather than a hole in it. */
+private val PIN_INK = androidx.compose.ui.graphics.Color(0xFF1A1A1A)
 
 private const val PIN_RADIUS_DP = 11f
 private const val PIN_STROKE_DP = 2f

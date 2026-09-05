@@ -1,7 +1,35 @@
 package lv.bolwarra.wetter.domain.location
 
+import java.util.Locale
+import kotlin.math.abs
+
 /** A point on the earth, as typed. */
-data class Coordinates(val latitude: Double, val longitude: Double)
+data class Coordinates(val latitude: Double, val longitude: Double) {
+
+    /**
+     * A name for a point that has none.
+     *
+     * A pin dropped on a field has no settlement to be named after, and the app
+     * needs something to put at the top of the screen and in the list of kept
+     * places. Four decimals is about eleven metres, which is finer than anything
+     * downstream resolves and coarse enough to read.
+     *
+     * Hemisphere letters rather than signs, because this is a label rather than
+     * a value - and because [CoordinateQuery] reads this form back, so a place
+     * named this way can be typed into the search box and found again.
+     */
+    fun format(): String {
+        val ns = if (latitude >= 0) 'N' else 'S'
+        val ew = if (longitude >= 0) 'E' else 'W'
+        return "%.4f°%s, %.4f°%s".format(
+            Locale.ROOT,
+            abs(latitude),
+            ns,
+            abs(longitude),
+            ew,
+        )
+    }
+}
 
 /**
  * Recognising a coordinate pair in the search box.

@@ -254,4 +254,10 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="widget_rain_label">Rain</string>
     <string name="widget_rain_description">Rain for the next four hours</string>
 
+    <!-- Putting a point on the map -->
+    <string name="locations_pin_on_map">Put a point on the map</string>
+    <string name="locations_pin_title">Point on the map</string>
+    <string name="locations_pin_confirm">Use this point</string>
+    <string name="locations_pin_cancel">Cancel</string>
+
 </resources>

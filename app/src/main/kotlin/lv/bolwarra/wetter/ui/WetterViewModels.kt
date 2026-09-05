@@ -33,6 +33,8 @@ object WetterViewModels {
                 container.selectedLocation,
                 container.placeSearch,
                 container.savedLocations,
+                container.repository,
+                container.basemap,
             )
         }
     }
