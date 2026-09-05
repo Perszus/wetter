@@ -91,6 +91,19 @@ internal data class ForecastRecordEntity(
     val predicted: Double,
     /** Null until the hour has passed and an observation has been found. */
     val observed: Double?,
+    /**
+     * How much the projection believed itself, 0..1, and how well the two
+     * sweeps it was built from actually matched.
+     *
+     * Both null for anything that is not a radar projection. They are here
+     * because an error is only worth learning from if something distinguishes
+     * the times it happens from the times it does not: sixteen hours of records
+     * showed the nowcast over-forecasting more the further ahead it looked, and
+     * with these it becomes possible to ask whether that is the extrapolation
+     * decaying or simply a poor motion estimate being carried forward.
+     */
+    val confidence: Double? = null,
+    val motionQuality: Double? = null,
 )
 
 /**
@@ -215,6 +228,25 @@ internal interface ForecastRecordDao {
         earliestEpochSecond: Long,
     ): List<ForecastRecordEntity>
 
+    /**
+     * When the oldest unsettled claim from one source was due, if any.
+     *
+     * Used to decide how far back to fetch sweeps. A claim can only be marked
+     * while a frame near its moment is in hand, so after the device has slept
+     * the backlog needs sweeps older than a routine run would bother with.
+     */
+    @Query(
+        "SELECT MIN(validAtEpochSecond) FROM forecast_records " +
+            "WHERE observed IS NULL AND source = :source " +
+            "AND validAtEpochSecond <= :nowEpochSecond " +
+            "AND validAtEpochSecond >= :earliestEpochSecond",
+    )
+    suspend fun oldestAwaiting(
+        source: String,
+        nowEpochSecond: Long,
+        earliestEpochSecond: Long,
+    ): Long?
+
     @Query("UPDATE forecast_records SET observed = :observed WHERE id = :id")
     suspend fun markVerified(id: Long, observed: Double)
 
@@ -283,7 +315,7 @@ internal interface SelectedLocationDao {
         RadarSeriesEntity::class,
         ProviderHealthEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -393,6 +425,21 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Two columns describing how much a projection deserved to be believed.
+         *
+         * Added rather than the table rebuilt, so the weeks of records already
+         * in there survive - they are the whole reason this database stopped
+         * having a destructive fallback. Existing rows get null, which reads
+         * correctly as "nobody wrote this down at the time".
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE `forecast_records` ADD COLUMN `confidence` REAL")
+                connection.execSQL("ALTER TABLE `forecast_records` ADD COLUMN `motionQuality` REAL")
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -408,7 +455,13 @@ internal abstract class WetterDatabase : RoomDatabase() {
             // it would silently throw away everything the app had learned
             // about this location. Every schema change from here needs a
             // migration.
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+            )
             .build()
     }
 }

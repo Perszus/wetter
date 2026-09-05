@@ -129,10 +129,34 @@ class VerificationRepository internal constructor(
                     variable = VerifiedVariable.PRECIPITATION.name,
                     predicted = sample.millimetresPerHour.toDouble(),
                     observed = null,
+                    // Written down at the time, because afterwards there is no
+                    // way to recover how much this projection deserved to be
+                    // believed - and an error is only worth learning from if
+                    // something separates the times it happens from the times
+                    // it does not.
+                    confidence = sample.confidence.toDouble(),
+                    motionQuality = sample.motionQuality.toDouble(),
                 )
             }
         if (rows.isNotEmpty()) dao.write(rows)
     }
+
+    /**
+     * How far back unsettled radar claims reach, or null if there are none.
+     *
+     * A claim can only be marked while a sweep near its moment is in hand, so a
+     * routine run - which carries half an hour of them - settles nothing that
+     * came due while the device was asleep. Measured over sixteen hours on a
+     * phone, that showed up as a settle rate falling from 77% at five minutes
+     * out to 19% at two hours, purely because the long leads came due in the
+     * gaps. Asking this lets a run reach back far enough to clear what it
+     * missed.
+     */
+    suspend fun oldestUnsettledNowcast(now: Instant): Instant? = dao.oldestAwaiting(
+        source = NOWCAST_SOURCE,
+        nowEpochSecond = now.epochSecond,
+        earliestEpochSecond = now.minus(NOWCAST_HORIZON).epochSecond,
+    )?.let(Instant::ofEpochSecond)
 
     /**
      * Settle outstanding radar predictions against a sweep that has now landed.

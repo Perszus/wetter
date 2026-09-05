@@ -126,7 +126,19 @@ class NowcastRepository internal constructor(
             return@withLock held.nowcast
         }
 
-        val frames = source.recentFrames(location.latitude, location.longitude, FRAMES)
+        // Reach back far enough to mark what the last sleep left outstanding.
+        //
+        // FRAMES is what the projection needs: two sweeps for the motion and a
+        // third so the trend has something to be measured across, half an hour
+        // in all. That is also all a run could ever settle, and claims run two
+        // hours ahead - so anything coming due while the device dozed was
+        // unmarkable by the time anything woke up, and the record thinned out
+        // exactly at the long leads where the error is largest.
+        //
+        // Extra sweeps are fetched only when something is actually waiting for
+        // them, which after a normal fifteen-minute run is nothing at all.
+        val frames = source
+            .recentFrames(location.latitude, location.longitude, framesNeeded(now))
             .getOrNull()
             .orEmpty()
         // Off the main thread, because this is the heaviest arithmetic in the
@@ -173,8 +185,7 @@ class NowcastRepository internal constructor(
             runCatching {
                 // Settled against every frame in hand, not just the newest.
                 //
-                // Each fetch brings back two hours of sweeps, and every one is
-                // an observation at a known time. Marking only the latest meant
+                // Every sweep in hand is an observation at a known time. Marking only the latest meant
                 // a claim was settled only when a sweep happened to land on the
                 // minute it was about - and the background worker wakes every
                 // thirty minutes, so in ordinary use the only leads ever scored
@@ -204,6 +215,23 @@ class NowcastRepository internal constructor(
     /** Drop projections too old to contain anything still ahead. */
     suspend fun prune() {
         seriesStore?.prune(Instant.now(clock).minus(KEEP_FOR))
+    }
+
+    /**
+     * How many sweeps to ask for: the projection's own needs, plus whatever it
+     * takes to reach the oldest claim still waiting to be marked.
+     *
+     * Capped, because each sweep is a block of tiles fetched and decoded. Two
+     * hours is the horizon claims are made over, so nothing older is worth
+     * reaching for - beyond it the claim is unmarkable whatever we fetch.
+     */
+    private suspend fun framesNeeded(now: Instant): Int {
+        val oldest = verification?.oldestUnsettledNowcast(now) ?: return FRAMES
+        val behind = Duration.between(oldest, now)
+        if (behind <= ROUTINE_REACH) return FRAMES
+
+        val extra = (behind.toMinutes() / SWEEP_MINUTES).toInt()
+        return (FRAMES + extra).coerceAtMost(MAX_FRAMES)
     }
 
     /**
@@ -463,6 +491,19 @@ class NowcastRepository internal constructor(
 
         /** Model runs publish hourly, so anything fresher gets the same numbers. */
         val ENSEMBLE_FRESH_FOR: Duration = Duration.ofHours(1)
+
+        /** What FRAMES alone already covers, so no catching up is needed. */
+        private val ROUTINE_REACH: Duration = Duration.ofMinutes(30)
+
+        /** RainViewer publishes on a ten-minute cadence. */
+        private const val SWEEP_MINUTES = 10L
+
+        /**
+         * Two hours of sweeps, which is the horizon claims are made over. Past
+         * this there is nothing left to settle, and each frame costs a block of
+         * tiles fetched and decoded.
+         */
+        private const val MAX_FRAMES = 13
 
         /** About a kilometre, the scale a radar pixel already averages over. */
         private const val GRID_TOLERANCE_DEGREES = 0.01

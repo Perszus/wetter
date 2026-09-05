@@ -51,6 +51,18 @@ class NowcastScoringTest {
                 it.validAtEpochSecond >= earliestEpochSecond
         }
 
+        override suspend fun oldestAwaiting(
+            source: String,
+            nowEpochSecond: Long,
+            earliestEpochSecond: Long,
+        ): Long? = rows
+            .filter {
+                it.observed == null &&
+                    it.source == source &&
+                    it.validAtEpochSecond in earliestEpochSecond..nowEpochSecond
+            }
+            .minOfOrNull { it.validAtEpochSecond }
+
         override suspend fun markVerified(id: Long, observed: Double) {
             val index = rows.indexOfFirst { it.id == id }
             if (index >= 0) rows[index] = rows[index].copy(observed = observed)
