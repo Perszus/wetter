@@ -9,6 +9,7 @@ import lv.bolwarra.wetter.data.db.WetterDatabase
 import lv.bolwarra.wetter.data.location.OpenMeteoGeocoder
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
+import lv.bolwarra.wetter.data.map.MapTileSource
 import lv.bolwarra.wetter.data.network.WetterHttpClient
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
 import lv.bolwarra.wetter.data.provider.metar.MetarObservationSource
@@ -165,6 +166,9 @@ class WeatherData(
     }
 
     /** Finding a place by name. */
+    /** Tiles for the map a pin is dropped on. Not weather; see MapTileSource. */
+    val basemap: MapTileSource by lazy { MapTileSource(httpClient) }
+
     val placeSearch: PlaceSearch by lazy { OpenMeteoGeocoder(httpClient) }
 
     /** The places somebody has kept, so search is used once rather than daily. */
