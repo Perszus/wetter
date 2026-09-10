@@ -343,6 +343,17 @@ Notable changes to Wetter. The format follows
 
 ### Fixed
 
+- **Drizzle and rain were the same drawing at two lengths.** Same cloud, same
+  three marks in the same places, one set half as long as the other — visible
+  side by side and not visible at all in a week row, where a cloud with marks
+  under it simply reads as rain. It mattered more than a drawing usually would,
+  because the app had just been taught to reserve the *word* rain for rain worth
+  naming: the bar would say rain starts Wednesday while Sunday's drizzle still
+  looked like rain. Drizzle is now drawn as suspended droplets rather than
+  falling streaks — a difference of kind, which survives being small, and which
+  is what drizzle is. It brings the rain pair up to the snow pair, where grains
+  and crystals were already told apart properly.
+
 - **The app had three ideas of how hard it was raining, and they disagreed on
   screen.** A provider's symbol claims both what is falling and how hard; the app
   measures the second for itself; nothing reconciled them. On a real forecast for

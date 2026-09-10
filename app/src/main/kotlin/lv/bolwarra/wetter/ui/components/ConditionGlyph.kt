@@ -113,9 +113,12 @@ private fun DrawScope.drawCondition(condition: WeatherCondition, ink: Color, wet
                 bands(s, ink)
             }
 
+            // Droplets, not short streaks. See [droplets]: this and RAIN were
+            // the same drawing at two lengths, which is not a difference at the
+            // size a week row gives a glyph.
             WeatherCondition.DRIZZLE -> {
                 cloud(s * 0.5f, s * 0.56f, s * 0.72f, ink)
-                drops(s, count = 3, length = s * 0.10f, colour = wet)
+                droplets(s, at = spread(3), colour = wet)
             }
 
             WeatherCondition.RAIN -> {
@@ -253,6 +256,35 @@ private fun DrawScope.drops(
             strokeWidth = s * STROKE,
             cap = StrokeCap.Round,
         )
+    }
+}
+
+/**
+ * Drizzle, as suspended droplets rather than falling streaks.
+ *
+ * This and rain used to be one drawing at two lengths - the same cloud, the same
+ * three marks in the same places, one set half as long as the other. Side by
+ * side the difference is visible; alone in a week row at a couple of dozen
+ * device-independent pixels it is not, and a reader seeing a cloud with marks
+ * under it reads rain.
+ *
+ * That was reported from use, and it mattered more than a drawing usually would:
+ * the app had just been taught to reserve the *word* rain for rain worth naming,
+ * so the bar would say rain starts on Wednesday while Sunday's drizzle still
+ * looked like rain. The vocabulary was right and the picture was not.
+ *
+ * Round marks rather than long ones, because the difference is then one of kind
+ * and survives being small. It is also what drizzle is: droplets fine enough to
+ * hang in the air rather than fall through it. The same distinction the snow
+ * pair already makes, where grains are dots and snow is crystals - this only
+ * brings the rain pair up to it.
+ *
+ * Slightly larger than a snow grain, and set a little higher, so a drizzle glyph
+ * is not mistaken for a snow-grain one either.
+ */
+private fun DrawScope.droplets(s: Float, at: FloatArray, colour: Color) {
+    at.forEach { x ->
+        drawCircle(colour, s * 0.055f, Offset(s * x, s * 0.80f))
     }
 }
 
