@@ -24,6 +24,9 @@ import lv.bolwarra.wetter.domain.hazard.Hazards
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.WeatherCondition
+import lv.bolwarra.wetter.domain.settings.PrecipitationUnit
+import lv.bolwarra.wetter.domain.settings.TemperatureUnit
+import lv.bolwarra.wetter.domain.settings.WindUnit
 import lv.bolwarra.wetter.domain.sky.TideState
 
 /**
@@ -45,8 +48,8 @@ const val NO_READING: String = "\u2014"
  * without a space. The unit letter is shown once in the header rather than after
  * every number.
  */
-fun formatTemperature(celsius: Double?): String =
-    if (celsius == null) NO_READING else "${celsius.roundToInt()}\u00b0"
+fun formatTemperature(celsius: Double?, unit: TemperatureUnit): String =
+    if (celsius == null) NO_READING else "${unit.from(celsius).roundToInt()}°"
 
 /**
  * A temperature adjustment, signed and to one decimal.
@@ -56,25 +59,45 @@ fun formatTemperature(celsius: Double?): String =
  * rounding it the way a reading is rounded would turn most corrections into
  * "0" or hide which way they went.
  */
-fun formatTemperatureDelta(celsius: Double): String {
+fun formatTemperatureDelta(celsius: Double, unit: TemperatureUnit): String {
     val sign = if (celsius > 0) "+" else "−"
-    return "$sign${String.format(Locale.getDefault(), "%.1f", kotlin.math.abs(celsius))}°"
+    // Converted as a difference, not as a reading. A degree of bias is 1.8 F,
+    // not 33.8 - see TemperatureUnit.difference.
+    val magnitude = kotlin.math.abs(unit.difference(celsius))
+    return "$sign${String.format(Locale.getDefault(), "%.1f", magnitude)}°"
 }
 
-/** Millimetres, to one decimal below 10 and whole above it. */
-fun formatMillimetres(mm: Double?): String = when {
-    mm == null -> NO_READING
-    mm < 10.0 -> String.format(Locale.getDefault(), "%.1f", mm)
-    else -> mm.roundToInt().toString()
+/**
+ * Rain, to one decimal below ten and whole above it.
+ *
+ * Inches keep their decimals throughout: the "whole above ten" rule exists
+ * because a tenth of a millimetre stops mattering once there are ten of them,
+ * and ten inches of rain in a day is not a number this app will ever draw.
+ */
+fun formatMillimetres(mm: Double?, unit: PrecipitationUnit): String {
+    if (mm == null) return NO_READING
+    val value = unit.from(mm)
+    return when {
+        unit == PrecipitationUnit.INCHES || value < WHOLE_ABOVE ->
+            String.format(Locale.getDefault(), "%.${unit.decimals}f", value)
+        else -> value.roundToInt().toString()
+    }
 }
+
+/** Above this a decimal place on rainfall is noise. */
+private const val WHOLE_ABOVE = 10.0
 
 /** "4.2 mm", or an em dash. Used where the unit is not already in the label. */
-fun formatMillimetresWithUnit(mm: Double?): String =
-    if (mm == null) NO_READING else "${formatMillimetres(mm)} mm"
+fun formatMillimetresWithUnit(mm: Double?, unit: PrecipitationUnit): String =
+    if (mm == null) NO_READING else "${formatMillimetres(mm, unit)} ${unit.label}"
 
-/** Whole metres per second. Sub-unit precision on wind is noise. */
-fun formatWindSpeed(metresPerSecond: Double?): String =
-    if (metresPerSecond == null) NO_READING else "${metresPerSecond.roundToInt()} m/s"
+/** Whole units. Sub-unit precision on wind is noise in any of them. */
+fun formatWindSpeed(metresPerSecond: Double?, unit: WindUnit): String =
+    if (metresPerSecond == null) {
+        NO_READING
+    } else {
+        "${unit.from(metresPerSecond).roundToInt()} ${unit.label}"
+    }
 
 fun formatPercent(value: Int?): String = if (value == null) NO_READING else "$value%"
 

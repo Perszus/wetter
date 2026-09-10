@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.db.WetterDatabase
+import lv.bolwarra.wetter.data.location.DeviceLocation
 import lv.bolwarra.wetter.data.location.OpenMeteoGeocoder
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
@@ -25,6 +26,7 @@ import lv.bolwarra.wetter.data.repository.AirQualityRepository
 import lv.bolwarra.wetter.data.repository.ClimatologyRepository
 import lv.bolwarra.wetter.data.repository.EnsembleStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
+import lv.bolwarra.wetter.data.repository.PreferencesStore
 import lv.bolwarra.wetter.data.repository.ProviderHealthStore
 import lv.bolwarra.wetter.data.repository.RadarSeriesStore
 import lv.bolwarra.wetter.data.repository.RoomForecastCache
@@ -120,6 +122,12 @@ class WeatherData(
             scope = scope,
         )
     }
+
+    /** One location fix, when the reader asks for one and never otherwise. */
+    val deviceLocation: DeviceLocation by lazy { DeviceLocation(appContext) }
+
+    /** What the reader has chosen: units, and which plate to draw on. */
+    val preferences: PreferencesStore by lazy { PreferencesStore(database.preferences()) }
 
     /**
      * What each date usually does here, for the far end of the Month page.

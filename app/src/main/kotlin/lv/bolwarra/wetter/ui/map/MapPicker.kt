@@ -1,33 +1,43 @@
 package lv.bolwarra.wetter.ui.map
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.floor
 import kotlin.math.roundToInt
-import kotlinx.coroutines.flow.collectLatest
+import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
@@ -52,17 +62,26 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * Attribution is drawn on the map, bottom-right, and not behind a toggle,
  * because the licence asks for exactly that.
  *
- * ### The pin does not move
+ * ### Look first, then choose
  *
- * The crosshair is fixed at the centre and the map moves under it. Dragging a
- * marker means the thing you are aiming with is under your thumb at the moment
- * you need to see it; moving the map instead keeps the target visible
- * throughout, and the point being chosen is always the middle of the screen.
+ * The map used to have a crosshair welded to the middle, and whatever sat under
+ * it was the answer. That made every pan a commitment: no way to move the map to
+ * see somewhere without also choosing it, and no way to look at a place you had
+ * not picked. Worse, a point was always chosen — the screen opened already
+ * claiming an answer nobody had given.
+ *
+ * The two are separate now. Pan and pinch as much as you like and nothing is
+ * chosen; one tap puts the pin where you tapped, and it then stays on that
+ * ground while the map moves under it. Tapping again moves it.
+ *
+ * The pin being *on the map* rather than on the screen is the whole of the
+ * change: it is a mark on a place, so it travels with the place.
  */
 @Composable
 fun MapPicker(
     centre: Coordinates,
-    onCentreChanged: (Coordinates) -> Unit,
+    chosen: Coordinates?,
+    onPick: (Coordinates) -> Unit,
     tiles: TileLoader,
     modifier: Modifier = Modifier,
 ) {
@@ -78,13 +97,10 @@ fun MapPicker(
     // through two trigonometric conversions.
     var world by remember { mutableStateOf(Mercator.worldOf(centre, zoom)) }
 
-    LaunchedEffect(zoom) { world = Mercator.worldOf(centre, zoom) }
-
-    LaunchedEffect(Unit) {
-        snapshotFlow { world to zoom }.collectLatest { (at, level) ->
-            onCentreChanged(Mercator.coordinatesOf(at, level))
-        }
-    }
+    // Re-centred when the caller moves the map from outside, which is what "use
+    // my current location" does. Keyed on the coordinate rather than fired once,
+    // so pressing it again after wandering off brings the map back.
+    LaunchedEffect(centre) { world = Mercator.worldOf(centre, zoom) }
 
     val loaded = remember { mutableStateOf<Map<TileKey, ImageBitmap>>(emptyMap()) }
     val wanted = if (size == IntSize.Zero) {
@@ -123,18 +139,98 @@ fun MapPicker(
                     world = WorldPoint(world.x - pan.x, world.y - pan.y)
                         .clampedTo(zoom)
                 }
+            }
+            // A second handler, so a tap that is really the end of a drag is not
+            // read as a choice: detectTapGestures fires only when the pointer
+            // went down and came up without travelling, and the handler above
+            // consumes anything that moved.
+            //
+            // Keyed on nothing, which matters. It was keyed on the map position
+            // at first, which restarts the whole gesture detector on every frame
+            // of a pan - the position changes continuously while a finger is
+            // down. The values below are read through their state delegates, so
+            // they are already current at the moment the tap lands and the keys
+            // bought nothing but the churn.
+            .pointerInput(Unit) {
+                detectTapGestures { at ->
+                    onPick(Mercator.coordinatesOf(screenToWorld(at, world, size), zoom))
+                }
             },
     ) {
         androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
             drawTiles(wanted, loaded.value, world, size)
         }
-        Crosshair(density)
+        if (chosen != null) {
+            Pin(at = worldToScreen(Mercator.worldOf(chosen, zoom), world, size), density = density)
+        }
+        ZoomControls(
+            canZoomIn = zoom < MAX_ZOOM,
+            canZoomOut = zoom > MIN_ZOOM,
+            onZoom = { step ->
+                val next = (zoom + step).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                if (next != zoom) {
+                    // Zoom about the middle of the screen: the map stays looking
+                    // at what it was looking at, just closer.
+                    val here = Mercator.coordinatesOf(world, zoom)
+                    zoom = next
+                    world = Mercator.worldOf(here, next)
+                }
+            },
+        )
         Attribution()
     }
 }
 
+/** Where a point on the screen falls on the world plane. */
+private fun screenToWorld(at: Offset, world: WorldPoint, size: IntSize): WorldPoint =
+    WorldPoint(world.x - size.width / 2f + at.x, world.y - size.height / 2f + at.y)
+
+/** And back, so a chosen place can be drawn wherever the map has carried it. */
+private fun worldToScreen(point: WorldPoint, world: WorldPoint, size: IntSize): Offset =
+    Offset(point.x - (world.x - size.width / 2f), point.y - (world.y - size.height / 2f))
+
 /**
- * Where the point being chosen is, which is always the middle.
+ * Plus and minus, because a pinch is a two-handed gesture.
+ *
+ * The map had pinch and nothing else, which is fine on a table and awkward on a
+ * phone held in one hand — and undiscoverable, since nothing on screen said the
+ * map could zoom at all. Two buttons say it, and can be worked with a thumb.
+ *
+ * Bottom-left, opposite the attribution, which is the one thing on this map that
+ * is not allowed to move.
+ */
+@Composable
+private fun BoxScope.ZoomControls(canZoomIn: Boolean, canZoomOut: Boolean, onZoom: (Int) -> Unit) {
+    Column(
+        modifier = Modifier.align(Alignment.BottomStart).padding(ZOOM_INSET),
+        verticalArrangement = Arrangement.spacedBy(ZOOM_GAP),
+    ) {
+        ZoomButton(stringResource(R.string.map_zoom_in), "+", canZoomIn) { onZoom(1) }
+        ZoomButton(stringResource(R.string.map_zoom_out), "−", canZoomOut) { onZoom(-1) }
+    }
+}
+
+@Composable
+private fun ZoomButton(description: String, glyph: String, enabled: Boolean, onClick: () -> Unit) {
+    androidx.compose.material3.Text(
+        text = glyph,
+        style = WetterTheme.type.headline,
+        // Fixed inks, for the same reason the pin has them: a basemap is somebody
+        // else's picture, and nothing that varies with our theme can be relied on
+        // to show up on it.
+        color = if (enabled) PIN_INK else PIN_INK.copy(alpha = ZOOM_DISABLED),
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .size(ZOOM_BUTTON)
+            .clip(RoundedCornerShape(ZOOM_RADIUS))
+            .background(Color.White.copy(alpha = ZOOM_SCRIM))
+            .clickable(enabled = enabled, onClickLabel = description, onClick = onClick)
+            .wrapContentHeight(Alignment.CenterVertically),
+    )
+}
+
+/**
+ * The point that has been chosen, drawn where it actually is.
  *
  * Drawn in fixed black and white rather than in any palette tone, and this is
  * the whole reason it needs a comment. The app's tones are solved for contrast
@@ -149,12 +245,9 @@ fun MapPicker(
  * which reads on pale fields, on grey streets and on the black of a label.
  */
 @Composable
-private fun BoxScope.Crosshair(density: Float) {
+private fun BoxScope.Pin(at: Offset, density: Float) {
     androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-        val centre = androidx.compose.ui.geometry.Offset(
-            this.size.width / 2f,
-            this.size.height / 2f,
-        )
+        val centre = at
         val stroke = PIN_STROKE_DP * density
         val radius = PIN_RADIUS_DP * density
 
@@ -344,3 +437,12 @@ private const val PIN_STROKE_DP = 2f
 private const val PIN_DOT_DP = 2.5f
 
 private const val ATTRIBUTION_SCRIM = 0.7f
+
+private val ZOOM_BUTTON = 40.dp
+private val ZOOM_RADIUS = 8.dp
+private val ZOOM_INSET = 8.dp
+private val ZOOM_GAP = 6.dp
+
+/** Opaque enough to read a glyph on, sheer enough to keep the map underneath. */
+private const val ZOOM_SCRIM = 0.86f
+private const val ZOOM_DISABLED = 0.3f

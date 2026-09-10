@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import lv.bolwarra.wetter.domain.settings.Preferences
 import lv.bolwarra.wetter.ui.WetterApp
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
@@ -17,11 +20,21 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  */
 class MainActivity : ComponentActivity() {
 
+    private val container: WetterContainer
+        get() = (application as WetterApplication).container
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            WetterTheme {
+            // Read here rather than inside the theme, so there is exactly one
+            // place the choice enters the app and everything below - including
+            // the second WetterTheme the weather screen applies for the sky -
+            // inherits it.
+            val units by container.preferences.preferences
+                .collectAsStateWithLifecycle(initialValue = Preferences())
+
+            WetterTheme(units = units) {
                 WetterApp()
             }
         }

@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -126,6 +127,7 @@ fun WeatherPlate(
     explaining: PlateMark? = null,
     onExplain: (PlateMark?) -> Unit = {},
 ) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
@@ -203,8 +205,14 @@ fun WeatherPlate(
                 Canvas(Modifier.fillMaxSize()) {
                     drawPorcelain(
                         face = colors.surface,
-                        lip = colors.surfaceShade,
-                        floorCatch = colors.surfaceRaised,
+                        // Pulled toward the face by the plate's relief factor, so
+                        // the bowl is the same depth on every plate. Taken raw,
+                        // these are rungs of a ladder built to separate panels -
+                        // and on a plate whose rungs are twice as far apart the
+                        // dial's ramp stopped being a ramp and became three
+                        // visible bands. See WetterColors.relief.
+                        lip = lerp(colors.surface, colors.surfaceShade, colors.relief),
+                        floorCatch = lerp(colors.surface, colors.surfaceRaised, colors.relief),
                         occlusion = colors.hairline,
                     )
                     drawFiredEdge(colors.hairline)
@@ -273,12 +281,12 @@ fun WeatherPlate(
             ) {
                 Row(verticalAlignment = Alignment.Top) {
                     Text(
-                        text = formatTemperature(current.temperature),
+                        text = formatTemperature(current.temperature, units.temperature),
                         style = WetterTheme.type.reading,
                         color = colors.textPrimary,
                     )
                     Text(
-                        text = stringResource(R.string.unit_celsius),
+                        text = units.temperature.suffix,
                         style = WetterTheme.type.readingUnit,
                         color = colors.textTertiary,
                         modifier = Modifier.padding(start = 3.dp, top = 16.dp),
@@ -351,6 +359,7 @@ private fun MarkExplanation(
     windGustMs: Double,
     onDismiss: () -> Unit,
 ) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
 
@@ -396,11 +405,11 @@ private fun MarkExplanation(
             PlateMark.WIND -> if (windGustMs > windSpeedMs + GUST_WORTH_SAYING) {
                 stringResource(
                     R.string.explain_wind_reading,
-                    formatWindSpeed(windSpeedMs),
-                    formatWindSpeed(windGustMs),
+                    formatWindSpeed(windSpeedMs, units.wind),
+                    formatWindSpeed(windGustMs, units.wind),
                 )
             } else {
-                formatWindSpeed(windSpeedMs)
+                formatWindSpeed(windSpeedMs, units.wind)
             }
             PlateMark.UMBRELLA -> null
             // The figure the mark is derived from, as the wind card does it:
@@ -498,9 +507,10 @@ private fun MarkExplanation(
  */
 @Composable
 private fun WindBands(currentLevel: Int) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
-    val moderate = formatWindSpeed(MODERATE_WIND_MS)
-    val strong = formatWindSpeed(STRONG_WIND_MS)
+    val moderate = formatWindSpeed(MODERATE_WIND_MS, units.wind)
+    val strong = formatWindSpeed(STRONG_WIND_MS, units.wind)
 
     val bands = listOf(
         1 to stringResource(R.string.explain_wind_band_light, moderate),

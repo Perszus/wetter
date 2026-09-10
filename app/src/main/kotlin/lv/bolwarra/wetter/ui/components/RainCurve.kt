@@ -228,14 +228,14 @@ fun RainCurve(
                         },
                         brush = Brush.verticalGradient(
                             listOf(
-                                colors.precipitation.copy(alpha = FILL_TOP_ALPHA),
-                                colors.precipitation.copy(alpha = FILL_BOTTOM_ALPHA),
+                                colors.textPrimary.copy(alpha = FILL_TOP_ALPHA),
+                                colors.textPrimary.copy(alpha = FILL_BOTTOM_ALPHA),
                             ),
                         ),
                     )
                     drawPath(
                         path = path,
-                        brush = intensityBrush(colors.precipitationMuted, colors.precipitation),
+                        brush = intensityBrush(colors.textTertiary, colors.textPrimary),
                         style = Stroke(width = STROKE.toPx(), cap = StrokeCap.Round),
                     )
                     scrubbed?.let { index ->
@@ -243,7 +243,7 @@ fun RainCurve(
                             index = index,
                             points = points,
                             lineColour = colors.textPrimary.copy(alpha = CURSOR_ALPHA),
-                            dotColour = colors.precipitation,
+                            dotColour = colors.textPrimary,
                             ringColour = colors.surfaceRaised,
                         )
                     }
@@ -397,6 +397,7 @@ private fun resample(hours: List<HourlyWeather>): List<CurvePoint> {
  */
 @Composable
 private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modifier) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
 
     Row(
@@ -425,10 +426,11 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
             // marks where the number came from rather than warning about it.
             text = stringResource(
                 if (point.interpolated) R.string.curve_rate_about else R.string.curve_rate,
-                formatMillimetres(point.millimetresPerHour.toDouble()),
+                formatMillimetres(point.millimetresPerHour.toDouble(), units.precipitation),
+                units.precipitation.label,
             ),
             style = WetterTheme.type.title,
-            color = colors.precipitation,
+            color = colors.textPrimary,
         )
     }
 }
@@ -451,12 +453,15 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
  * off-by-one at every boundary, and a seam wherever the line grazes a level
  * without settling in it.
  *
- * It stays inside the one hue precipitation already owns, running from the
- * palette's light-precipitation tone up to its full one. Reaching for a warning
- * colour at the top would put a second meaning on the chart and break the rule
- * that this app has exactly one loud colour - and the guide labels behind the
- * line already say which level it is in words. This is reinforcement, not the
- * message.
+ * It runs in ink, from the tone of a quiet label up to the tone of a headline.
+ * It used to run through the precipitation blue, which was the obvious choice and
+ * the wrong one: the one saturated hue in this app means *rain is falling*, and a
+ * chart of when it might is a different statement. On a true-grayscale plate the
+ * line was also the only coloured thing on the page that was not a weather mark,
+ * which made it read as a highlight rather than as a reading.
+ *
+ * The blue is not gone from the app, only from here. It belongs to the condition
+ * glyphs, where it marks what is actually falling.
  *
  * Stops are given as one minus the height, because a vertical gradient measures
  * from the top of the canvas downwards while intensity is measured up from the

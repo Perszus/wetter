@@ -90,6 +90,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  */
 @Composable
 fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modifier) {
+    val units = WetterTheme.units
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
     val today = now.atZone(zone).toLocalDate()
@@ -110,7 +111,12 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
     ) {
         Tile(
             label = stringResource(R.string.tile_week_rain),
-            trailing = formatMillimetresWithUnit(days.sumOf { it.precipitationTotal ?: 0.0 }),
+            trailing = formatMillimetresWithUnit(
+                days.sumOf {
+                    it.precipitationTotal ?: 0.0
+                },
+                units.precipitation,
+            ),
         ) {
             days.forEachIndexed { index, day ->
                 if (index > 0) {
@@ -152,6 +158,7 @@ private fun DayRow(
     open: Boolean,
     onToggle: () -> Unit,
 ) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
 
@@ -216,13 +223,13 @@ private fun DayRow(
             Text(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(color = colors.textTertiary)) {
-                        append(formatTemperature(day.temperatureMin))
+                        append(formatTemperature(day.temperatureMin, units.temperature))
                     }
                     withStyle(SpanStyle(color = colors.textDisabled)) {
                         append(RANGE)
                     }
                     withStyle(SpanStyle(color = colors.textPrimary)) {
-                        append(formatTemperature(day.temperatureMax))
+                        append(formatTemperature(day.temperatureMax, units.temperature))
                     }
                 },
                 style = WetterTheme.type.figure,
@@ -257,6 +264,7 @@ private fun DayRow(
 /** The two facts worth taking from a week at a glance. */
 @Composable
 private fun WeekSummaryTile(days: List<DailyWeather>) {
+    val units = WetterTheme.units
     val wetDays = days.count { PrecipitationIntensity.ofRate(it.precipitationTotal).isWet }
     val wettest = days.maxByOrNull { it.precipitationTotal ?: 0.0 }
     val wettestIsWet = wettest != null &&
@@ -275,11 +283,11 @@ private fun WeekSummaryTile(days: List<DailyWeather>) {
                 ),
                 Metric(
                     stringResource(R.string.metric_warmest),
-                    formatTemperature(days.maxOf { it.temperatureMax }),
+                    formatTemperature(days.maxOf { it.temperatureMax }, units.temperature),
                 ),
                 Metric(
                     stringResource(R.string.metric_coldest),
-                    formatTemperature(days.minOf { it.temperatureMin }),
+                    formatTemperature(days.minOf { it.temperatureMin }, units.temperature),
                 ),
             ),
         )

@@ -84,6 +84,7 @@ fun TodayPage(
     air: AirQuality? = null,
     modifier: Modifier = Modifier,
 ) {
+    val units = WetterTheme.units
     val zone = forecast.location.zone
     val spacing = WetterTheme.spacing
     val span = Duration.ofHours(TIMELINE_HOURS)
@@ -118,7 +119,8 @@ fun TodayPage(
                 // the number next to a reading should be the reading.
                 trailing = stringResource(
                     R.string.curve_rate,
-                    formatMillimetres(rateNow(timeline, ahead, now)),
+                    formatMillimetres(rateNow(timeline, ahead, now), units.precipitation),
+                    units.precipitation.label,
                 ),
             ) {
                 RainCurve(
@@ -160,6 +162,7 @@ private fun AdvancedTile(
     /** So the drawer asks about the same thing the chart above it is drawing. */
     falling: PrecipitationKind,
 ) {
+    val units = WetterTheme.units
     val zone = forecast.location.zone
     val current = forecast.conditionsAt(now)
     val today = now.atZone(zone).toLocalDate()
@@ -199,12 +202,13 @@ private fun AdvancedTile(
                 listOf(
                     Metric(
                         stringResource(R.string.metric_feels_like),
-                        formatTemperature(current.apparentTemperature),
+                        formatTemperature(current.apparentTemperature, units.temperature),
                     ),
                     Metric(
                         stringResource(R.string.metric_dew_point),
                         formatTemperature(
                             Psychrometrics.dewPoint(current.temperature, current.humidity),
+                            units.temperature,
                         ),
                     ),
                     Metric(
@@ -224,11 +228,11 @@ private fun AdvancedTile(
                 listOf(
                     Metric(
                         stringResource(R.string.metric_wind),
-                        formatWindSpeed(current.windSpeed),
+                        formatWindSpeed(current.windSpeed, units.wind),
                     ),
                     Metric(
                         stringResource(R.string.metric_gust),
-                        formatWindSpeed(current.windGust),
+                        formatWindSpeed(current.windGust, units.wind),
                     ),
                     Metric(
                         stringResource(R.string.metric_wind_direction),
@@ -421,7 +425,7 @@ private fun AdvancedTile(
                     listOf(
                         Metric(
                             stringResource(R.string.metric_local_correction),
-                            formatTemperatureDelta(-bias.effectiveOffset),
+                            formatTemperatureDelta(-bias.effectiveOffset, units.temperature),
                         ),
                     ),
                 )
@@ -433,7 +437,7 @@ private fun AdvancedTile(
                 Text(
                     text = stringResource(
                         R.string.advanced_correction_note,
-                        formatTemperatureDelta(bias.offset),
+                        formatTemperatureDelta(bias.offset, units.temperature),
                         bias.samples,
                     ),
                     style = WetterTheme.type.meta,
@@ -539,7 +543,7 @@ private fun NextRainBar(
                     if (wet ||
                         spell != null
                     ) {
-                        colors.precipitation
+                        colors.textPrimary
                     } else {
                         colors.textTertiary
                     },

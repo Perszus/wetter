@@ -5,6 +5,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import lv.bolwarra.wetter.WetterApplication
 import lv.bolwarra.wetter.ui.screens.LocationsViewModel
+import lv.bolwarra.wetter.ui.screens.SettingsViewModel
 import lv.bolwarra.wetter.ui.screens.WeatherViewModel
 import lv.bolwarra.wetter.widget.RainWidget
 
@@ -30,6 +31,9 @@ object WetterViewModels {
             )
         }
         initializer {
+            SettingsViewModel(application().container.preferences)
+        }
+        initializer {
             val app = application()
             val container = app.container
             LocationsViewModel(
@@ -38,6 +42,8 @@ object WetterViewModels {
                 container.savedLocations,
                 container.repository,
                 container.reverseGeocoder,
+                container.preferences,
+                container.deviceLocation,
                 container.basemap,
                 onPlaceChanged = { RainWidget.refresh(app) },
             )

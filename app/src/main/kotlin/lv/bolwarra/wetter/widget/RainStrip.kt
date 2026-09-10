@@ -225,7 +225,7 @@ internal object RainStrip {
      */
     private fun drawBands(canvas: Canvas, chart: RectF, scale: Float, colors: WetterColors) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.precipitationTrack.toArgb()
+            color = colors.gridline.toArgb()
             strokeWidth = HAIRLINE_DP * scale
         }
         listOf(RainCurveBands.moderateEdge, RainCurveBands.heavyEdge).forEach { fraction ->
@@ -366,8 +366,8 @@ internal object RainStrip {
         }
 
         val line = smoothPath(points)
-        val muted = colors.precipitationMuted.toArgb()
-        val full = colors.precipitation.toArgb()
+        val muted = colors.textTertiary.toArgb()
+        val full = colors.textPrimary.toArgb()
 
         val fill = Path(line).apply {
             lineTo(chart.right, chart.bottom)

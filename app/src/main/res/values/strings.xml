@@ -12,14 +12,44 @@
     <string name="locations_none_saved">Search for a place to add it here.</string>
     <string name="nav_settings">Settings</string>
     <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
     <string name="action_retry">Try again</string>
 
     <!-- Section headings. The forecast sections arrive in the visual phase. -->
+    <string name="section_general">General</string>
+    <string name="section_appearance">Appearance</string>
     <string name="section_about">About</string>
     <string name="section_sources">Sources</string>
 
+    <!--
+      Settings. Every label is the thing being chosen, not an instruction: the
+      control beside it already says that a choice is being made.
+    -->
+    <string name="setting_temperature">Temperature</string>
+    <string name="setting_wind">Wind speed</string>
+    <string name="setting_precipitation">Precipitation</string>
+    <string name="setting_theme">Theme</string>
+    <!--
+      Spelled out rather than "°C" and "°F". At the size these segments are set,
+      a degree ring is a speck and the two options differ by one letter.
+    -->
+    <!--
+      Where the first guess came from. Said once, in General, because a reader
+      who opens Settings and finds Fahrenheit already chosen is owed an
+      explanation of who chose it - and because it is the answer to "why is this
+      wrong", which is the only reason most people will ever come here.
+    -->
+    <string name="setting_units_note">Guessed from the first place you chose. Changing any of these keeps your choice.</string>
+    <!--
+      Brought across from This Note and Orobos, and named as they name them. Not
+      translated: they are the names of two specific palettes - one built on
+      Hara's White, one on Adams' zone system - the way a typeface keeps its name.
+    -->
+    <string name="theme_pure_white" translatable="false">Pure White</string>
+    <string name="theme_pure_black" translatable="false">Pure Black</string>
+    <string name="setting_theme_note">Two whole designs rather than a light switch, so this does not follow the phone.</string>
+
     <!-- Readings -->
-    <string name="unit_celsius">C</string>
     <!-- Read aloud in place of the umbrella glyph on the dial. -->
     <string name="plate_umbrella">Rain worth an umbrella today</string>
     <!-- Read aloud in place of the wind level lines on the dial. -->
@@ -128,9 +158,9 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="next_rain_starts_on">%1$s starts %2$s at %3$s</string>
     <string name="next_rain_until">%1$s until %2$s</string>
 
-    <string name="curve_rate">%1$s mm/h</string>
+    <string name="curve_rate">%1$s %2$s/h</string>
     <!-- A tilde marks a point read between the forecast’s own samples. -->
-    <string name="curve_rate_about">≈%1$s mm/h</string>
+    <string name="curve_rate_about">≈%1$s %2$s/h</string>
 
     <!--
       How hard it is falling, in words. Millimetres per hour is a unit
@@ -271,6 +301,17 @@ It appears only for rain at that level between now and midnight, and goes once t
     <!-- Putting a point on the map -->
     <string name="locations_pin_on_map">Put a point on the map</string>
     <string name="locations_pin_title">Point on the map</string>
+    <string name="locations_pin_hint">Tap the map to place a point.</string>
+    <string name="locations_pin_locate">Use my current location</string>
+    <string name="locations_pin_locating">Finding you…</string>
+    <!--
+      Every way this fails says the same thing, because every way leads to the
+      same place: put the pin where you know you are. Naming the cause - refused,
+      switched off, no fix yet - would be four messages for one action.
+    -->
+    <string name="locations_pin_not_located">Could not find you. Tap the map instead.</string>
+    <string name="map_zoom_in">Zoom in</string>
+    <string name="map_zoom_out">Zoom out</string>
     <string name="locations_pin_confirm">Use this point</string>
     <string name="locations_pin_cancel">Cancel</string>
 

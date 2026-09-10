@@ -364,6 +364,43 @@ internal interface ClimateNormalsDao {
     suspend fun deleteOlderThan(cutoffEpochSecond: Long)
 }
 
+/**
+ * What the reader has chosen, as a single row.
+ *
+ * Stored the way [SelectedLocationEntity] is, and for the same reason: the
+ * background worker redraws the widget in its own process lifetime and has to be
+ * able to read the units without a screen ever having been open.
+ *
+ * Every column is defaulted, so a row written before a preference existed still
+ * reads back - which is what lets a new setting ship without a migration that
+ * touches data.
+ */
+@Entity(tableName = "preferences")
+internal data class PreferencesEntity(
+    @PrimaryKey val id: Int = SINGLE_ROW,
+    val temperatureUnit: String = "",
+    val windUnit: String = "",
+    val precipitationUnit: String = "",
+    val theme: String = "",
+) {
+    companion object {
+        const val SINGLE_ROW = 1
+    }
+}
+
+@Dao
+internal interface PreferencesDao {
+
+    @Query("SELECT * FROM preferences WHERE id = 1")
+    fun observe(): Flow<PreferencesEntity?>
+
+    @Query("SELECT * FROM preferences WHERE id = 1")
+    suspend fun read(): PreferencesEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(preferences: PreferencesEntity)
+}
+
 @Database(
     entities = [
         ForecastEntity::class,
@@ -374,8 +411,9 @@ internal interface ClimateNormalsDao {
         EnsembleEntity::class,
         ProviderHealthEntity::class,
         ClimateNormalsEntity::class,
+        PreferencesEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -395,6 +433,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
     abstract fun ensembles(): EnsembleDao
 
     abstract fun climateNormals(): ClimateNormalsDao
+
+    abstract fun preferences(): PreferencesDao
 
     companion object {
 
@@ -535,6 +575,27 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the preferences row.
+         *
+         * Additive, and every column defaulted so the absent row reads as the
+         * defaults rather than as a failure - the app has to work on the launch
+         * before anybody has opened Settings.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `preferences` (" +
+                        "`id` INTEGER NOT NULL, " +
+                        "`temperatureUnit` TEXT NOT NULL DEFAULT '', " +
+                        "`windUnit` TEXT NOT NULL DEFAULT '', " +
+                        "`precipitationUnit` TEXT NOT NULL DEFAULT '', " +
+                        "`theme` TEXT NOT NULL DEFAULT '', " +
+                        "PRIMARY KEY(`id`))",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -558,6 +619,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             )
             .build()
     }

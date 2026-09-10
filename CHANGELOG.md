@@ -190,8 +190,70 @@ Notable changes to Wetter. The format follows
 - Open-Meteo is asked for all sixteen days it will give rather than seven — 14 KB
   to 31 KB per fetch. Its declared `maximumForecastDays` had been claiming reach
   the request never asked for, and the router ranks on that.
+- **Settings, as a panel over the app rather than a screen you travel to.**
+  Groups down the left — General, Appearance, About — and the chosen group on the
+  right. It opens for one change and shuts again, and the forecast never leaves
+  the screen for it.
+- **Units.** Temperature in Celsius or Fahrenheit, wind in m/s, km/h, mph or
+  knots, precipitation in millimetres or inches. The domain still computes in
+  Celsius, metres per second and millimetres throughout; these say only how a
+  number is written.
+- The units are **guessed from the first place you pick**, so somebody in Ohio
+  does not have to find Settings before the app says anything they recognise.
+  Guessed from the coordinates rather than from the address: a pin dropped in
+  Montana may never get a country name, and a default that depended on a
+  volunteer-run geocoder answering would be metric for some Americans and
+  imperial for none of them, at random. Both long US borders are drawn as
+  polylines — a rectangle takes Monterrey and Tijuana with it, and the 49th
+  parallel takes Toronto, which sits below the latitude of Detroit.
+- The guess is made once. Changing anything keeps the choice, and "chosen" means
+  a row exists rather than that the values differ from the defaults — somebody in
+  Boston who deliberately set Celsius must not be re-guessed at because they
+  moved a pin.
+- **Two plates: Pure White and Pure Black**, brought across from This Note and
+  Orobos and built to the formulas those apps state. Pure Black is Ansel Adams'
+  zone system — `Zone 0 #0A → I #1A → II #2A → III #3A`, layers about sixteen hex
+  apart, brightness as elevation. Pure White is Kenya Hara's *White*: off-white
+  paper, never `#FFF`, ink at near-black, and elevation as a subtle darkening
+  because at L* 97 a lifted surface clamps to white and vanishes. Both are true
+  grayscale, which is the whole of what "pure" means in the names.
+- There is no "follow the system". Each plate is a whole design rather than a
+  light switch, and the cost is stated plainly: a phone that flips to dark at
+  sunset will not take this app with it.
+- **The only saturated colour left is on the weather glyphs.** The rain chart,
+  the hour strip, the month's wet days, the next-rain dot and the widget's curve
+  all draw in ink now. The chart keeps its intensity ramp — it runs from a quiet
+  label's tone up to a headline's instead of through the blue.
+- **The map is looked at before it is chosen from.** Pan and zoom as much as you
+  like and nothing is picked; one tap places the pin, and it then stays on that
+  ground while the map moves under it. The crosshair welded to the centre made
+  every pan a commitment and opened already claiming an answer nobody had given.
+- Zoom buttons on the map. It had pinch and nothing else, which is fine on a
+  table, awkward one-handed, and undiscoverable — nothing on screen said the map
+  could zoom at all.
+- **Use my current location**, from one fix, asked for at the moment it is
+  pressed. Coarse permission only, the framework's own `LocationManager` rather
+  than Play Services, and the network provider before GPS: a fix to a few hundred
+  metres in about a second is well inside any model's grid, and a reader can
+  nudge a pin but cannot nudge a spinner. Nothing subscribes to updates and
+  nothing runs in the background.
 
 ### Fixed
+
+- The system bar icons were painted from the *phone's* dark mode rather than from
+  the app's, so choosing a dark plate on a phone set to light left dark icons on
+  a near-black ground — a blacked-out strip where the clock should be. The plate
+  now tells the insets controller which way it runs. The app still draws under
+  the status bar; drawing under somebody's clock is not the same as covering it.
+- The dial's porcelain ramp read as three flat bands on a zone plate. It was
+  built from the surface ladder, which those plates space at roughly twice this
+  app's own — right for separating panels, wrong for shading a single object.
+  Objects now shade by a normalised fraction of that ladder, so a bowl is the
+  same depth on every plate.
+- The map's tap handler was keyed on the map position, so it tore down and
+  rebuilt the whole gesture detector on every frame of a pan.
+- The dial's unit letter was a hardcoded "C" and the rain rate a hardcoded
+  "mm/h", so Fahrenheit read `64° C` and inches read `0.02 mm/h`.
 
 - The fused timeline used to pad its tail with zeros when asked for more than
   the sources could answer. A step neither the radar nor the model covers is an

@@ -45,6 +45,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.model.WeatherLocation
+import lv.bolwarra.wetter.domain.settings.Preferences
+import lv.bolwarra.wetter.domain.settings.ThemeChoice
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.HairlineRule
 import lv.bolwarra.wetter.ui.components.ScreenTitle
@@ -66,6 +68,7 @@ fun LocationsRoute(
             start = Coordinates(selected.latitude, selected.longitude),
             tiles = viewModel.tiles,
             nameOf = viewModel::nameOf,
+            locate = viewModel::locate,
             onCancel = { pinning = false },
             onConfirm = { point, name ->
                 viewModel.savePin(point, name)
@@ -321,7 +324,7 @@ private val REMOVE_ICON = 18.dp
 @Preview(name = "Locations · light", showBackground = true)
 @Composable
 private fun LocationsPreview() {
-    WetterTheme(darkTheme = false) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_WHITE)) {
         LocationsScreen(
             state = LocationsUiState(places = listOf(SampleWeather.location)),
             selected = SampleWeather.location,

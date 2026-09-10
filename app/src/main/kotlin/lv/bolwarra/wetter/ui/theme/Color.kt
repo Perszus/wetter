@@ -91,6 +91,25 @@ data class WetterColors(
     /** Neutral notice: an explanation, a note about provenance. */
     val informational: Color,
 
+    /**
+     * How much of this plate's surface ladder an *object* should shade itself by.
+     *
+     * Not a colour, and the only number in this table. The ladder exists to
+     * separate one panel from another and each plate sets its own spacing for
+     * that — the zone plates use roughly twice this app's own, which is what
+     * makes their layers legible on an OLED screen.
+     *
+     * Shading a single object is a different job. The dial is one piece of
+     * porcelain with a continuous ramp across it, and a ramp built from a ladder
+     * meant for panels stops being a ramp: on a zone plate its three stops sit
+     * far enough apart to read as three bands rather than as one curved surface.
+     *
+     * So the relief is normalised. An object multiplies the ladder by this and
+     * gets the same depth of shading whichever plate it is drawn on, while the
+     * panels keep the spacing their plate was designed with.
+     */
+    val relief: Float,
+
     val isLight: Boolean,
 )
 
@@ -140,6 +159,40 @@ private data class PlateSpec(
     val ground: Double,
     val inkIsDarker: Boolean,
     val sky: Atmosphere = Atmosphere.Neutral,
+    /**
+     * How far this plate's greys stray from true grey.
+     *
+     * The app's own two plates carry a trace of blue, which is what makes them
+     * read as material rather than as grey. The imported plates set this to zero
+     * and are genuinely neutral - that is the whole of what makes them "pure",
+     * and it is a property of the plate rather than of the tone system.
+     */
+    val neutral: Double = Tone.NEUTRAL_CHROMA,
+    /**
+     * How far apart two surfaces sit on this plate.
+     *
+     * This app's own plates use a small step, because the step is the whole
+     * effect and a large one turns a quiet page into a stack of boxes. The
+     * imported plates use the zone system's, which is roughly twice as far -
+     * "enough to read on OLED without halation", which is a different problem
+     * from the one a paper-white page has.
+     */
+    val step: Double = SURFACE_STEP,
+    /**
+     * Which way a raised surface goes.
+     *
+     * Up, everywhere except a paper plate. Light falls from above, so a raised
+     * surface is lighter than its ground on the light plate and *also* lighter
+     * on the dark one - a dark theme that darkens its raised surfaces is
+     * lighting the scene from below, which reads as a hole rather than a step.
+     *
+     * Pure White is the exception and has to be. Its ground sits at L* 97 and
+     * there is no headroom left above it: a raised tile would clamp to
+     * near-white and disappear into the page. Hara's answer, which is the one
+     * that plate was built on, is to recess instead - ink lines on bond paper,
+     * where elevation is a subtle darkening rather than a lift.
+     */
+    val raisedIsLighter: Boolean = true,
 ) {
 
     /**
@@ -150,12 +203,11 @@ private data class PlateSpec(
      * haze that compresses contrast compresses it for every role at the same
      * rate, which is what keeps the hierarchy intact while the light changes.
      */
-    fun ink(ratio: Double, chroma: Double = Tone.NEUTRAL_CHROMA, hue: Double = Tone.NEUTRAL_HUE) =
-        Tone.of(
-            Tone.lightnessFor(ground, 1.0 + (ratio - 1.0) * sky.contrast, inkIsDarker),
-            chroma * sky.chroma,
-            hue,
-        )
+    fun ink(ratio: Double, chroma: Double = neutral, hue: Double = Tone.NEUTRAL_HUE) = Tone.of(
+        Tone.lightnessFor(ground, 1.0 + (ratio - 1.0) * sky.contrast, inkIsDarker),
+        chroma * sky.chroma,
+        hue,
+    )
 
     /**
      * A surface, a stated number of lightness steps from the ground.
@@ -166,7 +218,8 @@ private data class PlateSpec(
      * reads as a hole rather than as a step, and is the single most common way a
      * dark theme goes wrong.
      */
-    fun surface(steps: Double) = Tone.of((ground + steps).coerceIn(4.0, 99.4))
+    fun surface(steps: Double) =
+        Tone.of((ground + if (raisedIsLighter) steps else -steps).coerceIn(4.0, 99.4), neutral)
 }
 
 /** How far apart two surfaces sit. Small, because the step is the whole effect. */
@@ -224,6 +277,18 @@ private const val HAIRLINE_CONTRAST = 1.7
 private const val GRIDLINE_CONTRAST = 1.35
 
 /** Any accent carrying text or a thin line meets the same bar the labels do. */
+/**
+ * Between body and headline: stronger than the text around it without
+ * becoming the loudest thing on the page.
+ *
+ * Its own numbers rather than a borrowed one. Reusing the tertiary or
+ * secondary contrast would make an interactive word the same tone as some
+ * static label, which is a duplicate role wearing a second name.
+ */
+private const val INTERACTIVE_CONTRAST = 10.0
+private const val INTERACTIVE_PRESSED_CONTRAST = 6.2
+
+/** What a coloured role is held to, so an accent carries a label's weight. */
 private const val ACCENT_CONTRAST = 4.7
 
 /** Accents that only ever fill an area, never carry a line or a glyph. */
@@ -258,11 +323,13 @@ private const val POSITIVE_HUE = 148.0
 private const val STATE_CHROMA = 26.0
 
 private fun plate(spec: PlateSpec, isLight: Boolean) = WetterColors(
-    surface = Tone.of(spec.ground),
-    surfaceRaised = spec.surface(SURFACE_STEP),
-    surfaceSunken = spec.surface(-SURFACE_STEP),
-    surfaceHighlight = spec.surface(SURFACE_STEP * HIGHLIGHT_REACH),
-    surfaceShade = spec.surface(-SURFACE_STEP * SHADE_REACH),
+    surface = Tone.of(spec.ground, spec.neutral),
+    relief = (SURFACE_STEP / spec.step).toFloat().coerceAtMost(1f),
+
+    surfaceRaised = spec.surface(spec.step),
+    surfaceSunken = spec.surface(-spec.step),
+    surfaceHighlight = spec.surface(spec.step * HIGHLIGHT_REACH),
+    surfaceShade = spec.surface(-spec.step * SHADE_REACH),
     // The one filled block in the app, and the only place a large area of ink
     // appears. It inverts its plate - a dark band on the light one, a light band
     // on the dark one - which is the same idea mirrored rather than a second
@@ -271,7 +338,7 @@ private fun plate(spec: PlateSpec, isLight: Boolean) = WetterColors(
     // The page showing through. Setting it to the ground makes the band's
     // contrast true by construction instead of a second value to keep in step,
     // and it is why this pair cannot drift apart.
-    onSurfaceStrong = Tone.of(spec.ground),
+    onSurfaceStrong = Tone.of(spec.ground, spec.neutral),
 
     hairline = spec.ink(HAIRLINE_CONTRAST),
     gridline = spec.ink(GRIDLINE_CONTRAST),
@@ -281,8 +348,13 @@ private fun plate(spec: PlateSpec, isLight: Boolean) = WetterColors(
     textTertiary = spec.ink(TERTIARY_CONTRAST),
     textDisabled = spec.ink(DISABLED_CONTRAST),
 
-    interactive = spec.ink(ACCENT_CONTRAST, RAIN_CHROMA * 0.7, RAIN_HUE),
-    interactivePressed = spec.ink(SECONDARY_CONTRAST, RAIN_CHROMA * 0.7, RAIN_HUE),
+    // Ink, not a hue. These carried a diluted rain blue, which made every
+    // tappable word in the app a quiet claim about precipitation - and on a
+    // true-grayscale plate it was the only colour on screen that was not
+    // weather. The one saturated hue this app has means rain and nothing
+    // else, so an action is separated by weight instead.
+    interactive = spec.ink(INTERACTIVE_CONTRAST),
+    interactivePressed = spec.ink(INTERACTIVE_PRESSED_CONTRAST),
 
     precipitation = spec.ink(ACCENT_CONTRAST, RAIN_CHROMA, RAIN_HUE),
     precipitationMuted = spec.ink(FILL_CONTRAST, RAIN_CHROMA * 0.62, RAIN_HUE),
@@ -347,6 +419,82 @@ fun darkPlate(sky: Atmosphere): WetterColors = plate(
     PlateSpec(DARK_GROUND - sky.ground * NIGHT_GROUND_SHARE, inkIsDarker = false, sky = sky),
     isLight = false,
 )
+
+/**
+ * Pure White and Pure Black, brought across from This Note and Orobos.
+ *
+ * Both are built to a stated formula rather than to this app's contrast solver,
+ * and the formula is what is being imported — the two plates are only the shape
+ * it takes at either end.
+ *
+ * ### Pure Black: Ansel Adams' zone system
+ *
+ * `Zone 0 #0A → I #1A → II #2A → III #3A → IV #4A → V #5E`, each layer about
+ * sixteen hex apart, "enough to read on OLED without halation". Elevation is
+ * brightness: light rises toward the reader, which is the same rule this app's
+ * own dark plate follows. The ground is Zone I rather than Zone 0, so the void
+ * is left underneath for a sunken surface to recede into.
+ *
+ * The step is the visible half of that formula and is roughly twice this app's
+ * own — [PURE_STEP] against [SURFACE_STEP]. A zone plate read at this app's
+ * spacing would be a different plate wearing the same name.
+ *
+ * ### Pure White: Kenya Hara's *White*
+ *
+ * White as a material rather than an absence. An off-white paper ground, never
+ * `#FFF`, ink at near-black, and elevation as a *subtle darkening* — crisp
+ * dividers like ink lines on bond paper. That inversion is not a stylistic
+ * choice: at L* 97 there is no room above the ground, and a lifted tile clamps
+ * to white and vanishes.
+ *
+ * ### What both share, and what this app does not
+ *
+ * True grayscale. This app's greys carry a trace of blue so they read as
+ * material; these are neutral, and that is the whole of what "pure" means in
+ * their names. docs/design-principles.md says both grounds are tinted slightly
+ * cool — these are a deliberate exception, offered rather than imposed. The app
+ * still opens on its own plates.
+ *
+ * The one saturated hue is untouched. Rain is the same blue on all four plates,
+ * because it is the reading rather than the decoration.
+ */
+fun pureWhitePlate(sky: Atmosphere): WetterColors = plate(
+    PlateSpec(
+        ground = PURE_WHITE_GROUND + sky.ground,
+        inkIsDarker = true,
+        sky = sky,
+        neutral = TRUE_GREY,
+        step = PURE_STEP_PAPER,
+        raisedIsLighter = false,
+    ),
+    isLight = true,
+)
+
+fun pureBlackPlate(sky: Atmosphere): WetterColors = plate(
+    PlateSpec(
+        ground = PURE_BLACK_GROUND - sky.ground * NIGHT_GROUND_SHARE,
+        inkIsDarker = false,
+        sky = sky,
+        neutral = TRUE_GREY,
+        step = PURE_STEP,
+    ),
+    isLight = false,
+)
+
+/** No trace of blue. The names mean this and nothing else. */
+private const val TRUE_GREY = 0.0
+
+/** Hara's paper, `#F6F6F6`, as L*. */
+private const val PURE_WHITE_GROUND = 96.9
+
+/** Zone I, `#1A1A1A`, as L*. Zone 0 is left below it for the sunken surface. */
+private const val PURE_BLACK_GROUND = 9.3
+
+/** Zone I to Zone II, `#1A1A1A` to `#2A2A2A`, as a difference in L*. */
+private const val PURE_STEP = 7.7
+
+/** `#F6F6F6` to `#ECECEC`: the same ladder, compressed by the top of the range. */
+private const val PURE_STEP_PAPER = 3.5
 
 /**
  * L* 9, not 0 and not 13.

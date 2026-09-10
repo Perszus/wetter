@@ -165,6 +165,7 @@ private fun RowScope.DayCell(
     isToday: Boolean,
     withinSpan: Boolean,
 ) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
     val wet = when {
         day != null -> PrecipitationIntensity.ofRate(day.precipitationTotal).isWet
@@ -186,7 +187,7 @@ private fun RowScope.DayCell(
             // on anything, and reading the wet days off a month at a glance is
             // the whole reason this page is a grid.
             .background(
-                if (wet) colors.precipitation.copy(alpha = Emphasis.GHOST) else Color.Transparent,
+                if (wet) colors.textPrimary.copy(alpha = Emphasis.GHOST) else Color.Transparent,
             )
             // Today is outlined rather than filled, so it can be today *and* wet
             // without the two marks having to fight over one background.
@@ -227,7 +228,7 @@ private fun RowScope.DayCell(
                 )
                 Spacer(Modifier.height(CELL_GAP))
                 Text(
-                    text = formatTemperature(day.temperatureMax),
+                    text = formatTemperature(day.temperatureMax, units.temperature),
                     style = WetterTheme.type.meta,
                     color = colors.textPrimary,
                     textAlign = TextAlign.Center,
@@ -242,7 +243,7 @@ private fun RowScope.DayCell(
                 // commonest of them would be a picture of nothing.
                 Spacer(Modifier.height(CELL_GLYPH + CELL_GAP * 2))
                 Text(
-                    text = formatTemperature(normal.medianHigh),
+                    text = formatTemperature(normal.medianHigh, units.temperature),
                     style = WetterTheme.type.meta,
                     // A rank lighter than a forecast's, so the two can never
                     // read as equally good answers to the same question.

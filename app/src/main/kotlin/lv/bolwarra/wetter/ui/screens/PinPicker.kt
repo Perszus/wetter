@@ -1,5 +1,8 @@
 package lv.bolwarra.wetter.ui.screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,12 +19,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.location.PlaceName
@@ -57,12 +62,44 @@ fun PinPicker(
     onCancel: () -> Unit,
     onConfirm: (Coordinates, PlaceName?) -> Unit,
     nameOf: suspend (Coordinates) -> PlaceName?,
+    /** One fix from the device, or null for every way that can fail. */
+    locate: suspend () -> Coordinates?,
     modifier: Modifier = Modifier,
 ) {
     val spacing = WetterTheme.spacing
     val colors = WetterTheme.colors
-    var chosen by remember { mutableStateOf(start) }
+    val scope = rememberCoroutineScope()
+
+    // Nothing is chosen until somebody taps the map. The screen used to open
+    // holding an answer it had been given by nobody, which made the confirm
+    // button a trap: pressing it saved wherever the map happened to have opened.
+    var chosen by remember { mutableStateOf<Coordinates?>(null) }
     var name by remember { mutableStateOf<PlaceName?>(null) }
+
+    // Where the map is looking. Separate from the choice, and only moved from
+    // here when the reader asks to be found.
+    var centre by remember { mutableStateOf(start) }
+    var locating by remember { mutableStateOf(false) }
+    var located by remember { mutableStateOf<Boolean?>(null) }
+
+    val permission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) {
+            located = false
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            locating = true
+            val here = locate()
+            locating = false
+            located = here != null
+            if (here != null) {
+                centre = here
+                chosen = here
+            }
+        }
+    }
 
     // Asked once the map has been still for a moment, never during a drag.
     //
@@ -73,8 +110,9 @@ fun PinPicker(
     // moves, so what is on screen is never a label for somewhere else.
     LaunchedEffect(chosen) {
         name = null
+        val at = chosen ?: return@LaunchedEffect
         delay(SETTLE_MS)
-        name = nameOf(chosen)
+        name = nameOf(at)
     }
 
     Column(
@@ -86,8 +124,9 @@ fun PinPicker(
         Spacer(Modifier.height(spacing.m))
 
         MapPicker(
-            centre = start,
-            onCentreChanged = { chosen = it },
+            centre = centre,
+            chosen = chosen,
+            onPick = { chosen = it },
             tiles = tiles,
             modifier = Modifier
                 .fillMaxWidth()
@@ -95,7 +134,46 @@ fun PinPicker(
                 .clip(RoundedCornerShape(spacing.m)),
         )
 
-        Spacer(Modifier.height(spacing.m))
+        Spacer(Modifier.height(spacing.s))
+
+        // Asking to be found, and what came of it.
+        //
+        // The permission is requested at the moment it is used rather than on
+        // the way into the screen. A prompt that arrives before anybody has
+        // asked for anything is a prompt with no context, and it is refused more
+        // often than not - deservedly.
+        TextButton(
+            onClick = {
+                located = null
+                permission.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            },
+            enabled = !locating,
+        ) {
+            Text(
+                text = stringResource(
+                    if (locating) {
+                        R.string.locations_pin_locating
+                    } else {
+                        R.string.locations_pin_locate
+                    },
+                ),
+                style = WetterTheme.type.body,
+                color = if (locating) colors.textTertiary else colors.interactive,
+            )
+        }
+
+        // Only on failure. Success is its own message: the map moves and a pin
+        // appears on it, which says more than a line of text could.
+        if (located == false) {
+            Text(
+                text = stringResource(R.string.locations_pin_not_located),
+                style = WetterTheme.type.meta,
+                color = colors.textTertiary,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        Spacer(Modifier.height(spacing.s))
 
         // The address when there is one, the coordinate when there is not.
         //
@@ -122,7 +200,11 @@ fun PinPicker(
             }
         }
         Text(
-            text = chosen.format(),
+            // The instruction until there is something to report. A blank line
+            // here would leave the screen looking finished when it is not, and
+            // the one thing a reader needs to know is that the map is waiting to
+            // be tapped.
+            text = chosen?.format() ?: stringResource(R.string.locations_pin_hint),
             style = if (place == null) WetterTheme.type.body else WetterTheme.type.meta,
             color = colors.textTertiary,
             modifier = Modifier.fillMaxWidth(),
@@ -142,11 +224,18 @@ fun PinPicker(
                     color = colors.textTertiary,
                 )
             }
-            TextButton(onClick = { onConfirm(chosen, name) }) {
+            TextButton(
+                onClick = { chosen?.let { onConfirm(it, name) } },
+                // Dead until a point exists, because there is nothing to
+                // confirm. Greyed rather than hidden: a button that appears when
+                // you tap the map is a surprise, and one that is plainly waiting
+                // is an instruction.
+                enabled = chosen != null,
+            ) {
                 Text(
                     text = stringResource(R.string.locations_pin_confirm),
                     style = WetterTheme.type.body,
-                    color = colors.precipitation,
+                    color = if (chosen == null) colors.textDisabled else colors.interactive,
                 )
             }
         }

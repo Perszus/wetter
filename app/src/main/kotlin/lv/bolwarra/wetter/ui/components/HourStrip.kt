@@ -110,6 +110,7 @@ fun HourStrip(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
 
 @Composable
 private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
+    val units = WetterTheme.units
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     val wet = hour.intensity.isWet
@@ -122,7 +123,7 @@ private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
             // Kept at the faintest step the palette has: it has to survive being
             // skimmed, not compete with the bar it is pointing at.
             .background(
-                if (wet) colors.precipitation.copy(alpha = Emphasis.GHOST) else Color.Transparent,
+                if (wet) colors.textPrimary.copy(alpha = Emphasis.GHOST) else Color.Transparent,
             )
             .padding(vertical = spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -139,7 +140,7 @@ private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
             // this app is for and the difference between two in the afternoon
             // and two in the morning is not.
             color = when {
-                wet -> colors.precipitation
+                wet -> colors.textPrimary
                 hour.isDay -> colors.textSecondary
                 else -> colors.textTertiary
             },
@@ -153,7 +154,7 @@ private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
         )
         Spacer(Modifier.height(spacing.xs))
         Text(
-            text = formatTemperature(hour.temperature),
+            text = formatTemperature(hour.temperature, units.temperature),
             style = WetterTheme.type.figure,
             color = colors.textPrimary,
             textAlign = TextAlign.Center,
@@ -190,7 +191,7 @@ private fun RainMark(millimetresPerHour: Double?) {
                     .fillMaxWidth()
                     .fillMaxHeight(fraction)
                     .clip(RoundedCornerShape(topStart = MARK_WIDTH / 2, topEnd = MARK_WIDTH / 2))
-                    .background(colors.precipitation),
+                    .background(colors.textPrimary),
             )
         }
     }

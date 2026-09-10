@@ -42,6 +42,8 @@ import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherError
+import lv.bolwarra.wetter.domain.settings.Preferences
+import lv.bolwarra.wetter.domain.settings.ThemeChoice
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.DomainSwitcher
 import lv.bolwarra.wetter.ui.components.EmptyState
@@ -307,7 +309,7 @@ private val sampleState = WeatherUiState(
 @Preview(name = "Today light", showBackground = true, heightDp = 900)
 @Composable
 private fun TodayLightPreview() {
-    WetterTheme(darkTheme = false) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_WHITE)) {
         WeatherScreen(sampleState, WeatherDomain.Today, {}, {}, {}, {})
     }
 }
@@ -315,7 +317,7 @@ private fun TodayLightPreview() {
 @Preview(name = "Today dark", showBackground = true, heightDp = 900)
 @Composable
 private fun TodayDarkPreview() {
-    WetterTheme(darkTheme = true) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_BLACK)) {
         WeatherScreen(sampleState, WeatherDomain.Today, {}, {}, {}, {})
     }
 }
@@ -323,7 +325,7 @@ private fun TodayDarkPreview() {
 @Preview(name = "Week light", showBackground = true, heightDp = 900)
 @Composable
 private fun WeekLightPreview() {
-    WetterTheme(darkTheme = false) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_WHITE)) {
         WeatherScreen(sampleState, WeatherDomain.Week, {}, {}, {}, {})
     }
 }
@@ -331,7 +333,7 @@ private fun WeekLightPreview() {
 @Preview(name = "Week dark", showBackground = true, heightDp = 900)
 @Composable
 private fun WeekDarkPreview() {
-    WetterTheme(darkTheme = true) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_BLACK)) {
         WeatherScreen(sampleState, WeatherDomain.Week, {}, {}, {}, {})
     }
 }
@@ -339,7 +341,7 @@ private fun WeekDarkPreview() {
 @Preview(name = "Offline cached", showBackground = true, heightDp = 900)
 @Composable
 private fun OfflinePreview() {
-    WetterTheme(darkTheme = true) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_BLACK)) {
         WeatherScreen(
             sampleState.copy(error = WeatherError.Offline),
             WeatherDomain.Today,
@@ -354,7 +356,7 @@ private fun OfflinePreview() {
 @Preview(name = "No forecast", showBackground = true, heightDp = 500)
 @Composable
 private fun EmptyPreview() {
-    WetterTheme(darkTheme = false) {
+    WetterTheme(units = Preferences(theme = ThemeChoice.PURE_WHITE)) {
         WeatherScreen(
             WeatherUiState(location = SampleWeather.location),
             WeatherDomain.Today,

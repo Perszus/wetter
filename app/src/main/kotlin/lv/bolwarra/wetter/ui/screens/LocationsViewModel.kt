@@ -16,10 +16,12 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.BuiltInLocations
+import lv.bolwarra.wetter.data.location.DeviceLocation
 import lv.bolwarra.wetter.data.location.SavedLocationStore
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.map.MapTileSource
 import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
+import lv.bolwarra.wetter.data.repository.PreferencesStore
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.location.PlaceName
@@ -82,6 +84,10 @@ class LocationsViewModel(
     private val savedLocations: SavedLocationStore,
     private val repository: WeatherRepository,
     private val reverseGeocoder: PhotonReverseGeocoder,
+    /** So the first place anybody picks can suggest which units they read in. */
+    private val preferences: PreferencesStore,
+    /** Asked only when somebody presses the button on the map. */
+    private val deviceLocation: DeviceLocation,
     basemap: MapTileSource,
     /**
      * Told when the chosen place changes, so the home screen stops showing the
@@ -179,9 +185,22 @@ class LocationsViewModel(
         selectedLocation.select(location)
         viewModelScope.launch {
             savedLocations.save(location)
+            // The first place anybody picks is the only clue the app has about
+            // which units they read in, and it is a good one. Does nothing
+            // after the first time - see PreferencesStore.seedFor.
+            preferences.seedFor(location)
             onPlaceChanged()
         }
     }
+
+    /**
+     * One fix from the device, for the map's "use my current location".
+     *
+     * Null for every way it can fail, which the picker draws as one message: the
+     * reader taps the map instead, and the distinction between "refused",
+     * "switched off" and "no fix yet" changes nothing about what they do next.
+     */
+    suspend fun locate(): Coordinates? = runCatching { deviceLocation.current() }.getOrNull()
 
     /**
      * Keep the exact point somebody put a pin on.
@@ -214,6 +233,7 @@ class LocationsViewModel(
 
             savedLocations.save(point)
             selectedLocation.select(point)
+            preferences.seedFor(point)
             // The home screen is looking at the place that was selected a
             // moment ago, and will not find out on its own until its next tick.
             onPlaceChanged()
