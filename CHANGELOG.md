@@ -8,6 +8,42 @@ Notable changes to Wetter. The format follows
 
 ### Added
 
+- **Hazard thresholds are what this place does, not one number for the planet.**
+  The old set was a single global figure per hazard, and it failed in both
+  directions: too low where the weather is routinely hard, too high where it is
+  usually mild. Measured — a real Kolkata forecast sat above the heat threshold
+  for most of every day, because twenty-seven degrees at high humidity is
+  thirty-three of heat index and that is an ordinary September night there.
+  Meanwhile the cold warning, at −25 °C, was a temperature Rīga reaches about
+  never: dead code in a country with genuinely dangerous winters.
+- Warning and danger levels for heat, cold and wind now come from the same decade
+  of archive the Month page already keeps — about the worst comparable day in
+  twenty, and the worst in ten years. Measured on ERA5, mid-January: Rīga warns
+  at −20.7 °C and Berlin at −11.8; Yakutsk at −58, where minus twenty is a mild
+  day. Kolkata's July heat bar comes out at 42.1 °C rather than 32.
+- This is how the public warning services do it, rather than an invention here.
+  Meteoalarm publishes one colour scale and leaves the numbers to each national
+  service, "differ[ing] from country to country or sometimes even from region to
+  region". The US National Weather Service rewrote its cold products in 2024 and
+  states the criteria "are based on local climatology and what temperatures
+  actually impact each area" — its mildest published Cold Weather Advisory is
+  −3.9 °C.
+- The absolute numbers that remain are the published physiological bands rather
+  than chosen ones: the NWS heat index at 80 / 90 / 105 °F (26.7 / 32.2 /
+  40.6 °C), and its wind chill chart's ten-minute frostbite line at −30 °F
+  (−34.4 °C), which replaces a danger level of −40 that was past the chart's
+  five-minute line and further out than any national service waits.
+- The place can move the bar but not off the scale. Nothing fires below the band
+  where the thing can hurt anybody — a coastal town that has never seen 25 °C
+  still gets no heat warning for one — and absolute danger fires wherever it is
+  reached, because there is no climate in which Beaufort 10 is fine.
+- **Wind can only be made stricter.** Beaufort 8 and 10 (17.2 and 24.5 m/s) sit
+  within a few per cent of the NWS Wind Advisory and High Wind Warning gust
+  criteria (40 and 58 mph) — two systems two centuries apart, neither adjusting
+  for where you are. What a windy place earns is a *higher* bar: Wellington's own
+  mid-September gust tail is 32.3 m/s, so the 22.7 m/s gale that warned before is
+  correctly silent there now.
+
 - **Severe weather warnings, up to a day ahead.** A notification for storms,
   gales, torrential rain, heavy snow, ice, extreme heat and extreme cold — on
   exactly the thresholds the amber mark on the dial already uses, so the phone
@@ -285,6 +321,13 @@ Notable changes to Wetter. The format follows
   said more precisely.
 
 ### Fixed
+
+- The scan named the wrong stretch when a hazard crossed its threshold more than
+  once. `maxByOrNull { it.severity }` returns the *first* maximum, so among
+  equals it took the earliest. On a real Kolkata forecast that meant warning
+  about a two-hour tail peaking at 33 °C and never mentioning the nine-hour
+  afternoon the next day. Runs are now ranked by severity, then by whether they
+  are already underway, then by how long they last from now.
 
 - **The learned temperature correction was counting the same hour a dozen
   times.** A forecast for eight o'clock is written down on every refresh, so one

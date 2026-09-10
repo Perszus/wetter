@@ -94,8 +94,9 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
      * Tell somebody about severe weather they have not been told about.
      *
      * Detection is already done - `Hazards.scan` is the same call the amber
-     * mark on the dial is drawn from, held to the same thresholds, so the phone
-     * and the screen can never disagree about whether tonight is dangerous.
+     * mark on the dial is drawn from, held to the same thresholds and given the
+     * same climatology, so the phone and the screen can never disagree about
+     * whether tonight is dangerous.
      * What happens here is only delivery: which of those have not been said,
      * and remembering that they now have been.
      *
@@ -109,7 +110,12 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
 
         val forecast = container.repository.cached(location) ?: return
         val now = Instant.now()
-        val hazards = Hazards.scan(forecast, air = null, now = now)
+        // The same decade of archive the Month page keeps, so the thresholds
+        // here are what this place does rather than one number for the planet -
+        // minus twenty is a serious night in Riga and a mild one in Yakutsk.
+        // Cached for a month, so this is a disk read on all but one run.
+        val climate = runCatching { container.climatology.normals(location) }.getOrNull()
+        val hazards = Hazards.scan(forecast, air = null, now = now, climate = climate)
         if (hazards.isEmpty()) return
 
         val said = container.announcedHazards.said(location)

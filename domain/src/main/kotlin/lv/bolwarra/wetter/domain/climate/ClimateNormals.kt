@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.domain.climate
 
 import java.time.LocalDate
 import java.time.MonthDay
+import kotlin.math.ceil
 
 /** One past day at a place, as the archive records it. */
 data class ArchivedDay(
@@ -12,6 +13,12 @@ data class ArchivedDay(
     val low: Double?,
     /** mm over the whole day */
     val precipitation: Double?,
+    /** °C, what the warmest part of the day felt like. */
+    val apparentHigh: Double? = null,
+    /** °C, what the coldest part of the day felt like. */
+    val apparentLow: Double? = null,
+    /** m/s, the strongest gust of the day. */
+    val gust: Double? = null,
 )
 
 /**
@@ -33,6 +40,29 @@ data class DayNormal(
     val wetShare: Double,
     /** How many past days the medians were taken over. */
     val samples: Int,
+    /**
+     * The upper and lower tails of what this date does here, and how often it
+     * thunders. Null where the archive did not carry the variable.
+     *
+     * These are what make a warning mean something. A threshold that is right
+     * for a place is not a number anybody can write down once: thirty-two
+     * degrees of heat index is a September night in Kolkata and a heatwave in
+     * Rīga, and an app that says the same word about both is only saying it
+     * about one of them. See `HazardAnnouncements`.
+     */
+    val warmTail: Double? = null,
+    val coldTail: Double? = null,
+    /** m/s. */
+    val gustTail: Double? = null,
+    /**
+     * The same three again, further out: about the worst comparable day in a
+     * decade rather than the worst in twenty. This is what lets a place have a
+     * *danger* level of its own instead of borrowing one set for the planet.
+     */
+    val warmExtreme: Double? = null,
+    val coldExtreme: Double? = null,
+    /** m/s. */
+    val gustExtreme: Double? = null,
 )
 
 /** A whole year of [DayNormal], ready to be read by date. */
@@ -142,6 +172,10 @@ object ClimateNormals {
             val rain = pooled.mapNotNull { it.precipitation }
             if (rain.size < LEAST_USEFUL_SAMPLE) return@forEach
 
+            val apparentHighs = pooled.mapNotNull { it.apparentHigh ?: it.high }
+            val apparentLows = pooled.mapNotNull { it.apparentLow ?: it.low }
+            val gusts = pooled.mapNotNull { it.gust }
+
             normals[monthDay] = DayNormal(
                 monthDay = monthDay,
                 medianHigh = highs.median(),
@@ -149,9 +183,55 @@ object ClimateNormals {
                 wetShare = rain.count { it >= WET_DAY_MM }
                     .toDouble() / rain.size,
                 samples = rain.size,
+                warmTail = apparentHighs.percentile(UNUSUAL_HERE),
+                coldTail = apparentLows.percentile(1.0 - UNUSUAL_HERE),
+                gustTail = gusts.percentile(UNUSUAL_HERE),
+                warmExtreme = apparentHighs.percentile(EXCEPTIONAL_HERE),
+                coldExtreme = apparentLows.percentile(1.0 - EXCEPTIONAL_HERE),
+                gustExtreme = gusts.percentile(EXCEPTIONAL_HERE),
             )
         }
         return Climatology(normals)
+    }
+
+    /**
+     * Where "unusual for this place at this time of year" is drawn.
+     *
+     * The 95th percentile, which with about a hundred and ten samples behind a
+     * date is roughly the warmest — or windiest — one day in twenty: something
+     * like a day a month at this point in the year. Rare enough that saying so
+     * is news, common enough that the figure is actually estimable from ten
+     * years rather than being the single worst day on record.
+     *
+     * Deliberately not the median plus some number of degrees. A place with
+     * steady weather and a place with wild weather can share a median and have
+     * nothing else in common, and the whole point of this is to ask how far out
+     * of the ordinary a day is *here*.
+     */
+    const val UNUSUAL_HERE = 0.95
+
+    /**
+     * Where "about as bad as this place gets at this time of year" is drawn.
+     *
+     * The 99th percentile, which over a decade and an eleven-day window is
+     * around the second-worst comparable day in ten years. Coarse, and
+     * deliberately so: it is being asked to stand in for a danger level, and a
+     * danger level that fires more than about once a decade is not one.
+     */
+    const val EXCEPTIONAL_HERE = 0.99
+
+    /**
+     * The value at a rank, by nearest-rank rather than by interpolation.
+     *
+     * The same reasoning as the median below it: an interpolated percentile is a
+     * number that never happened, and the entire use of this is to say what an
+     * unusual day at this place actually looks like.
+     */
+    private fun List<Double>.percentile(fraction: Double): Double? {
+        if (size < LEAST_USEFUL_SAMPLE) return null
+        val sorted = sorted()
+        val rank = ceil(fraction * sorted.size).toInt().coerceIn(1, sorted.size)
+        return sorted[rank - 1]
     }
 
     /**

@@ -202,9 +202,12 @@ class WeatherViewModel(
             airQuality = if (forecast != null) extra.air else null,
             climatology = if (forecast != null) extra.climatology else Climatology(emptyMap()),
             // Read off the forecast on screen and the air beside it, so a
-            // warning cannot outlive the forecast that raised it.
+            // warning cannot outlive the forecast that raised it. The normals
+            // go in too: the thresholds for heat, cold and wind are what this
+            // place does rather than one number for the planet, and the mark on
+            // the dial has to be the same judgement the notification made.
             hazards = if (forecast != null) {
-                Hazards.scan(forecast, extra.air, Instant.now())
+                Hazards.scan(forecast, extra.air, Instant.now(), extra.climatology)
             } else {
                 emptyList()
             },

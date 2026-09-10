@@ -4,6 +4,8 @@ import java.time.Duration
 import java.time.Instant
 import lv.bolwarra.wetter.domain.air.AirQuality
 import lv.bolwarra.wetter.domain.air.AirQualityBand
+import lv.bolwarra.wetter.domain.climate.Climatology
+import lv.bolwarra.wetter.domain.climate.DayNormal
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
@@ -75,19 +77,100 @@ data class Hazard(
  *
  * The bar is deliberately high. A mark that is up most of the week is furniture,
  * and the umbrella already learned that lesson once.
+ *
+ * ### And then the place gets a vote, the way the warning services do it
+ *
+ * The paragraph above states the problem and then hands every place on earth the
+ * same number anyway, which does not work in either direction.
+ *
+ * The two big public warning systems both solved this the same way, and neither
+ * of them solved it with a global constant:
+ *
+ * - **Meteoalarm**, the European system, publishes one colour scale - yellow,
+ *   orange, red - and leaves the numbers behind it to each national service.
+ *   Its own documentation says the thresholds "differ from country to country or
+ *   sometimes even from region to region".
+ * - The **US National Weather Service** rewrote its cold products in October
+ *   2024 and says outright that the criteria "are based on local climatology and
+ *   what temperatures actually impact each area". Its regional offices publish
+ *   the numbers: a Cold Weather Advisory on the Mississippi coast is -3.9 C,
+ *   and an Extreme Cold Warning there is -9.4 C.
+ *
+ * Minus four is a mild winter afternoon in Rīga and an advisory in Mississippi,
+ * and both are correct. So the absolute numbers below are the published
+ * *physiological* bands - where a body is actually at risk, which does not move
+ * when you cross a border - and the *warning* level for heat, cold and wind
+ * comes from what this place does.
+ *
+ * It is too low where the weather is routinely hard. Measured on a real Kolkata
+ * forecast: twenty-seven degrees of air at high humidity is thirty-three of heat
+ * index, which cleared the heat threshold for most of every day. An amber mark
+ * that is up permanently says nothing, and a phone that warns nightly gets
+ * turned off before the storm that mattered.
+ *
+ * It is too high where the weather is usually mild, which is worse, because
+ * there the app simply says nothing. Minus twenty-five is where exposed skin is
+ * in danger inside an hour and it is also a temperature Rīga reaches about
+ * never - so the cold warning, in a country that gets genuinely dangerous
+ * winters, was dead code. Minus twenty there is already a serious night.
+ *
+ * So where there is a decade of archive for the place - the same decade the
+ * Month page keeps - the thresholds for heat, cold and wind come from it:
+ *
+ * - **warning** at about the worst comparable day in twenty
+ * - **danger** at about the worst in ten years
+ *
+ * bounded at both ends by published numbers, so the place can move the bar but
+ * not off the scale. Nothing fires below the band where the thing can hurt
+ * anybody at all - the heat index's Caution line, freezing - and the absolute
+ * danger thresholds still fire wherever they are reached, because there is no
+ * climate in which Beaufort 10 is fine.
+ *
+ * Wind is the one that can only be made *stricter*. A gale is a gale: the NWS
+ * issues a Wind Advisory at gusts of 40 mph and a High Wind Warning at 58,
+ * which is 17.9 and 25.9 m/s, and Beaufort has been saying 17.2 and 24.5 for
+ * two centuries - two systems, one from the age of sail, agreeing to within a
+ * few per cent and neither of them adjusting for where you are. What a windy
+ * place does earn is a *higher* bar, so somewhere that gets Beaufort 8 every
+ * fortnight is not told about it every fortnight.
+ *
+ * Rain and snow keep their absolute numbers, because those thresholds are
+ * *rates*: twenty millimetres in an hour overwhelms drainage anywhere on earth,
+ * and four centimetres of snow in an hour closes a road in Sapporo the same as
+ * in Kyiv. A wet climate has more such hours; it does not have them daily. Ice
+ * keeps its too - freezing rain is rare and dangerous everywhere. Thunder keeps
+ * its for a worse reason: it should be relative and the archive cannot measure
+ * it. See the note beside it.
+ *
+ * With no archive, everything falls back to the absolute thresholds, which is
+ * what a new place gets for its first day.
  */
 object Hazards {
 
     /** How far ahead to look. Beyond a day, "a storm is coming" stops being actionable. */
     val HORIZON: Duration = Duration.ofHours(24)
 
-    fun scan(forecast: WeatherForecast, air: AirQuality?, now: Instant): List<Hazard> {
+    fun scan(
+        forecast: WeatherForecast,
+        air: AirQuality?,
+        now: Instant,
+        climate: Climatology? = null,
+    ): List<Hazard> {
         val hours = forecast.hourly
             .filter { !it.timestamp.isBefore(now) && it.timestamp.isBefore(now.plus(HORIZON)) }
             .sortedBy { it.timestamp }
 
+        // Looked up per hour rather than once, because the horizon crosses
+        // midnight and the night either side of it is not the same normal - most
+        // visibly at the turn of a season, which is exactly when an unusual day
+        // is most likely.
+        val zone = forecast.location.zone
+        val normalFor: (HourlyWeather) -> DayNormal? = { hour ->
+            climate?.at(hour.timestamp.atZone(zone).toLocalDate())
+        }
+
         val found = HazardKind.entries.mapNotNull { kind ->
-            runsOf(hours, { severityOf(kind, it) }, { readingOf(kind, it) })
+            runsOf(hours, { severityOf(kind, it, normalFor(it)) }, { readingOf(kind, it) })
                 .bestOf(now)
                 ?.let { Hazard(kind, it.severity, it.from, it.until, it.peak) }
         }.toMutableList()
@@ -119,25 +202,50 @@ object Hazards {
         )
     }
 
-    /** The severity one hour reaches for one kind of hazard, or null for none. */
-    fun severityOf(kind: HazardKind, hour: HourlyWeather): HazardSeverity? = when (kind) {
-        HazardKind.EXTREME_HEAT -> byThreshold(
-            hour.apparentTemperature ?: hour.temperature,
-            HEAT_WARNING_C,
-            HEAT_DANGER_C,
+    /**
+     * The severity one hour reaches for one kind of hazard, or null for none.
+     *
+     * @param normal what this date usually does here, when there is a decade of
+     *   archive to say so. Null falls back to the absolute thresholds.
+     */
+    fun severityOf(
+        kind: HazardKind,
+        hour: HourlyWeather,
+        normal: DayNormal? = null,
+    ): HazardSeverity? = when (kind) {
+        HazardKind.EXTREME_HEAT -> byLocalThreshold(
+            value = hour.apparentTemperature ?: hour.temperature,
+            localWarning = normal?.warmTail,
+            localDanger = normal?.warmExtreme,
+            absoluteWarning = HEAT_WARNING_C,
+            absoluteDanger = HEAT_DANGER_C,
+            leastWarning = HEAT_FLOOR_C,
+            leastDanger = HEAT_WARNING_C,
         )
 
-        // Negated so one comparison serves both ends of the thermometer.
-        HazardKind.EXTREME_COLD -> byThreshold(
-            (hour.apparentTemperature ?: hour.temperature)?.let { -it },
-            -COLD_WARNING_C,
-            -COLD_DANGER_C,
+        // Negated so one comparison serves both ends of the thermometer - the
+        // local tails with it, so they stay in the same frame as the reading.
+        HazardKind.EXTREME_COLD -> byLocalThreshold(
+            value = (hour.apparentTemperature ?: hour.temperature)?.let { -it },
+            localWarning = normal?.coldTail?.let { -it },
+            localDanger = normal?.coldExtreme?.let { -it },
+            absoluteWarning = -COLD_WARNING_C,
+            absoluteDanger = -COLD_DANGER_C,
+            leastWarning = -COLD_CEILING_C,
+            leastDanger = -COLD_WARNING_C,
         )
 
-        HazardKind.DAMAGING_WIND -> byThreshold(
-            hour.windGust ?: hour.windSpeed,
-            GALE_MS,
-            STORM_MS,
+        // The only one whose local bar may only go up. See the note on the
+        // object: two independent systems put a damaging gust in the same place
+        // and neither adjusts for where you are.
+        HazardKind.DAMAGING_WIND -> byLocalThreshold(
+            value = hour.windGust ?: hour.windSpeed,
+            localWarning = normal?.gustTail,
+            localDanger = normal?.gustExtreme,
+            absoluteWarning = GALE_MS,
+            absoluteDanger = STORM_MS,
+            leastWarning = GALE_MS,
+            leastDanger = STORM_MS,
         )
 
         HazardKind.TORRENTIAL_RAIN -> if (hour.kind == PrecipitationKind.SNOW) {
@@ -160,6 +268,17 @@ object Hazards {
             else -> null
         }
 
+        // Absolute, and knowingly so. A storm is an event in most of the world
+        // and the season in a monsoon, so this ought to be relative like the
+        // temperature and the wind - but the archive cannot say how often it
+        // thunders here. Its daily weather code is one representative code for
+        // the whole day, and a few storm hours always lose to the prevailing
+        // rain: measured across eight cities including Kolkata in July and Riga
+        // in July, that field says a thunderstorm share of zero everywhere.
+        // Counting real storm hours needs the hourly codes, which is about four
+        // times the payload of the whole archive fetch for one boolean. Left as
+        // it is, and written down in notes.md, rather than shipping a check that
+        // silently never fires.
         HazardKind.THUNDERSTORM -> when (hour.condition) {
             WeatherCondition.THUNDERSTORM_WITH_HAIL -> HazardSeverity.DANGER
             WeatherCondition.THUNDERSTORM -> HazardSeverity.WARNING
@@ -185,6 +304,51 @@ object Hazards {
         HazardKind.TORRENTIAL_RAIN, HazardKind.HEAVY_SNOW -> hour.precipitation
         HazardKind.EXTREME_UV -> hour.uvIndex
         HazardKind.ICE, HazardKind.THUNDERSTORM, HazardKind.UNBREATHABLE_AIR -> null
+    }
+
+    /**
+     * A threshold the place gets a vote in.
+     *
+     * Everything is oriented so that larger is worse, the cold included - it
+     * arrives negated - so this reads in one direction instead of being two
+     * mirrored sets of comparisons to keep in step.
+     *
+     * The order is the argument:
+     *
+     * 1. Absolute danger always wins. There is no climate in which Beaufort 10
+     *    is fine, and a place whose own worst day is worse than that still has a
+     *    dangerous day when it arrives.
+     * 2. With no local knowledge, the absolute thresholds, exactly as before.
+     * 3. Otherwise the place's own tails, each held at whatever floor its kind
+     *    was given - [leastWarning] so a mild place cannot warn about a pleasant
+     *    day it merely has not had before, [leastDanger] so it cannot call one
+     *    dangerous.
+     *
+     * Note what step 3 does *not* do: it does not fall back to the absolute
+     * warning when the local tails sit above it. That is the point. Thirty-three
+     * degrees of heat index clears the global bar and is an ordinary September
+     * night in Kolkata, and calling that a hazard is how an amber mark stops
+     * meaning anything.
+     *
+     * @param leastWarning the loosest a warning may be for this kind. Passing
+     *   the absolute warning here makes the local bar able only to tighten,
+     *   which is what the wind does.
+     */
+    private fun byLocalThreshold(
+        value: Double?,
+        localWarning: Double?,
+        localDanger: Double?,
+        absoluteWarning: Double,
+        absoluteDanger: Double,
+        leastWarning: Double,
+        leastDanger: Double,
+    ): HazardSeverity? {
+        if (value == null) return null
+        if (value >= absoluteDanger) return HazardSeverity.DANGER
+        if (localWarning == null) return byThreshold(value, absoluteWarning, absoluteDanger)
+
+        if (value >= maxOf(localDanger ?: absoluteDanger, leastDanger)) return HazardSeverity.DANGER
+        return if (value >= maxOf(localWarning, leastWarning)) HazardSeverity.WARNING else null
     }
 
     private fun byThreshold(value: Double?, warning: Double, danger: Double): HazardSeverity? =
@@ -288,25 +452,73 @@ object Hazards {
     }
 
     /**
-     * Apparent temperature at which heat stops being uncomfortable and becomes a
-     * health event. Near the foot of every national heat scale that exists,
-     * which is the most agreement available.
+     * The NWS heat index bands, which are the published ones and are in apparent
+     * temperature because that is what the chart is.
+     *
+     * 80 F, where "fatigue is possible with prolonged exposure". Below it,
+     * standing outside is not the weather's fault, however unusual the day is
+     * for the place - so this is the lowest a local threshold may go.
      */
-    const val HEAT_WARNING_C = 32.0
+    const val HEAT_FLOOR_C = 26.7
 
-    /** Where heat stroke becomes likely rather than possible under exertion. */
-    const val HEAT_DANGER_C = 40.0
+    /**
+     * 90 F, the foot of "extreme caution": sunstroke, cramps and heat exhaustion
+     * become possible with prolonged exposure.
+     */
+    const val HEAT_WARNING_C = 32.2
 
-    /** Apparent temperature at which exposed skin is at risk inside an hour. */
+    /**
+     * 105 F, the foot of "danger": heat exhaustion becomes likely and heatstroke
+     * possible.
+     */
+    const val HEAT_DANGER_C = 40.6
+
+    /**
+     * Freezing, above which cold is not a hazard however unusual it is here.
+     *
+     * Where the road ices and the pipe bursts, and the NWS's own point that skin
+     * cannot freeze until the air is below this. It is the highest a local
+     * threshold may go: a place whose coldest day in a decade is four degrees
+     * has no cold hazard to warn about, whatever its climatology says.
+     *
+     * That still leaves a great deal of room - the mildest published criterion
+     * found anywhere is a US Cold Weather Advisory at -3.9 C.
+     */
+    const val COLD_CEILING_C = 0.0
+
+    /**
+     * Apparent temperature at which exposed skin is at risk inside an hour.
+     *
+     * The NWS wind chill chart puts frostbite at thirty minutes around -28 C, so
+     * this sits just inside that. It is a floor under the *danger* level rather
+     * than a warning threshold in its own right now: a place may set its own
+     * warning far milder - Rīga's own coldest-in-twenty January night is
+     * -18.3 C - but nowhere gets told it is in danger from a temperature that is
+     * merely cold.
+     */
     const val COLD_WARNING_C = -25.0
 
-    /** Frostbite in minutes rather than in an hour. */
-    const val COLD_DANGER_C = -40.0
+    /**
+     * -30 F, where the same chart puts frostbite at ten minutes rather than
+     * thirty. Was -40, which is past the chart's five-minute line and further
+     * than any national service waits.
+     */
+    const val COLD_DANGER_C = -34.4
 
-    /** Beaufort 8: twigs break off trees and walking is difficult. */
+    /**
+     * Beaufort 8: twigs break off trees and walking is difficult.
+     *
+     * Corroborated by the NWS Wind Advisory criterion of gusts at 40 mph, which
+     * is 17.9 m/s. A local threshold may sit above this and never below it.
+     */
     const val GALE_MS = 17.2
 
-    /** Beaufort 10: trees uprooted, structural damage. */
+    /**
+     * Beaufort 10: trees uprooted, structural damage.
+     *
+     * Corroborated by the NWS High Wind Warning criterion of gusts at 58 mph,
+     * which is 25.9 m/s.
+     */
     const val STORM_MS = 24.5
 
     /**

@@ -21,6 +21,9 @@ internal data class OpenMeteoArchiveDaily(
     @SerialName("temperature_2m_max") val high: List<Double?> = emptyList(),
     @SerialName("temperature_2m_min") val low: List<Double?> = emptyList(),
     @SerialName("precipitation_sum") val precipitation: List<Double?> = emptyList(),
+    @SerialName("apparent_temperature_max") val apparentHigh: List<Double?> = emptyList(),
+    @SerialName("apparent_temperature_min") val apparentLow: List<Double?> = emptyList(),
+    @SerialName("wind_gusts_10m_max") val gust: List<Double?> = emptyList(),
 )
 
 /**
@@ -76,6 +79,11 @@ internal class OpenMeteoArchive(
                 parameter("timezone", "auto")
                 parameter("temperature_unit", "celsius")
                 parameter("precipitation_unit", "mm")
+                // Metres per second, because the domain computes in them and a
+                // gust silently arriving in km/h would put the local wind
+                // threshold out by a factor of 3.6 - which is not a wrong
+                // number anybody would notice, only a warning that never fires.
+                parameter("wind_speed_unit", "ms")
             }.body()
 
             response.daily?.toDays().orEmpty()
@@ -97,6 +105,9 @@ internal class OpenMeteoArchive(
                 high = high.getOrNull(index),
                 low = low.getOrNull(index),
                 precipitation = precipitation.getOrNull(index),
+                apparentHigh = apparentHigh.getOrNull(index),
+                apparentLow = apparentLow.getOrNull(index),
+                gust = gust.getOrNull(index),
             )
         }
 
@@ -113,7 +124,17 @@ internal class OpenMeteoArchive(
          */
         const val SETTLING_DAYS = 7L
 
+        /**
+         * The medians the Month page draws, and the tails the hazard thresholds
+         * are taken from.
+         *
+         * Apparent temperature rather than only the air, because that is what
+         * both ends of the thermometer are judged on in the forecast, and a
+         * local threshold has to be in the same units as the reading it is
+         * compared with.
+         */
         private const val DAILY_VARIABLES =
-            "temperature_2m_max,temperature_2m_min,precipitation_sum"
+            "temperature_2m_max,temperature_2m_min,precipitation_sum," +
+                "apparent_temperature_max,apparent_temperature_min,wind_gusts_10m_max"
     }
 }

@@ -234,6 +234,27 @@ is the one they would then miss.
 There is no digest, no "rain starting in 20 minutes", no daily forecast push.
 The app has one thing worth saying without being opened.
 
+**A hazard threshold is a property of the place, not of the planet.**
+Heat, cold and wind are judged against what the location itself does at this
+time of year — the 95th and 99th percentiles of a decade of ERA5, from the same
+archive the Month page keeps — bounded by the published physiological bands so
+the local figure can move the bar without moving it off the scale.
+
+This is not an invention. Meteoalarm publishes one colour scale and leaves every
+number behind it to the national services; the NWS says plainly that its cold
+criteria are set from local climatology, and issues advisories as mild as
+−3.9 °C. A single global number is the thing neither of them does, and the
+reason is visible in the data: −25 °C is a dead threshold in Rīga and 32 °C of
+heat index is a nightly one in Kolkata.
+
+Wind is the exception and only tightens. Beaufort and the NWS gust criteria
+agree to within a few per cent across two centuries and neither adjusts for
+location, so a calm place does not earn a lower bar; a windy one earns a higher.
+
+Rain and snow keep absolute thresholds because theirs are *rates* — 20 mm in an
+hour overwhelms drainage anywhere. Ice keeps its because freezing rain is rare
+and dangerous everywhere.
+
 **No feature modules.**
 See Modules above. `:app` holds the whole UI and will keep holding it.
 

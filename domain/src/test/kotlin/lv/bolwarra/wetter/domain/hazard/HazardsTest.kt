@@ -2,8 +2,12 @@ package lv.bolwarra.wetter.domain.hazard
 
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.MonthDay
 import java.time.ZoneId
 import lv.bolwarra.wetter.domain.air.AirQuality
+import lv.bolwarra.wetter.domain.climate.Climatology
+import lv.bolwarra.wetter.domain.climate.DayNormal
 import lv.bolwarra.wetter.domain.model.CurrentWeather
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.WeatherCondition
@@ -271,5 +275,144 @@ class HazardsTest {
 
         val wind = scan(hours).single { it.kind == HazardKind.DAMAGING_WIND }
         assertEquals(now, wind.from)
+    }
+
+    /**
+     * The tails as they actually came back from ERA5 for these places and dates,
+     * so the numbers under these tests are measured rather than invented.
+     */
+    private fun climatologyOf(
+        warmTail: Double? = null,
+        warmExtreme: Double? = null,
+        coldTail: Double? = null,
+        coldExtreme: Double? = null,
+        gustTail: Double? = null,
+        gustExtreme: Double? = null,
+    ) = Climatology(
+        // Every date in a leap year, so the window can cross midnight and any
+        // 29 February without the lookup falling through to null.
+        (1..366).map { LocalDate.ofYearDay(LEAP_YEAR, it) }
+            .map { MonthDay.of(it.month, it.dayOfMonth) }
+            .associateWith {
+                DayNormal(
+                    monthDay = it,
+                    medianHigh = null,
+                    medianLow = null,
+                    wetShare = 0.0,
+                    samples = 110,
+                    warmTail = warmTail,
+                    coldTail = coldTail,
+                    gustTail = gustTail,
+                    warmExtreme = warmExtreme,
+                    coldExtreme = coldExtreme,
+                    gustExtreme = gustExtreme,
+                )
+            },
+    )
+
+    @Test
+    fun `minus twenty is a hazard in Riga and not in Yakutsk`() {
+        // The measured mid-January tails: Rīga -18.3 / -25.8, Yakutsk -58.0 /
+        // -59.5. One global number cannot serve both, and the one this app used
+        // to carry - minus twenty-five - served neither: it is a temperature
+        // Rīga reaches about never, so the warning was dead code in a country
+        // that gets genuinely dangerous winters.
+        val night = List(4) { hour(it, temperature = -20.0, apparent = -20.0) }
+
+        val riga = Hazards.scan(
+            forecast(night),
+            air = null,
+            now = now,
+            climate = climatologyOf(coldTail = -18.3, coldExtreme = -25.8),
+        )
+        assertEquals(
+            HazardSeverity.WARNING,
+            riga.single { it.kind == HazardKind.EXTREME_COLD }.severity,
+        )
+
+        val yakutsk = Hazards.scan(
+            forecast(night),
+            air = null,
+            now = now,
+            climate = climatologyOf(coldTail = -58.0, coldExtreme = -59.5),
+        )
+        assertTrue(yakutsk.none { it.kind == HazardKind.EXTREME_COLD })
+    }
+
+    @Test
+    fun `an ordinary muggy night in Kolkata is not a heat hazard`() {
+        // Twenty-seven degrees of air at high humidity is thirty-three of heat
+        // index, which clears the global bar and is what September does there
+        // every night. The measured July tails are 42.1 / 42.9.
+        val kolkata = climatologyOf(warmTail = 42.1, warmExtreme = 42.9)
+        val muggy = List(4) { hour(it, temperature = 27.0, apparent = 33.0) }
+        assertTrue(Hazards.scan(forecast(muggy), null, now, kolkata).isEmpty())
+
+        // And a real heat event there still is one.
+        val heatwave = List(4) { hour(it, temperature = 40.0, apparent = 43.5) }
+        assertEquals(
+            HazardSeverity.DANGER,
+            Hazards.scan(forecast(heatwave), null, now, kolkata)
+                .single { it.kind == HazardKind.EXTREME_HEAT }.severity,
+        )
+    }
+
+    @Test
+    fun `a mild place cannot warn about a pleasant day it has not had before`() {
+        // Unusual is not the same as dangerous. A coastal town whose warmest
+        // comparable day in a decade is twenty-four gets no heat hazard at
+        // twenty-five, because the heat index says nothing is at risk below its
+        // Caution line whatever the local record says.
+        val mild = climatologyOf(warmTail = 23.0, warmExtreme = 24.0)
+        val pleasant = List(4) { hour(it, temperature = 25.0, apparent = 25.0) }
+        assertTrue(Hazards.scan(forecast(pleasant), null, now, mild).isEmpty())
+    }
+
+    @Test
+    fun `a windy place gets a higher bar, a calm one keeps the gale`() {
+        // Wind is the one that may only be tightened. Two systems two centuries
+        // apart put a damaging gust in the same place and neither adjusts for
+        // where you are - so somewhere that gets Beaufort 8 fortnightly earns a
+        // higher bar, and somewhere calm does not earn a lower one.
+        val blowing = List(4) { hour(it, gust = 18.0) }
+
+        val faroes = climatologyOf(gustTail = 25.0, gustExtreme = 30.0)
+        assertTrue(Hazards.scan(forecast(blowing), null, now, faroes).isEmpty())
+
+        val calm = climatologyOf(gustTail = 9.1, gustExtreme = 9.5)
+        assertEquals(
+            HazardSeverity.WARNING,
+            Hazards.scan(forecast(blowing), null, now, calm)
+                .single { it.kind == HazardKind.DAMAGING_WIND }.severity,
+        )
+    }
+
+    @Test
+    fun `absolute danger fires wherever it is reached`() {
+        // There is no climate in which Beaufort 10 is fine, so a place whose own
+        // tails sit above it does not get to shrug this off.
+        val hurricane = List(3) { hour(it, gust = 33.0) }
+        val patagonia = climatologyOf(gustTail = 28.0, gustExtreme = 40.0)
+        assertEquals(
+            HazardSeverity.DANGER,
+            Hazards.scan(forecast(hurricane), null, now, patagonia)
+                .single { it.kind == HazardKind.DAMAGING_WIND }.severity,
+        )
+    }
+
+    @Test
+    fun `with no archive the published absolute thresholds still apply`() {
+        // A new place on its first day, or an archive that did not answer.
+        val gale = List(3) { hour(it, gust = 18.0) }
+        assertEquals(
+            HazardSeverity.WARNING,
+            Hazards.scan(forecast(gale), null, now, climate = null)
+                .single { it.kind == HazardKind.DAMAGING_WIND }.severity,
+        )
+    }
+
+    private companion object {
+        /** Any year with a 29 February. */
+        const val LEAP_YEAR = 2024
     }
 }

@@ -25,6 +25,15 @@ private data class StoredNormal(
     val medianLow: Double? = null,
     val wetShare: Double = 0.0,
     val samples: Int = 0,
+    // Defaulted, so a payload written before these existed still decodes and
+    // simply has no local thresholds - which reads as "no climatology" and
+    // falls back to the absolute ones until the decade is next rebuilt.
+    val warmTail: Double? = null,
+    val coldTail: Double? = null,
+    val gustTail: Double? = null,
+    val warmExtreme: Double? = null,
+    val coldExtreme: Double? = null,
+    val gustExtreme: Double? = null,
 )
 
 /**
@@ -110,6 +119,12 @@ class ClimatologyRepository internal constructor(
                         medianLow = it.medianLow,
                         wetShare = it.wetShare,
                         samples = it.samples,
+                        warmTail = it.warmTail,
+                        coldTail = it.coldTail,
+                        gustTail = it.gustTail,
+                        warmExtreme = it.warmExtreme,
+                        coldExtreme = it.coldExtreme,
+                        gustExtreme = it.gustExtreme,
                     )
                 }
             }
@@ -132,6 +147,12 @@ class ClimatologyRepository internal constructor(
                     medianLow = row.medianLow,
                     wetShare = row.wetShare,
                     samples = row.samples,
+                    warmTail = row.warmTail,
+                    coldTail = row.coldTail,
+                    gustTail = row.gustTail,
+                    warmExtreme = row.warmExtreme,
+                    coldExtreme = row.coldExtreme,
+                    gustExtreme = row.gustExtreme,
                 )
             },
         )
