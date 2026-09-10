@@ -175,7 +175,10 @@ internal object MetNorwayMapper {
             } else {
                 hourlySteps.count { step ->
                     val mm = step.step.data.next1Hours?.details?.precipitationAmount ?: 0.0
-                    mm >= PrecipitationIntensity.TRACE_MM_PER_HOUR
+                    // Hours worth calling wet. A one-hour window's amount is
+                    // numerically its rate, so this is the same bar the rest of
+                    // the app names rain at.
+                    PrecipitationIntensity.ofRate(mm).isWorthNaming
                 }.toDouble()
             },
             sunrise = solar.sunrise,
@@ -232,8 +235,12 @@ internal object MetNorwayMapper {
             .filter { it.step.data.next1Hours != null }
             .ifEmpty { steps }
 
+        // Wet enough to name the day after. Below this the day is described by
+        // its sky instead, which is what a cloudy afternoon with a tenth of a
+        // millimetre in it actually is - and stops a week of drizzle marks
+        // sitting over days nobody would call rainy.
         val wettest = candidates
-            .filter { (it.precipitationRate() ?: 0.0) >= PrecipitationIntensity.TRACE_MM_PER_HOUR }
+            .filter { PrecipitationIntensity.ofRate(it.precipitationRate()).isWorthNaming }
             .maxByOrNull { it.precipitationRate() ?: 0.0 }
 
         val chosen = wettest ?: candidates.minByOrNull { step ->

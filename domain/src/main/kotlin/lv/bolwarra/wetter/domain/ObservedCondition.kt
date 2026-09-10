@@ -56,6 +56,16 @@ object ObservedCondition {
         if (observedRate == null) return reported
         if (reported in RADAR_CANNOT_SEE) return reported
 
+        // The lower bar here, deliberately, while the rain *claims* use the
+        // higher one.
+        //
+        // Two reasons. This reads the radar, which is an observation of what is
+        // overhead rather than a model's guess at an average hour - the 53%
+        // figure behind isWorthNaming was measured on model hours and does not
+        // transfer. And the word this produces for the trace band is "drizzle",
+        // which is the accurate name for it: the dial is describing the sky, not
+        // promising rain, and drizzle is exactly what a tenth of a millimetre
+        // falling out of an overcast is.
         val falling = observedRate >= PrecipitationIntensity.TRACE_MM_PER_HOUR
         return when {
             falling && !reported.isPrecipitating -> observedPrecipitation(observedRate, temperature)

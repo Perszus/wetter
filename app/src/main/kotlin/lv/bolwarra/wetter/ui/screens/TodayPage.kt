@@ -495,7 +495,12 @@ private fun NextRainBar(
     // curve above it, and the rate beside the label, both showed rain falling.
     // Whatever is actually overhead wins.
     val rate = rateNow(timeline, forecast.hourly, now)
-    val fallingNow = rate >= PrecipitationIntensity.TRACE_MM_PER_HOUR
+    // Rain, not merely something measurable. This bar is the app's plainest
+    // sentence and it was built on the lower bar, so a fortnight of Rīga cloud
+    // with a tenth of a millimetre in it read as continuous rain. An hour in
+    // that band is actually raining about half the time; see
+    // PrecipitationIntensity.isWorthNaming.
+    val fallingNow = PrecipitationIntensity.ofRate(rate).isWorthNaming
     val modelAgrees = spell != null && !spell.start.isAfter(now)
     val wet = fallingNow || modelAgrees
 

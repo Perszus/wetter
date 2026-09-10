@@ -290,6 +290,24 @@ the data. **The words and the marks wait for rain.** Wrong claims fell by half �
 43 to 20 — and the app went from being right 70% of the time when it says rain to
 79%.
 
+The higher bar was then carried to every surface that *claims* rain, which took
+two passes: the bar under the chart had a second route to "raining now" through
+the current rate, so the first fix only covered half of it. The claims are now
+the spell sentence, that bar, the marks in the hour strip, the week's day icon
+and its wet-hour count. Verified on live Rīga data with the rate sitting exactly
+on the old threshold: 0.1 mm/h, dial reading "Partly cloudy", bar reading "Rain
+starts Sunday at 14:00" where it would previously have said it was raining.
+
+Two things deliberately keep the lower bar, and the difference is the point:
+
+- **The curve**, which is a picture of the data. A drizzle is not concerning and
+  the line lifting off the axis is signal enough to expect something.
+- **The word on the dial**, which comes from radar rather than a model and whose
+  answer in that band is "drizzle" — the accurate name for a tenth of a
+  millimetre out of an overcast. The 53% figure was measured on model hours and
+  does not transfer to an observation. An existing test caught this being
+  over-reached and was right to.
+
 Things that were tried and rejected, because the measurement said so:
 
 - **Raising the measurable threshold** instead. Worse: at 0.5 mm/h the app
