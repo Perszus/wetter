@@ -38,7 +38,7 @@ object OpenMeteoMapper {
         val resolved = if (zone == location.zone) location else location.copy(zone = zone)
 
         val hourly = response.hourly?.let { toHourly(it, zone) }.orEmpty()
-        val daily = response.daily?.let { toDaily(it, zone) }.orEmpty()
+        val daily = response.daily?.let { toDaily(it, zone, hourly) }.orEmpty()
 
         return WeatherForecast(
             location = resolved,
@@ -104,8 +104,22 @@ object OpenMeteoMapper {
             )
         }
 
-    private fun toDaily(daily: OpenMeteoDaily, zone: ZoneId): List<DailyWeather> =
-        daily.time.mapIndexedNotNull { index, stamp ->
+    /**
+     * @param hourly the same day's hours, which the daily block does not carry.
+     *   A day is named for the hardest hour in it, and the provider ships only a
+     *   total - four millimetres spread over a day and four in one hour are a
+     *   drizzly day and a downpour, and a sum cannot tell them apart.
+     */
+    private fun toDaily(
+        daily: OpenMeteoDaily,
+        zone: ZoneId,
+        hourly: List<HourlyWeather>,
+    ): List<DailyWeather> {
+        val peakByDate = hourly
+            .groupBy { it.timestamp.atZone(zone).toLocalDate() }
+            .mapValues { (_, hours) -> hours.mapNotNull { it.precipitation }.maxOrNull() }
+
+        return daily.time.mapIndexedNotNull { index, stamp ->
             val date = stamp.toLocalDate() ?: return@mapIndexedNotNull null
             val max = daily.temperatureMax.at(index)
             val min = daily.temperatureMin.at(index)
@@ -118,6 +132,7 @@ object OpenMeteoMapper {
                 temperatureMax = max,
                 condition = weatherConditionFromWmoCode(daily.weatherCode.at(index)),
                 precipitationTotal = daily.precipitationSum.at(index),
+                precipitationPeakRate = peakByDate[date],
                 precipitationProbabilityMax = daily.precipitationProbabilityMax.at(index),
                 precipitationHours = daily.precipitationHours.at(index),
                 sunrise = daily.sunrise.at(index)?.toInstant(zone),
@@ -125,6 +140,7 @@ object OpenMeteoMapper {
                 windSpeedMax = daily.windSpeedMax.at(index),
             )
         }
+    }
 
     /**
      * Parallel arrays are only parallel when the provider says so. Any of them

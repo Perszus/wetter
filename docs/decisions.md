@@ -255,6 +255,29 @@ Rain and snow keep absolute thresholds because theirs are *rates* — 20 mm in a
 hour overwhelms drainage anywhere. Ice keeps its because freezing rain is rare
 and dangerous everywhere.
 
+**One source of truth for how hard it is falling.**
+A provider's symbol carries two claims in one word — *what* is falling and *how
+hard*. The first is theirs to make; the second this app measures against its own
+published scale. They were displayed side by side and never reconciled, so the
+week could show a drizzle mark on a day whose own bar said rain. Measured on a
+real MET Norway forecast for Rīga: a 1.0 mm/h day came back as `DRIZZLE`, while
+the app calls anything from 0.5 mm/h light rain.
+
+The rule is now: **the temperature decides what is falling, the rate decides how
+hard, and the symbol keeps only what it alone knows** — the sky, the character of
+the fall, the hazard. `WeatherCondition.atRate` is the intensity counterpart to
+the older `appropriateFor(temperature)`, and every surface draws `.appearance`
+rather than the raw symbol: the hour, the day, and the current conditions on the
+dial.
+
+Only two pairs are renamed — drizzle against rain, snow grains against snow.
+Showers stay showers, because intermittency is not intensity and a rate cannot
+see it. Thunder stays thunder. Freezing drizzle and freezing rain stay as
+reported: the difference between them is a hazard level rather than a word, and a
+provider that has said which one it is knows more than a millimetre count.
+
+An absent rate changes nothing. Null is not evidence of a light hour.
+
 **No feature modules.**
 See Modules above. `:app` holds the whole UI and will keep holding it.
 

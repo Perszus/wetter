@@ -156,7 +156,9 @@ fun WeatherPlate(
     // the least evidenced thing on it, and it could contradict the chart
     // directly beneath it.
     val seen = ObservedCondition.of(
-        reported = current.condition,
+        // The reconciled word, not the raw symbol, so the radar correction
+        // below starts from the same answer the rest of the app would give.
+        reported = current.appearance,
         observedRate = radarRateAt(timeline, now),
         temperature = current.temperature,
         cloudCover = hour?.cloudCover,

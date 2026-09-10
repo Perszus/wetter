@@ -99,6 +99,9 @@ internal data class StoredDay(
     val temperatureMax: Double,
     val condition: String,
     val precipitationTotal: Double?,
+    // Defaulted, so a forecast cached before this existed still reads back - it
+    // simply has no measured rate and keeps the provider's own word.
+    val precipitationPeakRate: Double? = null,
     val precipitationProbabilityMax: Int?,
     val precipitationHours: Double?,
     val sunriseEpochSecond: Long?,
@@ -181,6 +184,7 @@ private fun DailyWeather.toStored() = StoredDay(
     temperatureMax = temperatureMax,
     condition = condition.name,
     precipitationTotal = precipitationTotal,
+    precipitationPeakRate = precipitationPeakRate,
     precipitationProbabilityMax = precipitationProbabilityMax,
     precipitationHours = precipitationHours,
     sunriseEpochSecond = sunrise?.epochSecond,
@@ -259,6 +263,7 @@ private fun StoredDay.toDomain() = DailyWeather(
     temperatureMax = temperatureMax,
     condition = condition.toCondition(),
     precipitationTotal = precipitationTotal,
+    precipitationPeakRate = precipitationPeakRate,
     precipitationProbabilityMax = precipitationProbabilityMax,
     precipitationHours = precipitationHours,
     sunrise = sunriseEpochSecond?.let(Instant::ofEpochSecond),

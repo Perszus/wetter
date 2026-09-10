@@ -343,6 +343,16 @@ Notable changes to Wetter. The format follows
 
 ### Fixed
 
+- **The app had three ideas of how hard it was raining, and they disagreed on
+  screen.** A provider's symbol claims both what is falling and how hard; the app
+  measures the second for itself; nothing reconciled them. On a real forecast for
+  Rīga a 1.0 mm/h day came back as `DRIZZLE` — light rain by the app's own scale
+  — so the week showed a drizzle mark above a bar that said rain, and elsewhere
+  the reverse. The dial was worse: it read the provider's `current` symbol raw,
+  never corrected at all, which is the most prominent word in the app.
+  Now the temperature decides what is falling, the rate decides how hard, and the
+  symbol keeps only what it alone knows. Every surface draws the corrected word.
+
 - **The umbrella belonged to the moment rather than to the day.** It ran from
   *now* to midnight, on the reasoning that a shower which finished this morning
   is no reason to carry an umbrella this afternoon — which is right about a

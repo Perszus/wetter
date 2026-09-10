@@ -167,6 +167,10 @@ internal object MetNorwayMapper {
             temperatureMax = temperatures.max(),
             condition = dominantCondition(steps, zone),
             precipitationTotal = total,
+            // The hardest hour in the day, which is what names it. Taken from
+            // the finest window each step publishes, so a six-hourly block
+            // contributes its rate rather than its total.
+            precipitationPeakRate = steps.mapNotNull { it.precipitationRate() }.maxOrNull(),
             precipitationProbabilityMax = probabilities.maxOrNull()?.roundToInt()?.coerceIn(0, 100),
             // Counted only where the day is covered hour by hour. Estimating it
             // from six-hourly totals would be a guess presented as a measurement.

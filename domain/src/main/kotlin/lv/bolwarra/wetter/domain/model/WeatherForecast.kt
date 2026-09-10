@@ -70,7 +70,22 @@ data class CurrentWeather(
     val humidity: Int?,
     /** hPa, reduced to mean sea level */
     val pressure: Double?,
-)
+) {
+
+    /**
+     * The condition as it should be shown, corrected the same way every other
+     * surface's is: the temperature decides what is falling, the measured rate
+     * decides how hard.
+     *
+     * This is the most prominent word in the app and it was the last one still
+     * reading a provider's symbol raw. `conditionsAt` only reaches for an hourly
+     * row once the observation has been overtaken, so in the ordinary case - a
+     * fresh observation, which is most of the time - the dial showed the
+     * unreconciled word while the chart beneath it was drawn from the rate.
+     */
+    val appearance: WeatherCondition
+        get() = condition.appropriateFor(temperature).atRate(precipitation)
+}
 
 /**
  * One hour of forecast. This is the row the whole precipitation timeline is built
@@ -168,10 +183,15 @@ data class HourlyWeather(
         }
 
     /**
-     * The condition as it should be shown: the provider's word, named for what
-     * the temperature says would actually reach the ground.
+     * The condition as it should be shown.
+     *
+     * The provider's word, named for what the temperature says would actually
+     * reach the ground and for how hard this hour is measured to be falling.
+     * Every surface that draws a condition reads this rather than the raw
+     * symbol, so there is one answer to appeal to.
      */
-    val appearance: WeatherCondition get() = condition.appropriateFor(temperature)
+    val appearance: WeatherCondition
+        get() = condition.appropriateFor(temperature).atRate(precipitation)
 }
 
 data class DailyWeather(
@@ -184,6 +204,17 @@ data class DailyWeather(
     val condition: WeatherCondition,
     /** mm over the whole day */
     val precipitationTotal: Double?,
+    /**
+     * The strongest hourly rate anywhere in the day, in mm/h, or null when the
+     * hours are not known.
+     *
+     * Kept beside the total because they answer different questions and have
+     * been confused before: a total says how much fell, a rate says how hard.
+     * Naming a day needs the rate - four millimetres spread evenly over
+     * twenty-four hours is a drizzly day, and the same four in one hour is a
+     * downpour - and the total cannot tell those apart.
+     */
+    val precipitationPeakRate: Double? = null,
     /** percent, the highest hourly probability of the day */
     val precipitationProbabilityMax: Int?,
     /** How many hours of the day see precipitation at all. */
@@ -210,5 +241,6 @@ data class DailyWeather(
      * day is below freezing — where "rain" is wrong at every hour of it — and
      * never on the strength of a cold night that the shower missed.
      */
-    val appearance: WeatherCondition get() = condition.appropriateFor(temperatureMax)
+    val appearance: WeatherCondition
+        get() = condition.appropriateFor(temperatureMax).atRate(precipitationPeakRate)
 }

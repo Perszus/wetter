@@ -87,6 +87,56 @@ enum class WeatherCondition {
         }
     }
 
+    /**
+     * The same condition, named for how hard it is actually falling.
+     *
+     * ### One source of truth for intensity
+     *
+     * A provider's symbol carries two different claims in one word: *what* is
+     * falling, and *how hard*. The first is theirs to make. The second this app
+     * measures for itself, against a published scale, and the two were being
+     * displayed side by side without ever being reconciled.
+     *
+     * Measured on a real MET Norway forecast for Rīga: the 20th had a peak of
+     * 1.0 mm/h and came back as `DRIZZLE`, while the app's own scale calls
+     * anything from 0.5 mm/h light rain. So the week showed a drizzle mark on a
+     * day the bar underneath called rain, and on another day the reverse. Both
+     * surfaces were reading the same forecast and neither was wrong on its own
+     * terms - there simply was no single answer to appeal to.
+     *
+     * This is the counterpart to [appropriateFor], which does exactly the same
+     * job for the other half of the word: the temperature decides rain or snow,
+     * and the rate decides drizzle or rain. Between them the symbol keeps what
+     * only it knows - the sky, the character of the fall, the hazard - and
+     * everything the app can measure, the app measures.
+     *
+     * ### What is deliberately left alone
+     *
+     * Only the two pairs that are genuinely the same thing at two strengths get
+     * renamed: drizzle against rain, and snow grains against snow.
+     *
+     * Showers stay showers, because that is a claim about the fall being
+     * intermittent rather than about how hard it is, and a rate cannot see it.
+     * Thunderstorms stay thunderstorms. Freezing drizzle and freezing rain stay
+     * as reported even though they are an intensity pair, because the difference
+     * between them is a hazard rather than a word - `Hazards` treats freezing
+     * rain as a danger and freezing drizzle as a warning - and a provider that
+     * has said which one it is knows more about it than a millimetre count does.
+     *
+     * @param millimetresPerHour the measured rate, or null when nothing was
+     *   measured. Null leaves the symbol exactly as it came: an absent
+     *   measurement is not evidence of a light one.
+     */
+    fun atRate(millimetresPerHour: Double?): WeatherCondition {
+        if (millimetresPerHour == null || !isPrecipitating) return this
+        val worthNaming = PrecipitationIntensity.ofRate(millimetresPerHour).isWorthNaming
+        return when (this) {
+            DRIZZLE, RAIN -> if (worthNaming) RAIN else DRIZZLE
+            SNOW_GRAINS, SNOW -> if (worthNaming) SNOW else SNOW_GRAINS
+            else -> this
+        }
+    }
+
     val isPrecipitating: Boolean
         get() = when (this) {
             DRIZZLE, FREEZING_DRIZZLE, RAIN, FREEZING_RAIN, SLEET, SNOW, SNOW_GRAINS,
