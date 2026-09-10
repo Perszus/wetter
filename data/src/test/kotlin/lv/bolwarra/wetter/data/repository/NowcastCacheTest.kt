@@ -110,6 +110,15 @@ class NowcastCacheTest {
         override suspend fun deleteOlderThan(cutoffEpochSecond: Long) {
             if ((row?.sweepAtEpochSecond ?: Long.MAX_VALUE) < cutoffEpochSecond) row = null
         }
+
+        // The real one is a Room query that re-emits on every write. Nothing in
+        // this file watches it, so a single emission of whatever is held is a
+        // faithful enough stand-in.
+        override fun observeSweep(cacheKey: String) = kotlinx.coroutines.flow.flowOf(
+            row?.takeIf {
+                it.cacheKey == cacheKey
+            }?.sweepAtEpochSecond,
+        )
     }
 
     private fun repository(radar: FakeRadar, clock: TestClock, dao: FakeSeriesDao? = null) =

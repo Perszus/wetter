@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -51,6 +52,17 @@ class WeatherViewModel(
 ) : ViewModel() {
 
     private val refreshing = MutableStateFlow(false)
+
+    /**
+     * Whether the near-term chart is being re-collected right now.
+     *
+     * Separate from [refreshing], which is about the model. These are different
+     * fetches on different cadences, and the reader only ever sees one mark - so
+     * the mark has to mean "numbers are on their way" rather than "one
+     * particular request is outstanding". The model is usually still fresh when
+     * the app is opened; the thing that actually redraws the grid is the radar.
+     */
+    private val collecting = MutableStateFlow(false)
     private val error = MutableStateFlow<WeatherError?>(null)
 
     /**
@@ -103,6 +115,9 @@ class WeatherViewModel(
      * ticking away behind a screen nobody is looking at. Network is rate-limited
      * by the repository's own cache, not by this cadence: most of these ticks
      * only re-anchor what is already held.
+     *
+     * It also listens to the store, so a sweep collected by the background
+     * worker reaches an open screen when it lands rather than at the next tick.
      */
     private val timelines: Flow<List<FusedPrecipitation>> = forecasts
         .map { it.value }
@@ -110,14 +125,35 @@ class WeatherViewModel(
             if (forecast == null) {
                 flowOf(emptyList())
             } else {
-                flow {
-                    while (true) {
-                        emit(
-                            runCatching {
-                                nowcasts.timeline(forecast, Instant.now())
-                            }.getOrDefault(emptyList()),
-                        )
-                        delay(TIMELINE_TICK_MS)
+                // Rebuilt when a new sweep lands, and on a slow clock besides.
+                //
+                // Those are two different reasons and only one of them is a
+                // timer. New radar is an event the database knows about the
+                // instant it is stored, so the screen is told rather than left
+                // to ask - it used to ask once a minute, which put the chart on
+                // average half a minute behind data the app was already
+                // holding, and that is exactly as slow as it sounds.
+                //
+                // The clock stays for the other reason: the steps are anchored
+                // at the instant they were built, so a timeline nobody has
+                // refreshed has its leading edge drift into the past and loses
+                // the minutes nearest now. That is a re-anchor, not a fetch.
+                merge(
+                    nowcasts.sweeps(forecast.location),
+                    flow {
+                        while (true) {
+                            emit(null)
+                            delay(TIMELINE_TICK_MS)
+                        }
+                    },
+                ).map {
+                    collecting.value = true
+                    try {
+                        runCatching {
+                            nowcasts.timeline(forecast, Instant.now())
+                        }.getOrDefault(emptyList())
+                    } finally {
+                        collecting.value = false
                     }
                 }
             }
@@ -178,10 +214,20 @@ class WeatherViewModel(
         Derived(timeline = timeline, bias = bias, air = air, climatology = normals)
     }
 
+    /**
+     * One mark for "asking again", whichever request is out.
+     *
+     * Combined here rather than shown as two, because a reader does not have a
+     * mental model of "the model" and "the radar" and should not be given one -
+     * design rule 8. Either way the answer on screen is about to change.
+     */
+    private val busy: Flow<Boolean> =
+        combine(refreshing, collecting) { model, radar -> model || radar }
+
     val state: StateFlow<WeatherUiState> = combine(
         selectedLocation.selected,
         forecasts,
-        refreshing,
+        busy,
         error,
         derived,
     ) { location, held, isRefreshing, failure, extra ->

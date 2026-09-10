@@ -1,7 +1,14 @@
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +35,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
+import kotlin.math.cos
+import kotlin.math.sin
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
@@ -53,6 +65,16 @@ fun Tile(
     label: String,
     modifier: Modifier = Modifier,
     trailing: String? = null,
+    /**
+     * Whether new numbers are on their way, drawn as a turning arc beside the
+     * label.
+     *
+     * After the label and not over the content, because the content is not
+     * wrong while this is happening - it is the last forecast, which is still
+     * the best answer there is until a better one lands. Covering it with a
+     * spinner would hide a true reading to announce that a truer one is coming.
+     */
+    busy: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = WetterTheme.colors
@@ -70,12 +92,20 @@ fun Tile(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(
-                text = label.uppercase(),
-                style = WetterTheme.type.sectionLabel,
-                color = colors.textTertiary,
+            Row(
                 modifier = Modifier.weight(1f, fill = false),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = label.uppercase(),
+                    style = WetterTheme.type.sectionLabel,
+                    color = colors.textTertiary,
+                )
+                if (busy) {
+                    Spacer(Modifier.width(spacing.s))
+                    TurningArc(colour = colors.textTertiary)
+                }
+            }
             if (trailing != null) {
                 Text(
                     text = trailing,
@@ -177,3 +207,63 @@ fun ExpandableTile(
 private val TILE_RADIUS = 12.dp
 private val CHEVRON = 20.dp
 private const val HALF_TURN = 180f
+
+/**
+ * The mark for "asking again": the dial's own triangle, turning.
+ *
+ * Drawn rather than borrowed, and drawn as a triangle rather than a ring
+ * because this app already has a small filled triangle that means "where you
+ * are" - the mark inside the dial's rim. Reusing that shape makes the second
+ * one read as the same family rather than as a control panel part that wandered
+ * in from another app.
+ *
+ * A solid triangle also survives being small far better than a hairline arc: at
+ * ten density-independent pixels a stroked ring is two or three physical pixels
+ * wide and turns into a grey smudge, while a filled shape keeps its corners and
+ * its direction.
+ */
+@Composable
+private fun TurningArc(colour: Color, modifier: Modifier = Modifier) {
+    val turning = rememberInfiniteTransition(label = "tile busy")
+    val angle by turning.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            // Linear, because an eased rotation reads as a stutter rather than
+            // as a turn.
+            animation = tween(durationMillis = TURN_MILLIS, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "tile busy angle",
+    )
+
+    Canvas(modifier.size(MARK_SIZE)) {
+        rotate(degrees = angle) {
+            // Equilateral, built from three points a third of a turn apart on
+            // one circle rather than from a width and a height. That is what
+            // makes the sides equal, and it also puts the centre of the shape
+            // on the centre of rotation - a triangle laid out as a box wobbles
+            // as it turns, because its centroid is not the middle of the box.
+            val radius = size.minDimension / 2f
+            val path = Path()
+            repeat(SIDES) { corner ->
+                val turn = Math.toRadians(START_DEGREES + corner * (360.0 / SIDES))
+                val x = center.x + radius * cos(turn).toFloat()
+                val y = center.y + radius * sin(turn).toFloat()
+                if (corner == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            path.close()
+            drawPath(path, colour)
+        }
+    }
+}
+
+/** Sized to a section label's own height, so the row does not grow around it. */
+private val MARK_SIZE = 10.dp
+
+private const val SIDES = 3
+
+/** Straight up, so a still frame reads as a mark rather than as a wedge. */
+private const val START_DEGREES = -90.0
+
+private const val TURN_MILLIS = 1100

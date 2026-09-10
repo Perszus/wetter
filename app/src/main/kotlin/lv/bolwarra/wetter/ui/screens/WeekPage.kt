@@ -31,8 +31,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.hourCovering
 import lv.bolwarra.wetter.domain.model.DailyWeather
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.WeatherForecast
@@ -102,7 +102,10 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
 
     if (days.isEmpty()) return
 
-    val thisHour = now.truncatedTo(ChronoUnit.HOURS)
+    // The row covering now, not the clock's idea of this hour. In a zone that
+    // runs half or three quarters of an hour off UTC the two are different, and
+    // truncating drops the hour the reader is actually in. See hourCovering.
+    val thisHour = forecast.hourly.hourCovering(now)
 
     // The open day, held as its own date rather than as a row number: the list
     // re-forms at midnight and an index would then point at a different day than

@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.data.repository
 
 import java.time.Duration
 import java.time.Instant
+import java.util.Locale
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import lv.bolwarra.wetter.domain.air.AirQuality
@@ -41,8 +42,17 @@ class AirQualityRepository(private val source: AirQualitySource) {
         return fetched
     }
 
+    /**
+     * Locale.ROOT, like every other key in this package.
+     *
+     * `String.format` without one uses the device's locale, and half of Europe
+     * writes a decimal point as a comma - so this produced "56,95,24,11" on a
+     * Latvian phone. Consistent within a run, so nothing is broken today; it
+     * would break silently the day this key is written to disk or compared
+     * across devices.
+     */
     private fun keyOf(location: WeatherLocation): String =
-        "%.2f,%.2f".format(location.latitude, location.longitude)
+        String.format(Locale.ROOT, "%.2f,%.2f", location.latitude, location.longitude)
 
     private companion object {
         val FRESH_FOR: Duration = Duration.ofMinutes(30)

@@ -33,11 +33,48 @@ fun List<HourlyWeather>.onDay(date: LocalDate, zone: ZoneId): List<HourlyWeather
  * is the same length whoever answered, and is the question being asked anyway.
  */
 fun List<HourlyWeather>.window(from: Instant, hours: Long): List<HourlyWeather> {
-    val start = from.truncatedTo(ChronoUnit.HOURS)
+    val sorted = sortedBy { it.timestamp }
+    val start = sorted.hourCovering(from)
     val end = start.plus(Duration.ofHours(hours))
-    return filter { !it.timestamp.isBefore(start) && it.timestamp.isBefore(end) }
-        .sortedBy { it.timestamp }
+    return sorted.filter { !it.timestamp.isBefore(start) && it.timestamp.isBefore(end) }
 }
+
+/**
+ * When the row that covers [instant] began.
+ *
+ * ### Why this is not `truncatedTo(HOURS)`
+ *
+ * It was, and that is an assumption that a forecast hour starts on a whole UTC
+ * hour. Most of the world agrees. India, Nepal, Iran, Afghanistan, Myanmar,
+ * Newfoundland, the Chatham Islands, Lord Howe and central Australia do not:
+ * their clocks run half or three quarters of an hour off UTC, and a provider
+ * asked for local time answers on the local hour - so the rows land at :15, :30
+ * or :45 past the UTC hour.
+ *
+ * Truncating to UTC then lands *before* the row covering now, which sounds
+ * harmless and is not: the filter that follows drops that row, the window opens
+ * on the next hour instead, and everything downstream is answering about an
+ * hour that has not started.
+ *
+ * What that looked like, measured in Kathmandu at 21:54 local: the hour covering
+ * the reader had 0.4 mm of drizzle in it and the dial said `Drizzle`, while the
+ * rain tile beside it read `0.0 mm/h` - because the window had begun at 22:00
+ * and the lookup for "now" fell off the front of it into a default of zero. A
+ * wrong number, silently, on the main screen, for about a fifth of the people on
+ * earth.
+ *
+ * So the start comes from the series rather than from the clock: whichever row
+ * is the last one that has already begun. For a series on whole hours this is
+ * exactly what truncation gave, which is why nothing anywhere else changes.
+ */
+fun List<HourlyWeather>.hourCovering(instant: Instant): Instant = asSequence()
+    .map { it.timestamp }
+    .filter { !it.isAfter(instant) }
+    .maxOrNull()
+    // Nothing has begun yet - a forecast entirely in the future, which is a
+    // cache read a moment before the first row. The clock is the only answer
+    // left and it is the right one: the window then opens on what is coming.
+    ?: instant.truncatedTo(ChronoUnit.HOURS)
 
 /**
  * Every unbroken run of wet hours, in order.

@@ -214,6 +214,14 @@ internal interface RadarSeriesDao {
     @Query("SELECT * FROM radar_series WHERE cacheKey = :cacheKey")
     suspend fun read(cacheKey: String): RadarSeriesEntity?
 
+    /**
+     * The same row, watched. Room re-emits on every write to the table, which is
+     * how a sweep collected by the background worker reaches a screen that is
+     * already open without the screen having to go looking for it.
+     */
+    @Query("SELECT sweepAtEpochSecond FROM radar_series WHERE cacheKey = :cacheKey")
+    fun observeSweep(cacheKey: String): Flow<Long?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun write(series: RadarSeriesEntity)
 

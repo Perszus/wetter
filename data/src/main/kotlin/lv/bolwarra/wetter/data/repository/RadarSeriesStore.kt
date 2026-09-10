@@ -2,6 +2,9 @@ package lv.bolwarra.wetter.data.repository
 
 import java.time.Duration
 import java.time.Instant
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import lv.bolwarra.wetter.data.db.RadarSeriesDao
@@ -58,6 +61,11 @@ internal class RadarSeriesStore(private val dao: RadarSeriesDao, private val jso
             },
         )
     }
+
+    /** When the kept sweep for a place changes, and nothing else. */
+    fun sweeps(cacheKey: String): Flow<Instant?> = dao.observeSweep(cacheKey)
+        .map { it?.let(Instant::ofEpochSecond) }
+        .distinctUntilChanged()
 
     suspend fun write(cacheKey: String, sweepAt: Instant, samples: List<RadarSample>) {
         val payload = json.encodeToString(

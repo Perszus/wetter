@@ -79,6 +79,8 @@ fun TodayPage(
     now: Instant,
     timeline: List<FusedPrecipitation> = emptyList(),
     air: AirQuality? = null,
+    /** Whether a fetch is outstanding, shown as a turning arc beside the label. */
+    isRefreshing: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val units = WetterTheme.units
@@ -119,6 +121,10 @@ fun TodayPage(
                     formatMillimetres(rateNow(timeline, ahead, now), units.precipitation),
                     units.precipitation.label,
                 ),
+                // This tile and no other. It is the one the reader is watching
+                // and the one the radar refresh actually changes; putting the
+                // same mark on the moon phase would be the app fidgeting.
+                busy = isRefreshing,
             ) {
                 RainCurve(
                     hours = ahead,

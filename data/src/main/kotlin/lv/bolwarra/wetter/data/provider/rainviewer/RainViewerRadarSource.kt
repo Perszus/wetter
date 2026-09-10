@@ -10,7 +10,12 @@ import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import lv.bolwarra.wetter.data.provider.toWeatherError
@@ -83,7 +88,7 @@ internal class RainViewerRadarSource(
     override val sweepInterval: Duration = SWEEP_INTERVAL
 
     override suspend fun latestSweep(): Result<Instant?> = try {
-        val index: RainViewerIndex = client.get(indexUrl).body()
+        val index = index()
         Result.success(index.radar.past.lastOrNull()?.let { Instant.ofEpochSecond(it.time) })
     } catch (cancellation: CancellationException) {
         throw cancellation
@@ -96,7 +101,7 @@ internal class RainViewerRadarSource(
         longitude: Double,
         frames: Int,
     ): Result<List<RadarField>> = try {
-        val index: RainViewerIndex = client.get(indexUrl).body()
+        val index = index()
         val wanted = index.radar.past.takeLast(frames.coerceAtLeast(2))
         if (wanted.isEmpty() || index.host.isBlank()) {
             Result.failure(WeatherFailure(WeatherError.NoProviderAvailable))
@@ -109,8 +114,21 @@ internal class RainViewerRadarSource(
                 tilesAcross = BLOCK_SIZE,
                 tilesDown = BLOCK_SIZE,
             )
-            val fields = wanted.map { frame ->
-                fetchFrame(index.host, frame, tileX, tileY, geometry)
+            // Frames together, not one after another.
+            //
+            // Each frame is nine tiles that were already fetched in parallel,
+            // and then the frames themselves were awaited in turn - so three
+            // sweeps cost three round trips and the catch-up case, which asks
+            // for thirteen, cost thirteen. They do not depend on each other in
+            // any way; the only reason they were sequential is that `map` is.
+            //
+            // The whole set shares one permit pool rather than each frame
+            // holding its own, so the burst is bounded by how many requests are
+            // in the air at once instead of by how many sweeps were asked for.
+            val fields = coroutineScope {
+                wanted.map { frame ->
+                    async { fetchFrame(index.host, frame, tileX, tileY, geometry) }
+                }.awaitAll()
             }
             Result.success(fields.filterNotNull())
         }
@@ -181,9 +199,44 @@ internal class RainViewerRadarSource(
      * either way the surrounding sweep is still worth having, and the block is
      * left as zero there.
      */
+    /**
+     * The index, kept for a moment.
+     *
+     * A refresh asks for it twice - once to learn the latest sweep and once to
+     * list the frames - and they are the same question a few milliseconds apart.
+     * RainViewer publishes a new index about every ten minutes, so holding the
+     * answer for one minute cannot serve a stale sweep and removes a round trip
+     * from every refresh.
+     */
+    private suspend fun index(): RainViewerIndex {
+        val now = Instant.now()
+        held.withLock {
+            val kept = cached
+            if (kept != null && Duration.between(kept.first, now) < INDEX_FRESH_FOR) {
+                return kept.second
+            }
+        }
+        val fetched: RainViewerIndex = client.get(indexUrl).body()
+        held.withLock { cached = now to fetched }
+        return fetched
+    }
+
+    private val held = Mutex()
+    private var cached: Pair<Instant, RainViewerIndex>? = null
+
+    /**
+     * How many tile requests may be in the air at once.
+     *
+     * Nine is one frame's worth. Without a bound, asking for the thirteen
+     * frames of a catch-up would put a hundred and seventeen requests on a
+     * volunteer service in one go, which is rude and, on a phone radio, slower
+     * than doing fewer at a time.
+     */
+    private val inFlight = Semaphore(MAX_TILES_IN_FLIGHT)
+
     private suspend fun tile(host: String, path: String, x: Int, y: Int): IntArray? = try {
         val url = "$host$path/${RadarGeometry.TILE_SIZE}/$ZOOM/$x/$y/$COLOUR_SCHEME/$OPTIONS.png"
-        val response: HttpResponse = client.get(url)
+        val response: HttpResponse = inFlight.withPermit { client.get(url) }
         val bytes = response.readRawBytes()
         withContext(Dispatchers.Default) { decoder.decode(bytes) }
     } catch (cancellation: CancellationException) {
@@ -205,6 +258,10 @@ internal class RainViewerRadarSource(
         const val ZOOM = 7
 
         /** Three by three, centred on the user's tile. */
+        const val MAX_TILES_IN_FLIGHT = 9
+
+        val INDEX_FRESH_FOR: Duration = Duration.ofMinutes(1)
+
         const val BLOCK_SIZE = 3
         const val BLOCK_RADIUS = BLOCK_SIZE / 2
 

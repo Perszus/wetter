@@ -134,6 +134,24 @@ data class Hazard(
  * place does earn is a *higher* bar, so somewhere that gets Beaufort 8 every
  * fortnight is not told about it every fortnight.
  *
+ * ### Heat and cold are not clamped the same way, and that is on purpose
+ *
+ * Heat may not reach *danger* below the published Extreme Caution line, however
+ * unusual it is locally. A body is a body: the heat index bands are
+ * physiological, thirty degrees of heat index does not hospitalise anybody
+ * anywhere, and a coastal town having never seen it does not change that.
+ *
+ * Cold may, down to freezing. Cold does not harm people directly so much as
+ * through clothing, housing, heating and roads - all of which are built to what
+ * the place normally does. Minus twelve is a Tuesday in Rīga and a national
+ * emergency in Lisbon, and the difference is entirely in what was built there.
+ *
+ * The cost of getting this wrong was measured: clamping the cold danger to the
+ * absolute warning gave most of Europe a level it can never reach. Reykjavík
+ * warned at -17.6 and could not be in danger until -25, a temperature it has
+ * essentially never seen; Ushuaia warned at -12 with the same unreachable
+ * danger. Now each of them reaches danger at its own hardest day in a decade.
+ *
  * Rain and snow keep their absolute numbers, because those thresholds are
  * *rates*: twenty millimetres in an hour overwhelms drainage anywhere on earth,
  * and four centimetres of snow in an hour closes a road in Sapporo the same as
@@ -232,7 +250,15 @@ object Hazards {
             absoluteWarning = -COLD_WARNING_C,
             absoluteDanger = -COLD_DANGER_C,
             leastWarning = -COLD_CEILING_C,
-            leastDanger = -COLD_WARNING_C,
+            // Freezing, the same floor the warning gets, and deliberately not
+            // the absolute warning the way heat has it. See the note on the
+            // object: cold harms through clothing, housing and infrastructure,
+            // all of which are built to local norms, so a place may reach
+            // danger at its own temperature. Clamping this to -25 gave most of
+            // Europe a danger level it will never see - Reykjavík warns at
+            // -17.6 and could not be in danger until -25, which it has
+            // essentially never been.
+            leastDanger = -COLD_CEILING_C,
         )
 
         // The only one whose local bar may only go up. See the note on the

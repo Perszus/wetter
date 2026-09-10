@@ -411,6 +411,44 @@ class HazardsTest {
         )
     }
 
+    @Test
+    fun `a mild-winter place can reach danger at its own temperature`() {
+        // Measured tails: Berlin mid-January -11.8 / -16.0, Reykjavik
+        // -17.6 / -20.4. Clamping the cold danger to the absolute warning gave
+        // both of them a level they can never see - Reykjavik has essentially
+        // never been -25 - so a night that is the worst in a decade there read
+        // as merely a warning.
+        val night = List(4) { hour(it, temperature = -20.0, apparent = -20.0) }
+
+        val berlin = climatologyOf(coldTail = -11.8, coldExtreme = -16.0)
+        assertEquals(
+            HazardSeverity.DANGER,
+            Hazards.scan(forecast(night), null, now, berlin)
+                .single { it.kind == HazardKind.EXTREME_COLD }.severity,
+        )
+
+        // And Riga, which is used to it, gets the warning rather than the danger
+        // at the same temperature.
+        val riga = climatologyOf(coldTail = -18.3, coldExtreme = -25.8)
+        assertEquals(
+            HazardSeverity.WARNING,
+            Hazards.scan(forecast(night), null, now, riga)
+                .single { it.kind == HazardKind.EXTREME_COLD }.severity,
+        )
+    }
+
+    @Test
+    fun `heat may not reach danger below the published physiological band`() {
+        // The asymmetry with cold, stated as a test. A body is a body: thirty
+        // degrees of heat index hospitalises nobody, however unusual it is for
+        // a cool coastal town that has never had one.
+        val warm = List(4) { hour(it, temperature = 29.0, apparent = 30.0) }
+        val cool = climatologyOf(warmTail = 21.0, warmExtreme = 23.0)
+        val found = Hazards.scan(forecast(warm), null, now, cool)
+            .singleOrNull { it.kind == HazardKind.EXTREME_HEAT }
+        assertEquals(HazardSeverity.WARNING, found?.severity)
+    }
+
     private companion object {
         /** Any year with a 29 February. */
         const val LEAP_YEAR = 2024

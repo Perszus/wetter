@@ -5,6 +5,8 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -259,6 +261,18 @@ class NowcastRepository internal constructor(
      * the same pixel and their samples are genuinely interchangeable. Anything
      * further apart now gets its own row.
      */
+    /**
+     * Emits whenever a newer radar sweep has been stored for this place.
+     *
+     * The screen used to find out by asking again every minute. That is a poll
+     * dressed as a clock: the answer changes when a sweep lands, which is a
+     * thing the database already knows the moment it happens, and waiting a
+     * minute to be told meant the chart was on average half a minute behind
+     * data the app was already holding.
+     */
+    fun sweeps(location: WeatherLocation): Flow<Instant?> =
+        seriesStore?.sweeps(cacheKeyOf(location)) ?: emptyFlow()
+
     private fun cacheKeyOf(location: WeatherLocation): String = keyOf(location)
 
     /**

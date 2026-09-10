@@ -56,6 +56,12 @@ internal class OpenMeteoEnsemble(
             parameter("forecast_days", FORECAST_DAYS)
             parameter("timeformat", "unixtime")
             parameter("timezone", "UTC")
+            // Stated rather than assumed. These happen to be Open-Meteo's
+            // defaults today, and a default is a promise nobody made: a silent
+            // switch to Fahrenheit here would not fail, it would just make every
+            // ensemble spread three times too wide.
+            parameter("temperature_unit", "celsius")
+            parameter("precipitation_unit", "mm")
         }.body()
 
         Result.success(parse(payload))

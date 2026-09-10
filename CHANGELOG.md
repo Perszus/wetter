@@ -8,6 +8,27 @@ Notable changes to Wetter. The format follows
 
 ### Added
 
+- **A turning arc beside the tile label while new numbers are on their way.** On
+  the label rather than over the content, because the content is not wrong while
+  this is happening - it is the last forecast, which is the best answer there is
+  until a better one lands. It covers the radar collection as well as the model
+  fetch, since the model is usually still fresh when the app is opened and the
+  radar is what actually redraws the chart.
+- **The chart no longer waits a minute for data the app already has.** The fused
+  timeline was rebuilt on a 60-second timer, so a sweep collected in the
+  background sat unused for an average of thirty seconds with the screen open.
+  The stored series is now observed, so it rebuilds when a sweep lands; the clock
+  stays only for the thing a clock is actually for, re-anchoring the leading edge
+  as it drifts into the past.
+- **Radar sweeps are fetched together rather than one after another.** Each
+  sweep's nine tiles were already parallel, but the sweeps themselves were
+  awaited in turn - three round trips for an ordinary refresh and thirteen when
+  catching up, for requests with no dependency on each other. Bounded by a
+  nine-permit pool so the burst stays polite. Worth about 260 ms ordinarily and
+  1.6 s when catching up.
+- RainViewer's index is held for a minute instead of being fetched twice in the
+  same refresh, against a service that publishes every ten.
+
 - **Hazard thresholds are what this place does, not one number for the planet.**
   The old set was a single global figure per hazard, and it failed in both
   directions: too low where the weather is routinely hard, too high where it is
@@ -321,6 +342,34 @@ Notable changes to Wetter. The format follows
   said more precisely.
 
 ### Fixed
+
+- **Sunrise and sunset were out by up to nineteen minutes a day.** The solar
+  position came from the low-precision Fourier series that circulates as "the
+  NOAA equations", which is accurate at the solstices and wrong by 0.43° at the
+  equinoxes - enough to misplace the March equinox by most of a day. Near a
+  grazing sun that becomes minutes: measured against an independent almanac, the
+  day was too long by 5.4 min at Rīga, 9.6 at Tromsø and 18.7 at Longyearbyen.
+  Now the full algorithm, plus a second pass that recomputes the sun's position
+  at the time the first pass produced. Every one of eighteen places is now within
+  76 seconds.
+- **The rain rate read `0.0 mm/h` in every timezone offset by half or three
+  quarters of an hour.** The hourly window opened by truncating the clock to a
+  whole *UTC* hour, which in those zones lands before the row covering now - so
+  the row was dropped, the window opened an hour late, and the lookup for "now"
+  fell off the front into a default of zero. Found in Kathmandu at 21:54 local,
+  showing no rain beside a dial reading `Drizzle` with 0.4 mm in the hour. It
+  affects India, Nepal, Iran, Afghanistan, Myanmar, Newfoundland, the Chathams,
+  Lord Howe and central Australia.
+- Most of Europe had a cold **danger** level it could never reach: it was clamped
+  to −25 °C, a temperature Reykjavík has essentially never seen, so its own
+  hardest night in a decade read as merely a warning. Cold now reaches danger at
+  freezing or the place's own extreme, whichever is colder - deliberately not
+  symmetric with heat, because a body is a body while cold harms through
+  clothing, housing and roads, all built to local norms.
+- The ensemble request stated no units at all and relied on the service's
+  defaults, and an in-memory cache key was built with the device's locale, so a
+  Latvian phone produced `56,95,24,11`. Neither was wrong today; both were wrong
+  the moment something changed underneath them.
 
 - The scan named the wrong stretch when a hazard crossed its threshold more than
   once. `maxByOrNull { it.severity }` returns the *first* maximum, so among
