@@ -142,6 +142,31 @@ Notable changes to Wetter. The format follows
   whole scrollable chart is one measurement end to end rather than radar for the
   visible part and the raw hourly rows for the rest, joined at whatever hour the
   radar happened to reach.
+- **The week is a row of marks, not a table of millimetres.** Each day gives its
+  sky as a small drawn glyph, then the temperature range. The rain column and the
+  temperature bars are gone: `4.2 mm` has no feel to it — the same finding that
+  fixed the rain chart's axis — and a week is skimmed rather than studied. What
+  somebody wants off that page is which day is the wet one, and a mark answers it
+  down a column faster than seven numbers can.
+- The glyphs are drawn rather than shipped as drawables: one file, the theme's
+  own colours, and no light/dark asset pairs to keep in step. The sky is in ink
+  and only what falls takes the precipitation hue, so the blue marks down the
+  column are the wet days and nothing else competes for the eye.
+- **A day opens into its hours**, scrolled sideways: the time, the sky, the
+  temperature, and how hard it is raining. One day at a time — seven open drawers
+  is a page nobody can hold in their head.
+- The hourly rain is height on the same fixed axis the chart and the widget use,
+  so a bar there and a peak here mean the same wetness. It is not a number, for
+  the same reason the chart's axis carries none.
+- A wet hour is said three times at three sizes: the column is washed in the rain
+  colour so it can be picked out of a strip that is still moving, its time is set
+  in that colour, and the bar says how hard once you have stopped on it. The bar
+  alone was not enough — one wet hour in twenty-four, at 0.4 mm, drew a two-pixel
+  stub you had to scroll past the other twenty-three to find.
+- Today's hours start at the current hour rather than at midnight. The rest of
+  the row summarises the whole day and rightly includes the morning that has
+  been; an hour-by-hour forecast of hours that have already happened is a stretch
+  of strip to scroll past before reaching anything anybody can act on.
 
 ### Fixed
 

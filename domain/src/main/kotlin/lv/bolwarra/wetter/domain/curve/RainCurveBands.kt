@@ -1,5 +1,6 @@
 package lv.bolwarra.wetter.domain.curve
 
+import kotlin.math.sqrt
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 
 /**
@@ -85,6 +86,43 @@ object RainCurveBands {
     val moderateEdge: Float get() = heightFraction(MODERATE_EDGE_MM)
 
     val heavyEdge: Float get() = heightFraction(HEAVY_EDGE_MM)
+
+    /**
+     * The same height, spread out inside the light band, for a short track.
+     *
+     * This axis puts the least rain there is at eight percent of the track. On
+     * the app's chart that is plenty — the band is captioned "Light" right
+     * beside the curve, and the track is tall enough for eight percent to be a
+     * real mark. On a surface a fifth of that height it is one or two pixels,
+     * and a genuine forecast of drizzle all evening draws as nothing at all.
+     *
+     * ### What it is allowed to change, and what it is not
+     *
+     * Only where a rate lands *within* the light band. The square root is
+     * anchored so that the light band's ceiling is a fixed point of it, which
+     * leaves both boundaries exactly where they were: **the three levels stay
+     * the same height**, which is the one thing about this axis that must never
+     * move. A scale whose steps are different sizes asks the reader to remember
+     * which step is which.
+     *
+     * Dry is exempt — zero maps to zero — because the whole point is to open a
+     * gap between no rain and some rain.
+     *
+     * ### Why it lives here and is still opt-in
+     *
+     * docs/design-principles.md says a legibility problem on one surface gets
+     * fixed on that surface, and the widget's own version of this was written
+     * under that rule. Two surfaces now need it — the widget's bitmap and the
+     * week's hour strip — and two hand-copied square roots is how they start
+     * disagreeing about a drizzle. So the arithmetic is shared and the
+     * *decision* is not: the tall chart does not call this, and nothing here
+     * changes what it draws.
+     */
+    fun spreadWithinLight(fraction: Float): Float {
+        val ceiling = moderateEdge
+        if (fraction <= 0f || fraction >= ceiling) return fraction
+        return ceiling * sqrt(fraction / ceiling)
+    }
 
     /**
      * Dry sits on the floor and the least rain there is steps just clear of it,

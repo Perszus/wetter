@@ -464,12 +464,13 @@ internal object RainStrip {
      *
      * Dry is exempt - zero maps to zero - because the whole point is to open a
      * gap between no rain and some rain.
+     *
+     * The arithmetic itself now lives beside the axis it bends, because the
+     * week's hour strip is a short track with the same problem, and two
+     * hand-copied square roots is how two surfaces start disagreeing about a
+     * drizzle. Which surfaces apply it is still each surface's own decision.
      */
-    private fun lifted(fraction: Float): Float {
-        val ceiling = RainCurveBands.moderateEdge
-        if (fraction <= 0f || fraction >= ceiling) return fraction
-        return ceiling * sqrt(fraction / ceiling)
-    }
+    private fun lifted(fraction: Float): Float = RainCurveBands.spreadWithinLight(fraction)
 
     /**
      * A path through the samples, rounded at the joins.

@@ -197,4 +197,18 @@ data class DailyWeather(
     val sunset: Instant?,
     /** m/s */
     val windSpeedMax: Double?,
-)
+) {
+
+    /**
+     * The condition as it should be shown for the whole day.
+     *
+     * Measured against the day's *maximum*, which is the conservative reading
+     * and the only one that is safe over a span this long. An hour can be named
+     * from the temperature at that hour; a day cannot, because it contains both
+     * ends of its own range and nothing here says which end the precipitation
+     * fell at. Taking the maximum means the rename only fires when the entire
+     * day is below freezing — where "rain" is wrong at every hour of it — and
+     * never on the strength of a cold night that the shower missed.
+     */
+    val appearance: WeatherCondition get() = condition.appropriateFor(temperatureMax)
+}
