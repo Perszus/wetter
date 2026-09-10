@@ -1,5 +1,14 @@
 package lv.bolwarra.wetter.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,6 +53,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lv.bolwarra.wetter.BuildConfig
@@ -54,6 +64,7 @@ import lv.bolwarra.wetter.domain.settings.Preferences
 import lv.bolwarra.wetter.domain.settings.TemperatureUnit
 import lv.bolwarra.wetter.domain.settings.ThemeChoice
 import lv.bolwarra.wetter.domain.settings.WindUnit
+import lv.bolwarra.wetter.notify.HazardNotifier
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.ChoiceRow
 import lv.bolwarra.wetter.ui.theme.WetterTheme
@@ -257,11 +268,31 @@ private fun ColumnScope.GeneralGroup(preferences: Preferences, onChange: (Prefer
     // First, because it is the only setting here that changes what the app does
     // rather than how it writes a number - and the only one that lets it speak
     // when nobody has opened it.
+    val context = LocalContext.current
+
+    // Turning this on has to *work*, including for somebody who said no to the
+    // system dialog months ago and has changed their mind. The app is asked
+    // once, ever, and never asks again - so this row is the only way back, and a
+    // switch that reads "On" while the platform is dropping every notification
+    // is a control that lies.
+    //
+    // If the request comes back still refused, the only remaining answer is the
+    // system's own screen, so this goes there rather than leaving somebody
+    // tapping a switch that has already done everything it can.
+    val request = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (!granted) context.openNotificationSettings()
+    }
+
     ChoiceRow(
         label = stringResource(R.string.setting_warnings),
         options = listOf(true, false),
         selected = preferences.warnings,
-        onSelect = { onChange(preferences.copy(warnings = it)) },
+        onSelect = { wanted ->
+            onChange(preferences.copy(warnings = wanted))
+            if (wanted) context.makeWarningsPossible(request::launch)
+        },
         describe = {
             stringResource(
                 if (it) R.string.setting_warnings_on else R.string.setting_warnings_off,
@@ -482,4 +513,45 @@ private fun SettingsPreview() {
             onDismiss = {},
         )
     }
+}
+
+/**
+ * Do whatever is still needed for a warning to actually arrive.
+ *
+ * Three states and three answers. Already allowed: nothing to do. Never asked,
+ * or asked and refusable again: ask, and the caller sends a refusal onwards.
+ * Notifications switched off for the whole app in system settings: no runtime
+ * permission can fix that, so go straight to the screen that can.
+ */
+private fun Context.makeWarningsPossible(ask: (String) -> Unit) {
+    if (HazardNotifier(this).isAllowed()) return
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        ask(Manifest.permission.POST_NOTIFICATIONS)
+        return
+    }
+
+    // The permission is held and warnings still cannot arrive, which means the
+    // channel or the app is muted further up.
+    openNotificationSettings()
+}
+
+/** The system's own page for this app's notifications. */
+private fun Context.openNotificationSettings() {
+    val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+    } else {
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(Uri.fromParts("package", packageName, null))
+    }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    // A device with no settings activity to answer this is not a device this
+    // app can do anything more for, and it is not worth a crash.
+    runCatching { startActivity(intent) }
 }

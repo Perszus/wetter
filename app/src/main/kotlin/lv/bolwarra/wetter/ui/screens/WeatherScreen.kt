@@ -1,5 +1,12 @@
 package lv.bolwarra.wetter.ui.screens
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -27,8 +34,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -44,6 +53,7 @@ import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.settings.Preferences
 import lv.bolwarra.wetter.domain.settings.ThemeChoice
+import lv.bolwarra.wetter.notify.HazardNotifier
 import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.DomainSwitcher
 import lv.bolwarra.wetter.ui.components.EmptyState
@@ -111,6 +121,8 @@ fun WeatherScreen(
 ) {
     val spacing = WetterTheme.spacing
 
+    AskAboutWarningsOnce(hasForecast = state.forecast != null)
+
     // The whole screen is read against this instant - the mark on the dial, the
     // rolling rain window, which day "tomorrow" means - so it has to keep up
     // with the clock rather than with when the screen happened to open.
@@ -165,6 +177,86 @@ fun WeatherScreen(
             modifier = modifier,
         )
     }
+}
+
+/**
+ * Ask about severe-weather notifications, once, and not before there is weather.
+ *
+ * The rule this is here to keep is that the dialog lands over a screen already
+ * showing a forecast: the difference between being asked about storm warnings
+ * for a place you can see the weather for, and being asked for the notification
+ * permission by an app that has so far shown you nothing.
+ *
+ * That used to be a comment rather than a condition. The request fired from the
+ * activity as soon as the composition ran, and on a warm cache and a quick
+ * network the forecast beat it by a frame or two, so it looked right. Offline it
+ * was not: a first run in aeroplane mode put the system dialog over an empty
+ * black screen, which is the exact prompt-about-nothing the comment claimed to
+ * avoid.
+ *
+ * Gated on the forecast rather than on a timer, so it is the state that decides.
+ *
+ * ### Once, and once means once
+ *
+ * The in-composition flag below only stops it firing twice on one screen; it
+ * does not survive the app being closed, so on its own this would ask again on
+ * every cold launch until the reader gave in. That is the behaviour of an app
+ * that has decided it knows better, and it is worth being precise about why the
+ * usual excuse - "Android stops showing it after two refusals" - is not good
+ * enough: two is still one more than nobody asked for.
+ *
+ * So the platform is asked whether the reader has already said no.
+ * `shouldShowRequestPermissionRationale` is true exactly once a permission has
+ * been refused and not yet refused for good, which is the state this must never
+ * ask in. It needs nothing stored and cannot drift out of step with the system's
+ * own record:
+ *
+ * - never asked -> false, and this asks.
+ * - refused once -> true, and this stays quiet from then on.
+ * - refused for good -> false again, but the system shows nothing and returns a
+ *   refusal immediately, so nothing is put in front of anybody.
+ *
+ * The reader therefore sees this dialog once in the life of the install. If they
+ * change their mind, the switch in Settings and the system's own app settings
+ * are both still there.
+ *
+ * There is no callback because there is nothing to do with the answer: a phone
+ * that says no simply never gets a warning, and the switch stays on meaning
+ * "yes, warn me" for the day the permission is granted somewhere else.
+ */
+@Composable
+private fun AskAboutWarningsOnce(hasForecast: Boolean) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+    val context = LocalContext.current
+    val wanted = WetterTheme.units.warnings
+    var askedThisScreen by rememberSaveable { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+
+    LaunchedEffect(hasForecast, wanted, askedThisScreen) {
+        if (!hasForecast || !wanted || askedThisScreen) return@LaunchedEffect
+        if (HazardNotifier(context).isAllowed()) return@LaunchedEffect
+
+        val activity = context.findActivity() ?: return@LaunchedEffect
+        val refusedBefore = ActivityCompat.shouldShowRequestPermissionRationale(
+            activity,
+            Manifest.permission.POST_NOTIFICATIONS,
+        )
+        if (refusedBefore) return@LaunchedEffect
+
+        askedThisScreen = true
+        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
+
+/** The activity behind a composable's context, through however many wrappers. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable

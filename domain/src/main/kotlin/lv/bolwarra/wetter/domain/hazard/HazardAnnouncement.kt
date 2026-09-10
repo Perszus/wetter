@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.domain.hazard
 
 import java.time.Instant
 import java.time.ZoneId
+import lv.bolwarra.wetter.domain.climate.Climatology
 
 /**
  * A hazard worth interrupting somebody for, and the name it is remembered by.
@@ -52,6 +53,35 @@ data class HazardAnnouncement(val hazard: Hazard, val key: String)
  * What is left is weather that happens *to* you: storms, gales, torrential
  * rain, heavy snow, ice, and the two ends of the thermometer.
  *
+ * ### The dial says what is dangerous. This says what is worth waking up for.
+ *
+ * Those are not the same question, and collapsing them into one was measured to
+ * fail badly. [Hazards] lets an absolute danger through wherever it is reached -
+ * correctly, because forty-one degrees of heat index is dangerous to a body
+ * whatever that body is used to, and the amber mark belongs on the dial. But
+ * replaying a year of archive through it showed what that does to a phone:
+ *
+ * | place | days warned | of which danger |
+ * |---|---|---|
+ * | Doha | 44% | 129 heat |
+ * | Yakutsk | 31% | 104 cold |
+ * | Phoenix | 21% | 64 heat |
+ *
+ * A danger notification every other day through a Gulf summer is not a warning
+ * system, it is a weather app somebody uninstalls in July. Meanwhile Rīga sat at
+ * 4.9% and Quito at zero, so the thresholds themselves are sound - what is wrong
+ * is treating "dangerous" as "worth interrupting somebody about".
+ *
+ * So a warning must clear the place's own bar as well: past the 95th percentile
+ * of what this date does here. In Doha that turns 129 heat dangers into about
+ * eighteen, and the eighteen are the days that are hard *for Doha*. Nothing is
+ * hidden - every one of those days still carries its mark on the dial, which is
+ * where a reader who wants to know what the afternoon is like will look.
+ *
+ * Rain, snow and ice are exempt, for the reason they are exempt in [Hazards]:
+ * their thresholds are rates rather than climates, and a wet place has more such
+ * hours without having them daily.
+ *
  * ### It says things that have already started
  *
  * A hazard is announced whether or not it has begun. Somebody indoors does not
@@ -68,11 +98,47 @@ object HazardAnnouncements {
      *   here is new, which on a fresh install is everything - correctly, since
      *   nothing has been said to that reader yet.
      */
-    fun due(hazards: List<Hazard>, said: Set<String>, zone: ZoneId): List<HazardAnnouncement> =
-        hazards
-            .filter { it.kind.isWorthWaking }
-            .map { HazardAnnouncement(it, keyFor(it, zone)) }
-            .filter { it.key !in said }
+    fun due(
+        hazards: List<Hazard>,
+        said: Set<String>,
+        zone: ZoneId,
+        climate: Climatology? = null,
+    ): List<HazardAnnouncement> = hazards
+        .filter { it.kind.isWorthWaking }
+        .filter { isUnusualHere(it, zone, climate) }
+        .map { HazardAnnouncement(it, keyFor(it, zone)) }
+        .filter { it.key !in said }
+
+    /**
+     * Whether this would be out of the ordinary here, which is a different
+     * question from whether it is dangerous.
+     *
+     * With no climatology every hazard passes: an archive that did not answer
+     * must not silence the warnings.
+     */
+    fun isUnusualHere(hazard: Hazard, zone: ZoneId, climate: Climatology?): Boolean {
+        val normal = climate?.at(hazard.from.atZone(zone).toLocalDate()) ?: return true
+        val peak = hazard.peak ?: return true
+
+        return when (hazard.kind) {
+            HazardKind.EXTREME_HEAT -> normal.warmTail?.let { peak >= it } ?: true
+
+            // The peak arrives negated, the way Hazards judges it, so it is
+            // turned back the right way up to compare with a temperature.
+            HazardKind.EXTREME_COLD -> normal.coldTail?.let { -peak <= it } ?: true
+
+            HazardKind.DAMAGING_WIND -> normal.gustTail?.let { peak >= it } ?: true
+
+            // Rates, not climates. See the note on this object.
+            HazardKind.TORRENTIAL_RAIN,
+            HazardKind.HEAVY_SNOW,
+            HazardKind.ICE,
+            HazardKind.THUNDERSTORM,
+            -> true
+
+            HazardKind.EXTREME_UV, HazardKind.UNBREATHABLE_AIR -> false
+        }
+    }
 
     /**
      * Whether this kind is an event that arrives, or a condition that is simply

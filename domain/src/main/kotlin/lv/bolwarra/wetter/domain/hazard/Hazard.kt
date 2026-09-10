@@ -232,7 +232,7 @@ object Hazards {
         normal: DayNormal? = null,
     ): HazardSeverity? = when (kind) {
         HazardKind.EXTREME_HEAT -> byLocalThreshold(
-            value = hour.apparentTemperature ?: hour.temperature,
+            value = (hour.apparentTemperature ?: hour.temperature).asTemperature(),
             localWarning = normal?.warmTail,
             localDanger = normal?.warmExtreme,
             absoluteWarning = HEAT_WARNING_C,
@@ -244,7 +244,7 @@ object Hazards {
         // Negated so one comparison serves both ends of the thermometer - the
         // local tails with it, so they stay in the same frame as the reading.
         HazardKind.EXTREME_COLD -> byLocalThreshold(
-            value = (hour.apparentTemperature ?: hour.temperature)?.let { -it },
+            value = (hour.apparentTemperature ?: hour.temperature).asTemperature()?.let { -it },
             localWarning = normal?.coldTail?.let { -it },
             localDanger = normal?.coldExtreme?.let { -it },
             absoluteWarning = -COLD_WARNING_C,
@@ -265,7 +265,7 @@ object Hazards {
         // object: two independent systems put a damaging gust in the same place
         // and neither adjusts for where you are.
         HazardKind.DAMAGING_WIND -> byLocalThreshold(
-            value = hour.windGust ?: hour.windSpeed,
+            value = (hour.windGust ?: hour.windSpeed).asWind(),
             localWarning = normal?.gustTail,
             localDanger = normal?.gustExtreme,
             absoluteWarning = GALE_MS,
@@ -277,13 +277,13 @@ object Hazards {
         HazardKind.TORRENTIAL_RAIN -> if (hour.kind == PrecipitationKind.SNOW) {
             null
         } else {
-            byThreshold(hour.precipitation, TORRENT_WARNING_MM, TORRENT_DANGER_MM)
+            byThreshold(hour.precipitation.asRate(), TORRENT_WARNING_MM, TORRENT_DANGER_MM)
         }
 
         HazardKind.HEAVY_SNOW -> if (hour.kind != PrecipitationKind.SNOW) {
             null
         } else {
-            byThreshold(hour.precipitation, SNOW_WARNING_MM, SNOW_DANGER_MM)
+            byThreshold(hour.precipitation.asRate(), SNOW_WARNING_MM, SNOW_DANGER_MM)
         }
 
         // No amount qualifies it. A road glazed by a tenth of a millimetre is as
@@ -324,10 +324,12 @@ object Hazards {
      * two answers to one question.
      */
     fun readingOf(kind: HazardKind, hour: HourlyWeather): Double? = when (kind) {
-        HazardKind.EXTREME_HEAT -> hour.apparentTemperature ?: hour.temperature
-        HazardKind.EXTREME_COLD -> (hour.apparentTemperature ?: hour.temperature)?.let { -it }
-        HazardKind.DAMAGING_WIND -> hour.windGust ?: hour.windSpeed
-        HazardKind.TORRENTIAL_RAIN, HazardKind.HEAVY_SNOW -> hour.precipitation
+        HazardKind.EXTREME_HEAT -> (hour.apparentTemperature ?: hour.temperature).asTemperature()
+        HazardKind.EXTREME_COLD ->
+            (hour.apparentTemperature ?: hour.temperature).asTemperature()?.let { -it }
+
+        HazardKind.DAMAGING_WIND -> (hour.windGust ?: hour.windSpeed).asWind()
+        HazardKind.TORRENTIAL_RAIN, HazardKind.HEAVY_SNOW -> hour.precipitation.asRate()
         HazardKind.EXTREME_UV -> hour.uvIndex
         HazardKind.ICE, HazardKind.THUNDERSTORM, HazardKind.UNBREATHABLE_AIR -> null
     }
@@ -376,6 +378,51 @@ object Hazards {
         if (value >= maxOf(localDanger ?: absoluteDanger, leastDanger)) return HazardSeverity.DANGER
         return if (value >= maxOf(localWarning, leastWarning)) HazardSeverity.WARNING else null
     }
+
+    /**
+     * A number that could have been measured, or nothing.
+     *
+     * Weather data is full of sentinels. `-9999` and `999` mean "missing" across
+     * a good deal of meteorology, they survive JSON perfectly well because they
+     * are ordinary numbers, and arithmetic on a bad field produces NaN and
+     * infinity without anything failing. Any of them reaching a threshold
+     * comparison raises a *danger* - the highest thing this app can say - and
+     * pushes a notification about it.
+     *
+     * So a reading outside what the planet has ever done is treated as absent
+     * rather than as extreme. The bounds are the records with room to spare, and
+     * they are deliberately wide: the job here is to reject -9999, not to
+     * second-guess a forecast.
+     *
+     * This is the app's own rule applied at the point a number becomes a claim -
+     * a wrong number is worse than a blank.
+     */
+    private fun Double?.asTemperature(): Double? = plausible(COLDEST_EVER_C, HOTTEST_EVER_C)
+
+    private fun Double?.asWind(): Double? = plausible(0.0, FASTEST_GUST_EVER_MS)
+
+    private fun Double?.asRate(): Double? = plausible(0.0, HEAVIEST_RAIN_EVER_MM_PER_HOUR)
+
+    private fun Double?.plausible(lowest: Double, highest: Double): Double? {
+        val value = this ?: return null
+        if (!value.isFinite()) return null
+        return value.takeIf { it in lowest..highest }
+    }
+
+    /**
+     * Vostok 1983, with room beneath it. Apparent temperature can sit below the
+     * air temperature by twenty degrees or more in wind, hence the margin.
+     */
+    const val COLDEST_EVER_C = -120.0
+
+    /** Furnace Creek 1913, with the same kind of margin above for heat index. */
+    const val HOTTEST_EVER_C = 70.0
+
+    /** Barrow Island 1996, 113 m/s, rounded up. */
+    const val FASTEST_GUST_EVER_MS = 130.0
+
+    /** Unionville 1956 held 305 mm in an hour. */
+    const val HEAVIEST_RAIN_EVER_MM_PER_HOUR = 400.0
 
     private fun byThreshold(value: Double?, warning: Double, danger: Double): HazardSeverity? =
         when {

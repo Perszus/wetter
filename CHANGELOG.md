@@ -343,6 +343,40 @@ Notable changes to Wetter. The format follows
 
 ### Fixed
 
+- **A hard climate meant a danger notification every other day.** Replaying a
+  year of archive through the hazard logic: Doha would have been marked on 44% of
+  days, Yakutsk on 31%, Everest on 97% — while Rīga sat at 4.9% and Quito at
+  zero, so the thresholds themselves were sound. What was wrong was letting an
+  absolute danger bypass the local check: right for the mark on the dial, where
+  forty-one degrees of heat index is dangerous to any body, and wrong for a phone.
+  A warning must now also be unusual *for that place* before it interrupts
+  anybody, which takes Everest from 353 notifications a year to 13 and Yakutsk
+  from 113 to 14, leaving Rīga untouched at 18.
+
+- **The verification loop threw away the location's height.** The observation for
+  a town in the hills was the temperature of the aerodrome on the plain below it,
+  and the whole gap was handed to the bias correction, which cannot tell an
+  elevation difference from a model that runs warm - so it would learn the gap
+  and subtract it from every temperature on screen. The extremes were already
+  refused by the 5 °C cap; the dangerous band was underneath, where 400 m is
+  2.6 °C: large enough to matter and small enough to be believed.
+- **A missing-data sentinel could raise a danger warning.** `-9999` and `999`
+  mean "no value" across a great deal of meteorology and are ordinary numbers to
+  a parser; either one reaching a threshold raised the strongest thing the app
+  can say and pushed a notification about it. Readings outside anything the
+  planet has recorded are now absent rather than extreme — while Vostok's
+  −89.2 °C and an 80 m/s hurricane gust still get through.
+- **The notification permission was asked for over an empty screen, and then
+  asked for again on every launch.** The "already asked" flag did not survive the
+  app closing, so somebody who declined would be asked again on the next cold
+  start, and the next. The platform's own record of a refusal is now the gate, so
+  the dialog appears once in the life of an install — and it waits for a forecast
+  to be on screen first, rather than opening over a blank one.
+- Declining that dialog used to be final, leaving a switch in Settings that read
+  "On" while the platform dropped every notification. Turning it on now requests
+  the permission if that is still possible and opens the system's own page for
+  this app if it is not.
+
 - **Sunrise and sunset were out by up to nineteen minutes a day.** The solar
   position came from the low-precision Fourier series that circulates as "the
   NOAA equations", which is accurate at the solstices and wrong by 0.43° at the

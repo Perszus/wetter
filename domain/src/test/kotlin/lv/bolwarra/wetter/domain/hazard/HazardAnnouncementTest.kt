@@ -2,7 +2,11 @@ package lv.bolwarra.wetter.domain.hazard
 
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.MonthDay
 import java.time.ZoneId
+import lv.bolwarra.wetter.domain.climate.Climatology
+import lv.bolwarra.wetter.domain.climate.DayNormal
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -123,4 +127,105 @@ class HazardAnnouncementTest {
         val forgettable = HazardAnnouncements.forgettableBefore(now)
         assertTrue(forgettable.isBefore(now.minus(Hazards.HORIZON)))
     }
+
+    @Test
+    fun `a dangerous day that is ordinary here does not wake anybody`() {
+        // Measured by replaying a year of archive: Doha reached the absolute heat
+        // danger on 129 days and Yakutsk the absolute cold danger on 104. Both
+        // are genuinely dangerous and both belong on the dial; neither is worth
+        // a phone going off every other day for two months.
+        //
+        // Doha's own mid-July tails are 46.8 warning, 47.7 exceptional.
+        val doha = climatologyOf(warmTail = 46.8, warmExtreme = 47.7)
+
+        val ordinary = Hazard(
+            kind = HazardKind.EXTREME_HEAT,
+            severity = HazardSeverity.DANGER,
+            from = now.plus(Duration.ofHours(4)),
+            until = now.plus(Duration.ofHours(9)),
+            peak = 43.0,
+        )
+        assertTrue(
+            "a routine Gulf afternoon should not be announced",
+            HazardAnnouncements.due(listOf(ordinary), emptySet(), zone, doha).isEmpty(),
+        )
+
+        // And a day that is hard even for Doha still is.
+        val exceptional = ordinary.copy(peak = 48.5)
+        assertEquals(
+            1,
+            HazardAnnouncements.due(listOf(exceptional), emptySet(), zone, doha).size,
+        )
+    }
+
+    @Test
+    fun `the same reading in a temperate place is still announced`() {
+        // The other half of the same rule. Thirty-five degrees is below Doha's
+        // bar and far past Rīga's, whose mid-July tails are 31.7 and 34.9.
+        val riga = climatologyOf(warmTail = 31.7, warmExtreme = 34.9)
+        val hot = Hazard(
+            kind = HazardKind.EXTREME_HEAT,
+            severity = HazardSeverity.WARNING,
+            from = now.plus(Duration.ofHours(4)),
+            until = now.plus(Duration.ofHours(9)),
+            peak = 35.0,
+        )
+        assertEquals(1, HazardAnnouncements.due(listOf(hot), emptySet(), zone, riga).size)
+    }
+
+    @Test
+    fun `rain and ice are not held to a local bar`() {
+        // Their thresholds are rates rather than climates: twenty millimetres in
+        // an hour overwhelms drainage anywhere, and a wet place has more such
+        // hours without having them daily.
+        val anywhere = climatologyOf(warmTail = 40.0, coldTail = -30.0, gustTail = 30.0)
+        val downpour = Hazard(
+            kind = HazardKind.TORRENTIAL_RAIN,
+            severity = HazardSeverity.WARNING,
+            from = now.plus(Duration.ofHours(2)),
+            until = now.plus(Duration.ofHours(4)),
+            peak = 22.0,
+        )
+        assertEquals(1, HazardAnnouncements.due(listOf(downpour), emptySet(), zone, anywhere).size)
+    }
+
+    @Test
+    fun `with no climatology nothing is suppressed`() {
+        // An archive that did not answer must not silence the warnings.
+        val storm = Hazard(
+            kind = HazardKind.THUNDERSTORM,
+            severity = HazardSeverity.WARNING,
+            from = now.plus(Duration.ofHours(3)),
+            until = now.plus(Duration.ofHours(5)),
+            peak = null,
+        )
+        assertEquals(1, HazardAnnouncements.due(listOf(storm), emptySet(), zone, null).size)
+    }
+
+    private fun climatologyOf(
+        warmTail: Double? = null,
+        warmExtreme: Double? = null,
+        coldTail: Double? = null,
+        coldExtreme: Double? = null,
+        gustTail: Double? = null,
+        gustExtreme: Double? = null,
+    ) = Climatology(
+        (1..366).map { LocalDate.ofYearDay(2024, it) }
+            .map { MonthDay.of(it.month, it.dayOfMonth) }
+            .associateWith {
+                DayNormal(
+                    monthDay = it,
+                    medianHigh = null,
+                    medianLow = null,
+                    wetShare = 0.0,
+                    samples = 110,
+                    warmTail = warmTail,
+                    coldTail = coldTail,
+                    gustTail = gustTail,
+                    warmExtreme = warmExtreme,
+                    coldExtreme = coldExtreme,
+                    gustExtreme = gustExtreme,
+                )
+            },
+    )
 }

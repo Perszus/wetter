@@ -284,7 +284,28 @@ class VerificationRepository internal constructor(
         val estimate = LocalEstimate.at(
             latitude = location.latitude,
             longitude = location.longitude,
-            elevationMetres = null,
+            // The place's own height, which was being thrown away here.
+            //
+            // LocalEstimate uses it for two things: it brings each station's
+            // reading to this height at the standard lapse rate, and it prefers
+            // stations at a similar height when several are in range. Passing
+            // null turned both off, so the "observation" for a town in the hills
+            // was the temperature of the aerodrome on the plain below it - and
+            // the whole difference was then handed to BiasCorrection, which has
+            // no way to tell an elevation gap from a model that runs warm. It
+            // would learn the gap and subtract it from every temperature on
+            // screen, making the app wrong at exactly the places terrain makes
+            // it hard.
+            //
+            // The extremes were already safe by accident: a gap over about 770 m
+            // exceeds MAX_TEMPERATURE_OFFSET and the correction is refused
+            // outright. The dangerous band was underneath that - four hundred
+            // metres is 2.6 C, which is large enough to matter and small enough
+            // to be believed.
+            //
+            // Null when the place has no recorded height, which is what a pin
+            // dropped on a map has, and then this behaves exactly as before.
+            elevationMetres = location.elevationMetres,
             observations = reports,
             at = hour,
         ) ?: return null

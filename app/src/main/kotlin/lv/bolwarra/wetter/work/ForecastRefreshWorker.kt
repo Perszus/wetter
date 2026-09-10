@@ -119,7 +119,10 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
         if (hazards.isEmpty()) return
 
         val said = container.announcedHazards.said(location)
-        val due = HazardAnnouncements.due(hazards, said, forecast.location.zone)
+        // The same normals the scan used. A hazard has to be dangerous *and*
+        // unusual here before it is worth a phone going off - see
+        // HazardAnnouncements.
+        val due = HazardAnnouncements.due(hazards, said, forecast.location.zone, climate)
         if (due.isEmpty()) return
 
         container.announcedHazards.remember(location, due, now)

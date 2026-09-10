@@ -3,8 +3,10 @@
 The run of `test.md`. Eighteen places, live provider data, a decade of ERA5, an
 independent almanac, and the verification record off a real phone.
 
-**Nine findings. Seven fixed, two recorded.** Three of them were wrong numbers on
-screen with no symptom to notice them by.
+**Fifteen findings. Thirteen fixed, two recorded.** Five were wrong numbers on
+screen with no symptom to notice them by; two were the app nagging or lying about
+a control; one was a warning system that would have been switched off within a
+week in half the climates on earth.
 
 ---
 
@@ -131,6 +133,117 @@ elevation — a valley's climate imported to a village above it. Written into
 `notes.md` rather than changed, because tightening the key costs an archive fetch
 per place and the right precision is a measurement nobody has taken.
 
+### 10. The verification loop threw away the location's height — FIXED
+
+**Silent.** `LocalEstimate` takes an elevation and uses it twice: it brings each
+station's reading to that height at the standard lapse rate, and it prefers
+stations at a similar height. The verification path passed `null` while
+`location.elevationMetres` sat unused on the line above.
+
+So the "observation" for a town in the hills was the temperature of the
+aerodrome on the plain below it, and the whole gap went to `BiasCorrection`,
+which cannot tell an elevation difference from a model that runs warm. It would
+learn the gap and subtract it from every temperature on screen — making the app
+wrong at exactly the places terrain makes it hard.
+
+The extremes were safe by accident: a gap over about 770 m exceeds
+`MAX_TEMPERATURE_OFFSET` and the correction is refused outright. The dangerous
+band is underneath it — 400 m is 2.6 °C, large enough to matter and small enough
+to be believed. Pinned by `ElevationReliabilityTest`.
+
+### 11. A missing-data sentinel became a DANGER warning — FIXED
+
+**Silent.** Found by the degradation tests: `Double.POSITIVE_INFINITY` passed
+straight through a threshold into a hazard peak.
+
+JSON has no infinity literal, but that is not the real exposure — `-9999` and
+`999` mean "missing" across a great deal of meteorology and are perfectly
+ordinary numbers as far as a parser is concerned. Either one reaching a
+comparison raises a **danger**, the strongest thing this app can say, and pushes
+a notification about it.
+
+Readings outside what the planet has ever done are now treated as absent rather
+than as extreme, with the bounds set at the records plus a wide margin — the job
+is to reject `-9999`, not to second-guess a forecast. Tested in both directions:
+sentinels raise nothing, and Vostok's −89.2 °C and an 80 m/s hurricane gust still
+do.
+
+### 12. The notification permission was asked for over an empty screen — FIXED
+
+**Visible.** The rule was "asked once, over a screen that is already showing the
+weather", and that was a comment rather than a condition — the request fired
+from the activity as soon as the composition ran. On a warm cache the forecast
+won by a frame or two, so it looked right. A first run in aeroplane mode put the
+system dialog over an empty black screen: the exact prompt-about-nothing the
+comment claimed to avoid. Now gated on a forecast actually being present, and
+verified in both directions on device.
+
+### 13. It would have asked again on every launch — FIXED
+
+**Visible, and the worst of the interaction findings.** The "asked" flag was a
+`rememberSaveable`, which does not survive the app being closed. Somebody who
+declined would be asked again on the next cold start, and the next, until they
+gave in — the platform's two-refusal limit is not a defence, because two is
+already one more than nobody asked for.
+
+The platform's own record is now the gate:
+`shouldShowRequestPermissionRationale` is true exactly once a permission has been
+refused and not yet refused for good. Nothing is stored, and it cannot drift out
+of step with the system. **Verified end to end: fresh install asks once, "Don't
+allow" tapped, then three cold launches with no dialog at all.**
+
+### 14. And then there was no way back — FIXED
+
+Asking only once creates the opposite problem: somebody who declined in March
+and wants warnings in November had a switch in Settings that read "On" while the
+platform dropped every notification. A control that lies.
+
+Turning the row on now does whatever is still needed — requests the permission if
+that is still possible, and goes to the system's own notification page for this
+app if it is not. Verified on device: with the permission refused, tapping "On"
+opened the system dialog, and granting it there left the app able to notify.
+
+### 15. A dangerous climate meant a notification every other day — FIXED
+
+**The most valuable test of the run, and it could not have been found any other
+way.** F4 replays a year of ERA5 through the hazard logic at every place. Unit
+tests say the thresholds are right; only this says what they *do*.
+
+| place | days marked | of which danger |
+|---|---|---|
+| Everest | 96.7% | 206 cold, 138 wind |
+| Doha | 44.1% | 129 heat |
+| Yakutsk | 31.0% | 104 cold |
+| Phoenix | 21.1% | 64 heat |
+| Rīga | 4.9% | none |
+| Quito | 0.0% | none |
+
+The temperate places are exactly right, so the thresholds themselves are sound.
+What was wrong is the rule that an absolute danger always wins — introduced
+deliberately, and defensible for the *dial*, because forty-one degrees of heat
+index is dangerous to any body. It bypassed the local suppression entirely, for
+precisely the places that needed it.
+
+Fixed by separating the two questions that had been collapsed into one: **the
+dial says what is dangerous, and the notification says what is unusual here.** A
+warning must now also clear the place's own 95th percentile before it reaches a
+phone. Every one of those days still carries its mark on the dial.
+
+Re-measured after the fix, counting notifications rather than marks:
+
+| place | before | after |
+|---|---|---|
+| Everest | 353 | **13** |
+| Yakutsk | 113 | **14** |
+| Phoenix | 77 | **28** |
+| Doha | 161 | **72** |
+| Rīga | 18 | 18 |
+| Tromsø | 29 | 27 |
+
+Doha at about seventy a year is still the highest and is recorded rather than
+tuned away: it is a genuinely hard climate, the figure counts hazard kinds rather
+than days, and the right rate is the tunable already noted in `notes.md`.
+
 ---
 
 ## What passed
@@ -157,6 +270,25 @@ per place and the right precision is a measurement nobody has taken.
 - **Compression** — gzip is already active end to end, 4.7× on the 16-day forecast
   (38.7 KB → 8.2 KB). Nothing to win there.
 
+- **Every threshold is in the unit its comparand arrives in** (A4). Every
+  `TRACE_MM_PER_HOUR` comparison is against a rate; `WET_DAY_MM` is an
+  accumulation and carries its own name and unit so the two cannot be confused.
+- **No hardcoded unit string anywhere outside the formatter layer** (A5).
+- **Extreme values and the other plate** (E4, E5) — Phoenix at 96 °F on Pure
+  White, in imperial: two decimals on inches so an ordinary shower does not round
+  to zero, dark status-bar icons on the light ground, the amber hazard mark as
+  the only saturated colour, no overflow.
+- **Offline with a warm cache** (G1) — the cached forecast is shown in full. No
+  spinner that never ends, no blank, no error state clobbering a reading that is
+  still the best answer available.
+- **Missing and absurd input** (G3, G4) — an empty series, a forecast entirely in
+  the past, a single hour, null temperature, null gust, null precipitation, NaN,
+  infinity, ±1000 °C. Nothing throws, and nothing becomes a zero.
+- **The shared intensity axis** (D5, partly) — `RainCurveBands` holds its 0..1
+  bounds at every edge including negative and `Float.MAX_VALUE`, and its band
+  edges keep their order. That is the geometry the chart and the widget share,
+  so it cannot silently disagree with itself.
+
 ## Plausible, not proven
 
 - **The learned bias correction helps** (H4). Replayed walk-forward with no
@@ -171,6 +303,11 @@ per place and the right precision is a measurement nobody has taken.
   the prevailing rain: across eight cities including Kolkata and Rīga in July it
   reports a thunder share of *zero everywhere*. Needs hourly codes, about four
   times the payload of the whole archive fetch. In `notes.md`.
-- **Offline and provider-failure behaviour** (G1, G2) — not exercised in this run.
-- **Cross-surface consistency with the widget** (D5, E1) — the app's own surfaces
-  agree; the widget bitmap was not diffed against the chart.
+- **Provider failover under a 5xx** (G2) — the ranking and health store are
+  covered by their own tests, but a live failure was not induced in this run.
+- **The widget bitmap against the chart** (E1) — they share `RainCurveBands` and
+  that is now tested, but the two rendered surfaces were not diffed pixel for
+  pixel.
+- Five of the eighteen places could not be replayed for F4: the archive refused
+  those requests after the rate limit and the run went ahead on the thirteen it
+  had.
