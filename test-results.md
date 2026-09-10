@@ -405,6 +405,12 @@ half marked far more wet days than the decade beside it. Both now use
   regression guard for the bug that once marked a day as rain from a six-hour
   total compared against an hourly threshold.
 - **Verification records match the hour they describe** (H1) — covered.
+- **The provider's zone wins over a stale saved one** (B7) — seeded Tokyo's
+  coordinates with a deliberately wrong `Europe/Riga` zone; the forecast came
+  back carrying `Asia/Tokyo`, and every rendering path — the plate, the week, the
+  widget, the hazard scan — reads the forecast's zone rather than the saved row's.
+  The saved row can hold a stale zone if the correction at pin time is missed, and
+  nothing displays it.
 
 ## Plausible, not proven
 
@@ -425,6 +431,13 @@ half marked far more wet days than the decade beside it. Both now use
 - **The widget bitmap against the chart** (E1) — they share `RainCurveBands` and
   that is now tested, but the two rendered surfaces were not diffed pixel for
   pixel.
+- **The widget bitmap against the chart, pixel for pixel.** The geometry they
+  share is now tested from both ends — the band edges are fixed points of the
+  short-track lift, and every band is the same height on both surfaces, so the
+  two cannot disagree about which band an hour falls in. Only positions *within*
+  the light band differ, which is a documented legibility adjustment for a
+  third-height track. Rendering the two surfaces and diffing them still needs an
+  instrumented test.
 - Five of the eighteen places could not be replayed for F4: the archive refused
   those requests once the day's quota ran out, and the run went ahead on the
   thirteen it had. The thirteen include both extremes, so the conclusion holds.

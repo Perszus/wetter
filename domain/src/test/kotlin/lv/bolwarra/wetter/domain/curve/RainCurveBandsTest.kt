@@ -107,4 +107,74 @@ class RainCurveBandsTest {
             RainCurveBands.levelOf(PrecipitationIntensity.LIGHT_MM_PER_HOUR),
         )
     }
+
+    @Test
+    fun `the short-track lift moves nothing across a band edge`() {
+        // The widget's bitmap and the week's hour strip apply spreadWithinLight;
+        // the tall chart does not. That is allowed to change where a drizzle
+        // sits and is never allowed to change which band it sits in - otherwise
+        // two surfaces drawn from one forecast disagree about whether an hour is
+        // light or moderate, which is the whole thing RainCurveBands exists to
+        // prevent.
+        //
+        // The guarantee is that both ends of the light band are fixed points.
+        assertEquals(0f, RainCurveBands.spreadWithinLight(0f), 0.0001f)
+        assertEquals(
+            "the light ceiling must not move",
+            RainCurveBands.moderateEdge,
+            RainCurveBands.spreadWithinLight(RainCurveBands.moderateEdge),
+            0.0001f,
+        )
+
+        // And above it nothing is touched at all.
+        listOf(RainCurveBands.heavyEdge, 0.9f, 1f).forEach {
+            assertEquals(
+                "$it should be untouched",
+                it,
+                RainCurveBands.spreadWithinLight(it),
+                0.0001f,
+            )
+        }
+    }
+
+    @Test
+    fun `the lift only ever raises, and never overtakes itself`() {
+        // Monotonic, so the order of two hours is the same on every surface, and
+        // one-directional, since the point is to lift a drizzle off the floor.
+        var previous = -1f
+        var step = 0
+        while (step <= 100) {
+            val fraction = step / 100f
+            val lifted = RainCurveBands.spreadWithinLight(fraction)
+            assertTrue(
+                "$fraction lifted to $lifted, which is below it",
+                lifted >= fraction - 0.0001f,
+            )
+            assertTrue("$fraction lifted out of 0..1 as $lifted", lifted in 0f..1f)
+            assertTrue("the lift went backwards at $fraction", lifted >= previous)
+            previous = lifted
+            step++
+        }
+    }
+
+    @Test
+    fun `every band keeps the same height on a lifted surface`() {
+        // The three levels are a scale of the words somebody acts on. A scale
+        // whose steps are different sizes on the widget than on the chart asks
+        // the reader to remember which surface they are looking at.
+        val chart = listOf(
+            RainCurveBands.moderateEdge,
+            RainCurveBands.heavyEdge - RainCurveBands.moderateEdge,
+            1f - RainCurveBands.heavyEdge,
+        )
+        val lifted = listOf(
+            RainCurveBands.spreadWithinLight(RainCurveBands.moderateEdge),
+            RainCurveBands.spreadWithinLight(RainCurveBands.heavyEdge) -
+                RainCurveBands.spreadWithinLight(RainCurveBands.moderateEdge),
+            1f - RainCurveBands.spreadWithinLight(RainCurveBands.heavyEdge),
+        )
+        chart.zip(lifted).forEachIndexed { index, (a, b) ->
+            assertEquals("band $index is a different height on the two surfaces", a, b, 0.0001f)
+        }
+    }
 }

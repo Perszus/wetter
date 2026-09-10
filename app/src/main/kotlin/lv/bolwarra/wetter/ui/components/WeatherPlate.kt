@@ -63,9 +63,9 @@ import lv.bolwarra.wetter.domain.SolarTime
 import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
+import lv.bolwarra.wetter.domain.forecast.UmbrellaDay
 import lv.bolwarra.wetter.domain.hazard.Hazard
 import lv.bolwarra.wetter.domain.hazard.HazardSeverity
-import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.sky.Stargazing
 import lv.bolwarra.wetter.ui.format.formatHazardWindow
@@ -141,7 +141,7 @@ fun WeatherPlate(
     // simply reports one figure rather than a nonsensical one.
     val windGust = (current.windGust ?: windSpeed).coerceAtLeast(windSpeed)
     val beamAngle = rememberBeamAngle(windSpeed)
-    val showUmbrella = forecast.umbrellaWeatherToday(now, timeline)
+    val showUmbrella = UmbrellaDay.isUmbrellaDay(forecast, timeline, now)
 
     // The cloud decks are what make this answerable at all: the total cannot
     // tell a veil of cirrus from a lid of stratus, and for this question that
@@ -593,53 +593,6 @@ private fun windLevelLabel(level: Int) = when (level) {
 }
 
 /**
- * Whether the day still holds rain worth carrying something for.
- *
- * Moderate, not merely wet. The mark used to appear for anything at all, which
- * meant it was up on most days in a maritime climate and stopped being read: a
- * warning that is always on is furniture. Moderate is where rain stops being
- * something you walk through and starts being something you take a coat for, and
- * an umbrella that appears only then is one worth looking at.
- *
- * From now rather than across the whole calendar day: a shower that finished
- * this morning is not a reason to carry an umbrella this afternoon.
- *
- * Radar counts, and has to. The model publishes one figure for a whole hour, so
- * a ten-minute downpour arrives as a mild average and never reaches moderate -
- * which meant the curve could be drawn plainly above the moderate guide with no
- * umbrella beside it, the chart and the mark disagreeing about the same rain.
- */
-private fun WeatherForecast.umbrellaWeatherToday(
-    now: Instant,
-    timeline: List<FusedPrecipitation>,
-): Boolean {
-    val zone = location.zone
-    val today = now.atZone(zone).toLocalDate()
-
-    fun isToday(at: Instant) = !at.isBefore(now) && at.atZone(zone).toLocalDate() == today
-
-    // Two steps in a row, not one. The threshold is a rate, and the model
-    // applies it to a whole hour while the projection applies it to ten minutes
-    // - so taking a single radar step at face value would raise the mark for a
-    // burst the model would have averaged away, and put it back to being up
-    // most days. Twenty minutes of moderate rain is a shower either way.
-    val projected = timeline
-        .filter { isToday(it.at) }
-        .windowed(SUSTAINED_STEPS, partialWindows = false)
-        .any { window ->
-            window.all {
-                PrecipitationIntensity.ofRate(it.millimetresPerHour) >=
-                    PrecipitationIntensity.MODERATE
-            }
-        }
-
-    return projected ||
-        hourly.any {
-            isToday(it.timestamp) && it.intensity >= PrecipitationIntensity.MODERATE
-        }
-}
-
-/**
  * What the radar says is falling at this moment, or null where it has nothing.
  *
  * Null and zero mean different things here and the distinction is the whole
@@ -1026,8 +979,6 @@ private val WAVE_STROKE = 2.dp
  * The previous values claimed to be these boundaries and were not; they were 3
  * and 5, which put "strong" at a fresh breeze.
  */
-/** Consecutive projected steps that must be moderate before the mark goes up. */
-private const val SUSTAINED_STEPS = 2
 
 private const val MODERATE_WIND_MS = 6.0
 private const val STRONG_WIND_MS = 11.0

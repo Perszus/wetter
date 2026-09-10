@@ -343,6 +343,17 @@ Notable changes to Wetter. The format follows
 
 ### Fixed
 
+- **The umbrella belonged to the moment rather than to the day.** It ran from
+  *now* to midnight, on the reasoning that a shower which finished this morning
+  is no reason to carry an umbrella this afternoon — which is right about a
+  readout and wrong about this, because an umbrella is decided once on the way
+  out of the door and cannot be revisited at three from the other side of town. A
+  mark that quietly goes out at eleven tells somebody the day changed its mind,
+  which is not something the day did. It is now a property of the calendar day:
+  if any part of today reaches moderate, it is up from midnight to midnight, and
+  it moves only when the forecast moves. The wording is an offer rather than an
+  instruction to match.
+
 - **"It is raining" was close to a coin flip.** Weeks of cloud over Rīga with
   little actual rain, and the bar under the chart said it was raining almost
   continuously. Measured against aerodrome reports across 1295 hours at ten
