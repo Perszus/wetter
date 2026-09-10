@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The same cloud, letting go. Flakes as marks rather than as little
+  crosses: three X shapes at this size read as a word, and a status bar is
+  the last place to put something that can be misread as text.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,13.5 C4.79,13.5 3,11.71 3,9.5 C3,7.43 4.57,5.73 6.59,5.52 C7.17,3.48 9.02,2 11.2,2 C13.6,2 15.6,3.79 15.94,6.11 C16.2,6.04 16.47,6 16.75,6 C18.82,6 20.5,7.68 20.5,9.75 C20.5,11.82 18.82,13.5 16.75,13.5 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.5,16.849999999999998 C8.356065000000001,16.849999999999998 9.05,17.543934999999998 9.05,18.4 C9.05,19.256065 8.356065000000001,19.95 7.5,19.95 C6.643935,19.95 5.95,19.256065 5.95,18.4 C5.95,17.543934999999998 6.643935,16.849999999999998 7.5,16.849999999999998 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12.0,16.849999999999998 C12.856065000000001,16.849999999999998 13.55,17.543934999999998 13.55,18.4 C13.55,19.256065 12.856065000000001,19.95 12.0,19.95 C11.143934999999999,19.95 10.45,19.256065 10.45,18.4 C10.45,17.543934999999998 11.143934999999999,16.849999999999998 12.0,16.849999999999998 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.5,16.849999999999998 C17.356065,16.849999999999998 18.05,17.543934999999998 18.05,18.4 C18.05,19.256065 17.356065,19.95 16.5,19.95 C15.643934999999999,19.95 14.95,19.256065 14.95,18.4 C14.95,17.543934999999998 15.643934999999999,16.849999999999998 16.5,16.849999999999998 Z" />
+</vector>

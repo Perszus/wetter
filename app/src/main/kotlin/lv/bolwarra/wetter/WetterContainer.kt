@@ -9,6 +9,7 @@ import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.map.MapTileSource
 import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
+import lv.bolwarra.wetter.data.repository.AnnouncedHazardStore
 import lv.bolwarra.wetter.data.repository.ClimatologyRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.PreferencesStore
@@ -47,6 +48,9 @@ class WetterContainer(context: Context) {
 
     /** Units and theme, as chosen. */
     val preferences: PreferencesStore get() = weatherData.preferences
+
+    /** What severe weather has already been announced for a place. */
+    val announcedHazards: AnnouncedHazardStore get() = weatherData.announcedHazards
 
     /** What each date usually does here, past where any forecast reaches. */
     val climatology: ClimatologyRepository get() = weatherData.climatology

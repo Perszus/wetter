@@ -218,9 +218,21 @@ location name.
 No destination carries an argument, so the generated route types would buy
 nothing. Revisit if one ever does.
 
-**Notifications are not built and will not be until the core app is good.**
-An elaborate notification system on top of an app that cannot yet draw a rain
-timeline would be the wrong thing done well.
+**One notification, and it is severe weather.**
+This used to read "notifications are not built and will not be until the core
+app is good", which was right at the time and stopped being true. What was built
+is deliberately the narrow version: storms, gales, torrential rain, heavy snow,
+ice and the two ends of the thermometer, up to a day ahead, at the same
+thresholds the amber mark on the dial uses.
+
+Extreme ultraviolet and unhealthy air are detected and drawn but never notified.
+The first is most summer days across half the world; the second is a condition a
+city has for a season rather than an event that arrives. Both would teach
+somebody to swipe warnings away without reading them, and the one that matters
+is the one they would then miss.
+
+There is no digest, no "rain starting in 20 minutes", no daily forecast push.
+The app has one thing worth saying without being opened.
 
 **No feature modules.**
 See Modules above. `:app` holds the whole UI and will keep holding it.

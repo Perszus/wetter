@@ -23,6 +23,7 @@ import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
+import lv.bolwarra.wetter.data.repository.AnnouncedHazardStore
 import lv.bolwarra.wetter.data.repository.ClimatologyRepository
 import lv.bolwarra.wetter.data.repository.EnsembleStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
@@ -142,6 +143,11 @@ class WeatherData(
 
     /** What the reader has chosen: units, and which plate to draw on. */
     val preferences: PreferencesStore by lazy { PreferencesStore(database.preferences()) }
+
+    /** What has already been warned about, so it is not warned about twice. */
+    val announcedHazards: AnnouncedHazardStore by lazy {
+        AnnouncedHazardStore(database.announcedHazards())
+    }
 
     /**
      * What each date usually does here, for the far end of the Month page.

@@ -382,6 +382,13 @@ internal data class PreferencesEntity(
     val windUnit: String = "",
     val precipitationUnit: String = "",
     val theme: String = "",
+    /**
+     * Whether severe weather is worth a notification. On by default: somebody
+     * who installed a weather app wants to be told a storm is coming, and a
+     * warning nobody opted into is the one kind of interruption that earns its
+     * keep.
+     */
+    val warnings: Boolean = true,
 ) {
     companion object {
         const val SINGLE_ROW = 1
@@ -401,6 +408,37 @@ internal interface PreferencesDao {
     suspend fun write(preferences: PreferencesEntity)
 }
 
+/**
+ * A warning that has already been given.
+ *
+ * One row per thing said, kept only long enough to stop it being said again.
+ * The key comes from the domain (`HazardAnnouncements.keyFor`) and carries the
+ * kind, the severity and the day - so this table never needs to know what a
+ * hazard is, only that this one has been mentioned.
+ *
+ * Keyed by place as well, because the same night is a frost in one town and not
+ * in another, and somebody who keeps two places wants to hear about both.
+ */
+@Entity(tableName = "announced_hazards", primaryKeys = ["cacheKey", "hazardKey"])
+internal data class AnnouncedHazardEntity(
+    val cacheKey: String,
+    val hazardKey: String,
+    val announcedAtEpochSecond: Long,
+)
+
+@Dao
+internal interface AnnouncedHazardDao {
+
+    @Query("SELECT hazardKey FROM announced_hazards WHERE cacheKey = :cacheKey")
+    suspend fun keysFor(cacheKey: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(announced: List<AnnouncedHazardEntity>)
+
+    @Query("DELETE FROM announced_hazards WHERE announcedAtEpochSecond < :cutoffEpochSecond")
+    suspend fun deleteOlderThan(cutoffEpochSecond: Long)
+}
+
 @Database(
     entities = [
         ForecastEntity::class,
@@ -412,8 +450,9 @@ internal interface PreferencesDao {
         ProviderHealthEntity::class,
         ClimateNormalsEntity::class,
         PreferencesEntity::class,
+        AnnouncedHazardEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -435,6 +474,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
     abstract fun climateNormals(): ClimateNormalsDao
 
     abstract fun preferences(): PreferencesDao
+
+    abstract fun announcedHazards(): AnnouncedHazardDao
 
     companion object {
 
@@ -596,6 +637,29 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the record of warnings already given, and the switch for them.
+         *
+         * Additive on both counts. The new column carries a default of 1, so an
+         * upgrade arrives with warnings on rather than with a preference nobody
+         * chose reading as off.
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `announced_hazards` (" +
+                        "`cacheKey` TEXT NOT NULL, " +
+                        "`hazardKey` TEXT NOT NULL, " +
+                        "`announcedAtEpochSecond` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`cacheKey`, `hazardKey`))",
+                )
+                connection.execSQL(
+                    "ALTER TABLE `preferences` " +
+                        "ADD COLUMN `warnings` INTEGER NOT NULL DEFAULT 1",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -620,6 +684,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
                 MIGRATION_6_7,
                 MIGRATION_7_8,
                 MIGRATION_8_9,
+                MIGRATION_9_10,
             )
             .build()
     }

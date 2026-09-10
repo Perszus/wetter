@@ -254,6 +254,22 @@ private fun GroupItem(label: String, chosen: Boolean, onClick: () -> Unit) {
 private fun ColumnScope.GeneralGroup(preferences: Preferences, onChange: (Preferences) -> Unit) {
     val spacing = WetterTheme.spacing
 
+    // First, because it is the only setting here that changes what the app does
+    // rather than how it writes a number - and the only one that lets it speak
+    // when nobody has opened it.
+    ChoiceRow(
+        label = stringResource(R.string.setting_warnings),
+        options = listOf(true, false),
+        selected = preferences.warnings,
+        onSelect = { onChange(preferences.copy(warnings = it)) },
+        describe = {
+            stringResource(
+                if (it) R.string.setting_warnings_on else R.string.setting_warnings_off,
+            )
+        },
+    )
+    Spacer(Modifier.height(spacing.l))
+
     ChoiceRow(
         label = stringResource(R.string.setting_temperature),
         options = TemperatureUnit.entries,

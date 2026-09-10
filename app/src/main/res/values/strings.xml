@@ -183,6 +183,10 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="plate_stars">Good night for stars</string>
     <string name="plate_hazard">Severe weather warning</string>
     <string name="hazard_title">Severe weather</string>
+    <string name="channel_hazards">Severe weather</string>
+    <string name="setting_warnings">Severe weather warnings</string>
+    <string name="setting_warnings_on">On</string>
+    <string name="setting_warnings_off">Off</string>
     <string name="hazard_heat">Extreme heat</string>
     <string name="hazard_cold">Extreme cold</string>
     <string name="hazard_wind">Damaging wind</string>

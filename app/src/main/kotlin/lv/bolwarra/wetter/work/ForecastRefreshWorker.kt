@@ -14,10 +14,13 @@ import java.util.concurrent.TimeUnit
 import lv.bolwarra.wetter.BuildConfig
 import lv.bolwarra.wetter.WetterApplication
 import lv.bolwarra.wetter.WetterContainer
+import lv.bolwarra.wetter.domain.hazard.HazardAnnouncements
+import lv.bolwarra.wetter.domain.hazard.Hazards
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.asWeatherError
+import lv.bolwarra.wetter.notify.HazardNotifier
 import lv.bolwarra.wetter.widget.RainWidget
 
 /**
@@ -59,6 +62,15 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
             refreshEverything(container, location)
         }
 
+        // The warning pass runs on whatever forecast is now on disk, not only on
+        // the runs that fetched a new one. A hazard is announced once and then
+        // remembered, so this costs a read and a set lookup on the other runs -
+        // and doing it every wake means a storm that entered the horizon
+        // between two model publications is said when it appears rather than up
+        // to an hour later.
+        runCatching { announceHazards(container, location) }
+            .onFailure { log("could not check for severe weather: " + it.message) }
+
         // Redraw last, and whatever happened above.
         //
         // Both halves of that matter. Last, because the widget reads the same
@@ -76,6 +88,38 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
             .onFailure { log("could not redraw the widget: ${it.message}") }
 
         return result
+    }
+
+    /**
+     * Tell somebody about severe weather they have not been told about.
+     *
+     * Detection is already done - `Hazards.scan` is the same call the amber
+     * mark on the dial is drawn from, held to the same thresholds, so the phone
+     * and the screen can never disagree about whether tonight is dangerous.
+     * What happens here is only delivery: which of those have not been said,
+     * and remembering that they now have been.
+     *
+     * The record is written *before* the notification is posted. Getting that
+     * the wrong way round means a phone that fails between the two repeats the
+     * warning at the next wake, and the next, which is how a useful
+     * interruption becomes one somebody switches off.
+     */
+    private suspend fun announceHazards(container: WetterContainer, location: WeatherLocation) {
+        if (!container.preferences.current().warnings) return
+
+        val forecast = container.repository.cached(location) ?: return
+        val now = Instant.now()
+        val hazards = Hazards.scan(forecast, air = null, now = now)
+        if (hazards.isEmpty()) return
+
+        val said = container.announcedHazards.said(location)
+        val due = HazardAnnouncements.due(hazards, said, forecast.location.zone)
+        if (due.isEmpty()) return
+
+        container.announcedHazards.remember(location, due, now)
+        HazardNotifier(applicationContext).post(due, forecast.location.zone, now)
+        container.announcedHazards.prune(now)
+        log("warned about " + due.joinToString { it.key })
     }
 
     /**

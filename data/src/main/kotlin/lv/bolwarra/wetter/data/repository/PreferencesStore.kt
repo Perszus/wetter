@@ -66,6 +66,7 @@ class PreferencesStore internal constructor(private val dao: PreferencesDao) {
                 windUnit = preferences.wind.name,
                 precipitationUnit = preferences.precipitation.name,
                 theme = preferences.theme.name,
+                warnings = preferences.warnings,
             ),
         )
     }
@@ -77,6 +78,7 @@ class PreferencesStore internal constructor(private val dao: PreferencesDao) {
             wind = windUnit.toEnumOr(WindUnit.METRES_PER_SECOND),
             precipitation = precipitationUnit.toEnumOr(PrecipitationUnit.MILLIMETRES),
             theme = theme.toEnumOr(ThemeChoice.PURE_BLACK),
+            warnings = warnings,
         )
     }
 

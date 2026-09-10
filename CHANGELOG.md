@@ -8,6 +8,31 @@ Notable changes to Wetter. The format follows
 
 ### Added
 
+- **Severe weather warnings, up to a day ahead.** A notification for storms,
+  gales, torrential rain, heavy snow, ice, extreme heat and extreme cold — on
+  exactly the thresholds the amber mark on the dial already uses, so the phone
+  and the screen can never disagree about whether tonight is dangerous. Twenty
+  millimetres of rain in the hour is drains losing; Beaufort 8 is twigs coming
+  off trees. Nothing fires for a wet Tuesday.
+- Extreme ultraviolet and unhealthy air are detected and drawn, and deliberately
+  never notified. The first is most summer days across half the world; the
+  second is something a city has for a season rather than an event that arrives.
+  A phone that buzzed for either would teach somebody to swipe the storm away
+  with it.
+- **Said once.** Keyed on the kind, the severity and the local day it starts on,
+  not on its start time — a storm forecast for six is forecast for half past
+  five on the next run, and a warning built on that would fire every quarter of
+  an hour all night. A warning that becomes a danger is said again, because the
+  plan that was fine for a gale is not fine for a storm, and it replaces the
+  first rather than sitting beside it.
+- **The icon says which.** A bolt for a storm, wind lines for a gale, a cloud
+  emptying itself for torrential rain, a flake for cold — the app's own glyphs,
+  not a row of identical exclamation triangles. The bolt is the same shape drawn
+  under a storm cloud on the forecast.
+- A switch in Settings → General, on by default, and the permission is asked for
+  once over a screen that is already showing the weather rather than on first
+  launch.
+
 - **Pure Black is the default plate.** A weather app is opened at the two ends
   of the day far more than in the middle of it, and that is when a bright page is
   worst; it is also the plate that costs least on an OLED screen. Paper is two

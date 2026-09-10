@@ -30,6 +30,22 @@
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+      Severe weather warnings, and nothing else.
+
+      The only thing this app says without being opened. What reaches a
+      notification has already cleared the thresholds in domain/hazard - a gale,
+      torrential rain, heavy snow, ice, a thunderstorm, or a temperature that is
+      dangerous - so this is not a channel for showers, tips or news about the
+      app. There is a switch for it in Settings and it can be turned off there
+      without the app losing anything else.
+
+      Asked for at the moment the app has a place to warn about, not on first
+      launch: a permission prompt before the app has done anything is a prompt
+      about nothing.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".WetterApplication"
         android:allowBackup="false"

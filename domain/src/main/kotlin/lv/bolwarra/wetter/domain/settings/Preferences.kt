@@ -30,6 +30,19 @@ data class Preferences(
      * Paper is two taps away, and the whole design exists on both.
      */
     val theme: ThemeChoice = ThemeChoice.PURE_BLACK,
+    /**
+     * Whether severe weather is worth a notification, up to a day ahead.
+     *
+     * On by default, which is the one interruption this app is prepared to
+     * make. Everything else it has to say waits until somebody opens it; a
+     * storm, a frost or a heatwave is worth knowing about before you leave the
+     * house, and a warning that arrives after the event is not a warning.
+     *
+     * The bar is the same one the amber mark on the dial uses, and it is set
+     * deliberately high - if this ever fires often enough to be furniture, the
+     * thresholds are wrong rather than the switch.
+     */
+    val warnings: Boolean = true,
 )
 
 /**
