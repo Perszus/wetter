@@ -19,12 +19,13 @@ keystore.properties
 hs_err_pid*.log
 replay_pid*.log
 
-# Working briefs and notes, kept locally. Their content lives in docs/ in a form meant to
-# be read rather than followed. Root-anchored so docs/providers.md is tracked.
-/philos.md
-/providers.md
-/upgrade.md
-/notes.md
+# The workbench: briefs, running notes and the long-form source material the
+# docs are distilled from. Kept locally on purpose - what belongs to a reader
+# lives in docs/ in a form meant to be read rather than followed.
+#
+# One directory rather than four loose files in the root, so the root holds only
+# what a visitor expects to find there.
+/workbench/
 
 # Source artwork dropped in for conversion; the drawable is what ships.
 /*.png

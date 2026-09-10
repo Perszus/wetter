@@ -182,7 +182,7 @@ it the *only* thing is the point.
 
 ## Contributing
 
-Bug reports and patches are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports and patches are welcome — see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 The short version: adding a weather provider should mean implementing
 `WeatherProvider` and adding one line to `WeatherData`, and nothing else.
