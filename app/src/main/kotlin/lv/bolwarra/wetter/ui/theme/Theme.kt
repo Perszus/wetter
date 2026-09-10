@@ -1,6 +1,7 @@
 package lv.bolwarra.wetter.ui.theme
 
 import android.app.Activity
+import android.graphics.drawable.ColorDrawable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -8,6 +9,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import lv.bolwarra.wetter.domain.settings.Preferences
@@ -62,12 +64,20 @@ fun WetterTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         val lightBars = colors.isLight
+        val ground = colors.surface.toArgb()
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = lightBars
                 isAppearanceLightNavigationBars = lightBars
             }
+            // The window's own ground, which the system paints before Compose
+            // draws anything and keeps behind it afterwards. The launch colour
+            // in colors.xml can only be the default plate - it is resolved from
+            // the manifest before any code runs - so this corrects it for
+            // somebody who chose the other one, and stops a recomposition on a
+            // sky change from leaving the old ground showing through.
+            window.setBackgroundDrawable(ColorDrawable(ground))
         }
     }
 
@@ -111,13 +121,6 @@ object WetterTheme {
  */
 val LocalUnits = staticCompositionLocalOf { Preferences() }
 
-/**
- * Which plate a choice asks for.
- *
- * Composable because the system answer is: somebody who has told their phone
- * they want dark has answered this once already, and the app follows unless it
- * has been told otherwise.
- */
 /**
  * The plate a choice asks for.
  *

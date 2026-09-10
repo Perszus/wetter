@@ -1,6 +1,7 @@
 package lv.bolwarra.wetter
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
 import lv.bolwarra.wetter.data.WeatherData
 import lv.bolwarra.wetter.data.location.DeviceLocation
 import lv.bolwarra.wetter.data.location.SavedLocationStore
@@ -37,6 +38,9 @@ class WetterContainer(context: Context) {
 
     /** The record of what was forecast against what actually happened. */
     val verification: VerificationRepository get() = weatherData.verification
+
+    /** For work that has to finish after the screen that started it has gone. */
+    val applicationScope: CoroutineScope get() = weatherData.applicationScope
 
     /** Where the phone thinks it is, asked once and never watched. */
     val deviceLocation: DeviceLocation get() = weatherData.deviceLocation

@@ -52,22 +52,6 @@ fun formatTemperature(celsius: Double?, unit: TemperatureUnit): String =
     if (celsius == null) NO_READING else "${unit.from(celsius).roundToInt()}°"
 
 /**
- * A temperature adjustment, signed and to one decimal.
- *
- * Signed on purpose, and to a finer resolution than a temperature: the whole
- * point of showing it is that it is a small correction with a direction, and
- * rounding it the way a reading is rounded would turn most corrections into
- * "0" or hide which way they went.
- */
-fun formatTemperatureDelta(celsius: Double, unit: TemperatureUnit): String {
-    val sign = if (celsius > 0) "+" else "−"
-    // Converted as a difference, not as a reading. A degree of bias is 1.8 F,
-    // not 33.8 - see TemperatureUnit.difference.
-    val magnitude = kotlin.math.abs(unit.difference(celsius))
-    return "$sign${String.format(Locale.getDefault(), "%.1f", magnitude)}°"
-}
-
-/**
  * Rain, to one decimal below ten and whole above it.
  *
  * Inches keep their decimals throughout: the "whole above ten" rule exists

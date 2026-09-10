@@ -51,6 +51,47 @@ class BiasCorrectionTest {
     }
 
     @Test
+    fun `many forecasts of one hour are one sample`() {
+        // The same hour, predicted twelve times as the app refreshed. That is
+        // one hour of evidence, and reading it as twelve would take a place from
+        // nothing to a fully trusted correction in an afternoon.
+        val sameHour = List(12) { index ->
+            ForecastRecord(
+                latitude = 56.95,
+                longitude = 24.11,
+                validAt = issued.plus(Duration.ofHours(8)),
+                issuedAt = issued.minus(Duration.ofHours(index.toLong())),
+                source = "met-norway",
+                variable = VerifiedVariable.TEMPERATURE,
+                predicted = 16.3,
+                observed = 15.0,
+            )
+        }
+        assertNull(BiasCorrection.learn(sameHour, VerifiedVariable.TEMPERATURE))
+
+        // Twenty-four distinct hours, each predicted a dozen times, is
+        // twenty-four - which is real evidence, and still short of full trust.
+        val everyHourRepeated = (0 until 24).flatMap { hour ->
+            List(12) { index ->
+                ForecastRecord(
+                    latitude = 56.95,
+                    longitude = 24.11,
+                    validAt = issued.plus(Duration.ofHours(hour.toLong())),
+                    issuedAt = issued.minus(Duration.ofHours(index.toLong())),
+                    source = "met-norway",
+                    variable = VerifiedVariable.TEMPERATURE,
+                    predicted = 16.3,
+                    observed = 15.0,
+                )
+            }
+        }
+        val bias = BiasCorrection.learn(everyHourRepeated, VerifiedVariable.TEMPERATURE)!!
+        assertEquals(24, bias.samples)
+        assertEquals(1.3, bias.offset, 0.001)
+        assertTrue("a day of hours must not be full strength", bias.strength < 1.0)
+    }
+
+    @Test
     fun `the correction ramps in rather than arriving whole`() {
         // A correction that hit full strength on its thirteenth sample would
         // swing the display about for days before settling.

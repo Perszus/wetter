@@ -123,6 +123,20 @@ class WeatherData(
         )
     }
 
+    /**
+     * A scope that outlives any one screen.
+     *
+     * Offered rather than hidden, for the small number of jobs that must finish
+     * whether or not the screen that started them is still there. Keeping a
+     * place somebody just chose is one: the screen closes itself the moment they
+     * press the button, and work left on its view model dies with it.
+     *
+     * Not a general-purpose escape hatch. Anything that only matters while
+     * somebody is looking at it belongs on a view model, where cancelling it
+     * when they leave is the correct behaviour rather than a bug.
+     */
+    val applicationScope: CoroutineScope get() = scope
+
     /** One location fix, when the reader asks for one and never otherwise. */
     val deviceLocation: DeviceLocation by lazy { DeviceLocation(appContext) }
 

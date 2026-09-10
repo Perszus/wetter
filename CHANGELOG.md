@@ -8,6 +8,16 @@ Notable changes to Wetter. The format follows
 
 ### Added
 
+- **Pure Black is the default plate.** A weather app is opened at the two ends
+  of the day far more than in the middle of it, and that is when a bright page is
+  worst; it is also the plate that costs least on an OLED screen. Paper is two
+  taps away. The launch colour follows suit, and the `values-night` variant is
+  gone: the app follows the phone's dark mode nowhere else, and a launch colour
+  that did would flash white at somebody who chose black. Whoever picks Pure
+  White has the window ground corrected as soon as the preference is read.
+- **Portrait only.** The column is the whole layout — a dial, a switcher and a
+  stack of tiles read top to bottom — and there is no landscape design of it to
+  turn into.
 - Three pages behind a domain switcher — Today, Week and Month — each answering
   one question with its own tiles, instead of one page trying to answer all
   three. Today is the default. The location and current reading sit above the
@@ -238,8 +248,33 @@ Notable changes to Wetter. The format follows
   nudge a pin but cannot nudge a spinner. Nothing subscribes to updates and
   nothing runs in the background.
 
+### Removed
+
+- **The explanations.** The note under the advanced view saying how far the
+  forecast had run against nearby airports and how many predictions that was
+  learned from; the "Local fix" figure beside it; the lines under the unit and
+  theme choices explaining how they were guessed and why they do not follow the
+  phone. The correction still happens — it is simply not narrated. The job is to
+  give a good reading, not to talk about how it was arrived at.
+- The week's summary tile. Every figure in it was already on the page above it,
+  said more precisely.
+
 ### Fixed
 
+- **The learned temperature correction was counting the same hour a dozen
+  times.** A forecast for eight o'clock is written down on every refresh, so one
+  hour arrives in the record ten or twelve times over. Measured on a real phone:
+  201 checked predictions at one place were 24 distinct hours — read as 201
+  samples, which is full strength, so the app had started subtracting 1.3 °C from
+  every temperature on the screen after a single day of evidence. Errors are now
+  collapsed by the hour they are about, and the sample count is hours verified.
+- **A clear airport report was not being recorded as a dry hour.** An absent
+  present-weather group was treated as "nobody looked" rather than "nothing was
+  falling", so the only precipitation observations that ever reached the record
+  were wet ones. On the same phone: 112 checked model predictions across 12
+  hours, every one of them wet, which makes any skill score computed from them
+  meaningless. A report that was actually filed and carries no weather group is
+  now the dry observation it is; silence with no report behind it stays unknown.
 - The system bar icons were painted from the *phone's* dark mode rather than from
   the app's, so choosing a dark plate on a phone set to light left dark icons on
   a near-black ground — a blacked-out strip where the clock should be. The plate

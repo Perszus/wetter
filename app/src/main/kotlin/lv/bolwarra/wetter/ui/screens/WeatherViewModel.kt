@@ -199,7 +199,6 @@ class WeatherViewModel(
             // screen. Changing place clears it rather than briefly drawing the
             // last city's rain over the new one's name.
             timeline = if (forecast != null) extra.timeline else emptyList(),
-            bias = if (forecast != null) extra.bias else null,
             airQuality = if (forecast != null) extra.air else null,
             climatology = if (forecast != null) extra.climatology else Climatology(emptyMap()),
             // Read off the forecast on screen and the air beside it, so a

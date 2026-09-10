@@ -42,7 +42,6 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.sky.StarWatch
 import lv.bolwarra.wetter.domain.sky.Stargazing
 import lv.bolwarra.wetter.domain.sky.Tides
-import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.window
 import lv.bolwarra.wetter.ui.components.ExpandableTile
 import lv.bolwarra.wetter.ui.components.Metric
@@ -60,7 +59,6 @@ import lv.bolwarra.wetter.ui.format.formatMillimetres
 import lv.bolwarra.wetter.ui.format.formatPercent
 import lv.bolwarra.wetter.ui.format.formatPressure
 import lv.bolwarra.wetter.ui.format.formatTemperature
-import lv.bolwarra.wetter.ui.format.formatTemperatureDelta
 import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatUvIndex
 import lv.bolwarra.wetter.ui.format.formatWeekday
@@ -80,7 +78,6 @@ fun TodayPage(
     forecast: WeatherForecast,
     now: Instant,
     timeline: List<FusedPrecipitation> = emptyList(),
-    bias: LearnedBias? = null,
     air: AirQuality? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -136,7 +133,7 @@ fun TodayPage(
             }
         }
 
-        AdvancedTile(forecast, now, bias, air, falling)
+        AdvancedTile(forecast, now, air, falling)
     }
 }
 
@@ -157,7 +154,6 @@ fun TodayPage(
 private fun AdvancedTile(
     forecast: WeatherForecast,
     now: Instant,
-    bias: LearnedBias?,
     air: AirQuality?,
     /** So the drawer asks about the same thing the chart above it is drawing. */
     falling: PrecipitationKind,
@@ -394,7 +390,7 @@ private fun AdvancedTile(
             )
         }
 
-        MetricGroup(stringResource(R.string.group_moon), last = bias == null) {
+        MetricGroup(stringResource(R.string.group_moon), last = true) {
             MetricGrid(
                 listOf(
                     Metric(
@@ -414,36 +410,6 @@ private fun AdvancedTile(
                     ),
                 ),
             )
-        }
-
-        // Absent entirely until this place has enough checked predictions to show
-        // a pattern, so the group appears when the correction does rather than
-        // sitting there as a dash.
-        if (bias != null) {
-            MetricGroup(stringResource(R.string.group_here), last = true) {
-                MetricGrid(
-                    listOf(
-                        Metric(
-                            stringResource(R.string.metric_local_correction),
-                            formatTemperatureDelta(-bias.effectiveOffset, units.temperature),
-                        ),
-                    ),
-                )
-                Spacer(Modifier.height(WetterTheme.spacing.l))
-                // Said in words as well as shown as a number, because a
-                // temperature that has been quietly adjusted is not an
-                // improvement on one that has not. Anybody comparing this screen
-                // against another app deserves to know why they differ.
-                Text(
-                    text = stringResource(
-                        R.string.advanced_correction_note,
-                        formatTemperatureDelta(bias.offset, units.temperature),
-                        bias.samples,
-                    ),
-                    style = WetterTheme.type.meta,
-                    color = WetterTheme.colors.textTertiary,
-                )
-            }
         }
     }
 }

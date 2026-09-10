@@ -11,15 +11,24 @@ import lv.bolwarra.wetter.domain.observation.ObservedIntensity
  * precipitation forecast is judged on, and it is answered by a human or an
  * instrument at the airport rather than by another model.
  *
- * ### Why absent is not dry
+ * ### Absent is dry, but only when a report actually arrived
  *
  * An empty present-weather group means nothing significant is happening, which
- * for a staffed station is a genuine report of no precipitation. But the field
- * is also simply missing from some reports, and treating that as "dry" would
- * quietly manufacture clear-weather observations that nobody made - which, fed
- * into verification, would credit forecasts for correctly predicting dry weather
- * that was never confirmed. [precipitationFrom] returns null for an absent
- * group and false only for one that is present and says nothing is falling.
+ * for a station that filed a report is a genuine observation of no
+ * precipitation. Treating the same absence as dry when nothing was received
+ * would manufacture clear-weather observations nobody made, and credit
+ * forecasts for correctly predicting a dry hour that was never confirmed.
+ *
+ * The two are told apart by the raw report. A METAR is a complete statement of
+ * the weather at one place at one time: if the text is there and carries no
+ * weather group, the observer looked and saw nothing falling. So
+ * [precipitationFrom] takes the report alongside the group, and returns null
+ * only when there is no report behind the silence.
+ *
+ * This is not a nicety. Without it the model's precipitation is scored on wet
+ * hours and no others - the record has no dry hours in it at all, because a
+ * clear METAR produces no observation - and a verification set with no
+ * negatives says every forecast missed every rain it ever called correctly dry.
  */
 internal object PresentWeather {
 
@@ -50,10 +59,10 @@ internal object PresentWeather {
     private val DESCRIPTORS = listOf("MI", "PR", "BC", "DR", "BL", "SH", "TS", "FZ", "PA")
 
     /** Present but reporting nothing falling - mist, fog, haze, smoke and such. */
-    fun precipitationFrom(group: String?): Boolean? {
-        if (group == null) return null
-        val trimmed = group.trim()
-        if (trimmed.isEmpty()) return null
+    fun precipitationFrom(group: String?, reported: Boolean = false): Boolean? {
+        val trimmed = group?.trim().orEmpty()
+        // Nothing said. Dry if a report said it, unknown if nothing was filed.
+        if (trimmed.isEmpty()) return if (reported) false else null
         return trimmed.split(WHITESPACE).any { isPrecipitation(it) }
     }
 

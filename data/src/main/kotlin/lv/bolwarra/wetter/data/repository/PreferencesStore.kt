@@ -76,7 +76,7 @@ class PreferencesStore internal constructor(private val dao: PreferencesDao) {
             temperature = temperatureUnit.toEnumOr(TemperatureUnit.CELSIUS),
             wind = windUnit.toEnumOr(WindUnit.METRES_PER_SECOND),
             precipitation = precipitationUnit.toEnumOr(PrecipitationUnit.MILLIMETRES),
-            theme = theme.toEnumOr(ThemeChoice.PURE_WHITE),
+            theme = theme.toEnumOr(ThemeChoice.PURE_BLACK),
         )
     }
 

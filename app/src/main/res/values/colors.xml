@@ -5,7 +5,14 @@
       Compose draws its first frame, so it must match WetterColors.surface or the
       app opens with a flash of the wrong ground. Every other colour is defined
       once, in ui/theme/Color.kt.
+
+      This is Pure Black's ground, because Pure Black is the default plate. There
+      is deliberately no values-night variant: the app does not follow the
+      phone's dark mode anywhere else, and a launch colour that did would flash
+      white at somebody who chose black on a phone set to light. Whoever chose
+      the other plate gets this for the frame or two before WetterTheme sets the
+      window background to their own ground.
     -->
-    <color name="window_background">#EDF1F5</color>
+    <color name="window_background">#1A1A1A</color>
     <color name="icon_background">#0E1A22</color>
 </resources>

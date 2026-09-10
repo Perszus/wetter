@@ -44,6 +44,7 @@ object WetterViewModels {
                 container.reverseGeocoder,
                 container.preferences,
                 container.deviceLocation,
+                container.applicationScope,
                 container.basemap,
                 onPlaceChanged = { RainWidget.refresh(app) },
             )

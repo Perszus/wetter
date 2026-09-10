@@ -279,12 +279,6 @@ private fun ColumnScope.GeneralGroup(preferences: Preferences, onChange: (Prefer
         onSelect = { onChange(preferences.copy(precipitation = it)) },
         describe = { it.label },
     )
-    Spacer(Modifier.height(spacing.m))
-    Text(
-        text = stringResource(R.string.setting_units_note),
-        style = WetterTheme.type.meta,
-        color = WetterTheme.colors.textTertiary,
-    )
 }
 
 /**
@@ -322,12 +316,6 @@ private fun ColumnScope.AppearanceGroup(preferences: Preferences, onChange: (Pre
             modifier = Modifier.padding(bottom = spacing.s),
         )
     }
-
-    Text(
-        text = stringResource(R.string.setting_theme_note),
-        style = WetterTheme.type.meta,
-        color = WetterTheme.colors.textTertiary,
-    )
 }
 
 @Composable

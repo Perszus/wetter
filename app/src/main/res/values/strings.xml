@@ -39,7 +39,6 @@
       explanation of who chose it - and because it is the answer to "why is this
       wrong", which is the only reason most people will ever come here.
     -->
-    <string name="setting_units_note">Guessed from the first place you chose. Changing any of these keeps your choice.</string>
     <!--
       Brought across from This Note and Orobos, and named as they name them. Not
       translated: they are the names of two specific palettes - one built on
@@ -47,7 +46,6 @@
     -->
     <string name="theme_pure_white" translatable="false">Pure White</string>
     <string name="theme_pure_black" translatable="false">Pure Black</string>
-    <string name="setting_theme_note">Two whole designs rather than a light switch, so this does not follow the phone.</string>
 
     <!-- Readings -->
     <!-- Read aloud in place of the umbrella glyph on the dial. -->
@@ -78,8 +76,6 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="tide_building">Building to spring</string>
     <string name="tide_easing">Easing to neap</string>
     <string name="metric_moon_illumination">Moonlight</string>
-    <string name="metric_local_correction">Local fix</string>
-    <string name="advanced_correction_note">Forecasts here have run %1$s on average against nearby airport readings, so temperatures are adjusted to match. Learned from %2$d checked predictions, and applied more strongly as more accumulate.</string>
     <string name="moon_new">New</string>
     <string name="moon_waxing_crescent">Waxing crescent</string>
     <string name="moon_first_quarter">Waxing half</string>
@@ -232,7 +228,6 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="metric_dark_until">Dark until</string>
     <string name="stars_window">%1$s – %2$s</string>
     <string name="group_moon">Moon</string>
-    <string name="group_here">This place</string>
     <string name="group_air_quality">Air quality</string>
     <string name="metric_air_quality">Overall</string>
     <string name="metric_pm25">Fine particles</string>
@@ -251,7 +246,6 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="metric_cloud">Cloud</string>
 
     <string name="tile_week_rain">Seven days</string>
-    <string name="tile_week_summary">The week</string>
     <string name="week_today">Today</string>
     <!--
       A day past the end of the provider's hourly forecast. MET Norway drops to
@@ -260,11 +254,6 @@ It appears only for rain at that level between now and midnight, and goes once t
       it says which.
     -->
     <string name="week_no_hours">No hour-by-hour forecast reaches this far ahead.</string>
-    <string name="week_days_of">%1$d of %2$d</string>
-    <string name="metric_wet_days">Wet days</string>
-    <string name="metric_wettest_day">Wettest</string>
-    <string name="metric_warmest">Warmest</string>
-    <string name="metric_coldest">Coldest</string>
 
     <string name="tile_month">Thirty days</string>
 

@@ -6,8 +6,11 @@
       Views. windowBackground is the only property that matters — the system paints
       it before Compose's first frame, and a mismatch shows as a flash on launch.
       The real theme is WetterTheme in ui/theme/Theme.kt.
+
+      The dark parent, and no values-night variant, because Pure Black is the
+      default plate and the app follows the phone's dark mode nowhere else.
     -->
-    <style name="Theme.Wetter" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Wetter" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
     </style>
 </resources>

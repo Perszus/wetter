@@ -20,12 +20,16 @@ data class Preferences(
     val wind: WindUnit = WindUnit.METRES_PER_SECOND,
     val precipitation: PrecipitationUnit = PrecipitationUnit.MILLIMETRES,
     /**
-     * Paper by default.
+     * Black by default.
      *
-     * The app is a drawn instrument — a porcelain dial, ink on a page — and that
-     * is the plate it was designed on. Two taps to the other one.
+     * A weather app is opened at the two ends of the day far more than in the
+     * middle of it — before leaving, and before going to bed — and that is when
+     * a bright page is worst. It is also the plate that costs least on an OLED
+     * screen, which is most of them.
+     *
+     * Paper is two taps away, and the whole design exists on both.
      */
-    val theme: ThemeChoice = ThemeChoice.PURE_WHITE,
+    val theme: ThemeChoice = ThemeChoice.PURE_BLACK,
 )
 
 /**

@@ -3,7 +3,6 @@ package lv.bolwarra.wetter.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,19 +35,15 @@ import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.R
 import lv.bolwarra.wetter.domain.model.DailyWeather
 import lv.bolwarra.wetter.domain.model.HourlyWeather
-import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.onDay
 import lv.bolwarra.wetter.ui.components.ConditionGlyph
 import lv.bolwarra.wetter.ui.components.HairlineRule
 import lv.bolwarra.wetter.ui.components.HourStrip
-import lv.bolwarra.wetter.ui.components.Metric
-import lv.bolwarra.wetter.ui.components.MetricGrid
 import lv.bolwarra.wetter.ui.components.Reveal
 import lv.bolwarra.wetter.ui.components.Tile
 import lv.bolwarra.wetter.ui.format.formatMillimetresWithUnit
 import lv.bolwarra.wetter.ui.format.formatTemperature
-import lv.bolwarra.wetter.ui.format.formatWeekday
 import lv.bolwarra.wetter.ui.format.formatWeekdayShort
 import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.WetterTheme
@@ -78,6 +73,15 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * already said. Once the sky became a mark the row could be read across in one
  * movement, and the bars were the thing standing in the way.
  *
+ * ### Nothing under the rows
+ *
+ * There was a summary tile below them — wet days, the wettest, warmest, coldest.
+ * Every figure in it was already on the page it sat under, one scroll up, said
+ * more precisely: "four of seven wet" is the four rows with a mark on them, and
+ * "warmest 19°" is the largest number in a column of seven. A tile that counts
+ * what is already drawn is asking the reader to trust an arithmetic they can do
+ * by looking.
+ *
  * ### The detail is behind the row, not on it
  *
  * A day opens into its own hours. That is where the rain rate, the sky at four
@@ -105,10 +109,7 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
     // the one that was opened.
     var openDay by rememberSaveable { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(spacing.m),
-    ) {
+    Column(modifier.fillMaxWidth()) {
         Tile(
             label = stringResource(R.string.tile_week_rain),
             trailing = formatMillimetresWithUnit(
@@ -144,8 +145,6 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
                 )
             }
         }
-
-        WeekSummaryTile(days)
     }
 }
 
@@ -261,41 +260,7 @@ private fun DayRow(
     }
 }
 
-/** The two facts worth taking from a week at a glance. */
-@Composable
-private fun WeekSummaryTile(days: List<DailyWeather>) {
-    val units = WetterTheme.units
-    val wetDays = days.count { PrecipitationIntensity.ofRate(it.precipitationTotal).isWet }
-    val wettest = days.maxByOrNull { it.precipitationTotal ?: 0.0 }
-    val wettestIsWet = wettest != null &&
-        PrecipitationIntensity.ofRate(wettest.precipitationTotal).isWet
-
-    Tile(label = stringResource(R.string.tile_week_summary)) {
-        MetricGrid(
-            listOf(
-                Metric(
-                    stringResource(R.string.metric_wet_days),
-                    stringResource(R.string.week_days_of, wetDays, days.size),
-                ),
-                Metric(
-                    stringResource(R.string.metric_wettest_day),
-                    if (wettestIsWet) formatWeekday(wettest.date) else DRY,
-                ),
-                Metric(
-                    stringResource(R.string.metric_warmest),
-                    formatTemperature(days.maxOf { it.temperatureMax }, units.temperature),
-                ),
-                Metric(
-                    stringResource(R.string.metric_coldest),
-                    formatTemperature(days.minOf { it.temperatureMin }, units.temperature),
-                ),
-            ),
-        )
-    }
-}
-
 private const val DAYS_SHOWN = 7
-private const val DRY = "—"
 
 /**
  * An en dash with a hair of air either side, which is how a range is set.

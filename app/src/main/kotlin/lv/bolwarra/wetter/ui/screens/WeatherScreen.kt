@@ -256,7 +256,7 @@ private fun WeatherScreenBody(
             ) { page ->
                 when (page) {
                     WeatherDomain.Today ->
-                        TodayPage(forecast, now, state.timeline, state.bias, state.airQuality)
+                        TodayPage(forecast, now, state.timeline, state.airQuality)
                     WeatherDomain.Week -> WeekPage(forecast, now)
                     WeatherDomain.Month -> MonthPage(forecast, now, state.climatology)
                 }

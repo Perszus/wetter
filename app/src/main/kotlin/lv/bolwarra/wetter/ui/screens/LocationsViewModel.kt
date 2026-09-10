@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.ZoneId
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,6 +89,11 @@ class LocationsViewModel(
     private val preferences: PreferencesStore,
     /** Asked only when somebody presses the button on the map. */
     private val deviceLocation: DeviceLocation,
+    /**
+     * For the one job here that must finish after this screen has gone: keeping
+     * a place somebody just chose.
+     */
+    private val applicationScope: CoroutineScope,
     basemap: MapTileSource,
     /**
      * Told when the chosen place changes, so the home screen stops showing the
@@ -205,6 +211,23 @@ class LocationsViewModel(
     /**
      * Keep the exact point somebody put a pin on.
      *
+     * ### It runs on a scope that outlives this screen, and that is the whole fix
+     *
+     * This used to fetch a forecast *first* — to learn the timezone — and save
+     * afterwards, on the view model's own scope. The screen closes itself the
+     * instant the button is pressed, which pops the destination, which clears
+     * this view model, which cancels that coroutine while it is still waiting on
+     * the network. The pin was then never written: chosen, confirmed, and gone.
+     *
+     * It was a race the whole time and it started being lost when Open-Meteo's
+     * request grew from seven days to sixteen — the same code, a slower answer,
+     * and suddenly the cancellation always won.
+     *
+     * So the place is written first and on the application's scope, before
+     * anything that can suspend for a network. The timezone is corrected after,
+     * as a second write, because a zone is worth waiting for and a lost pin is
+     * not.
+     *
      * A coordinate has no timezone, and [WeatherLocation] needs one because
      * "18:00" on a forecast means 18:00 *there*. Nothing on the device knows
      * which zone an arbitrary point is in - that is a map of political
@@ -219,23 +242,33 @@ class LocationsViewModel(
      * provisional zone is not wasted.
      */
     fun savePin(at: Coordinates, name: PlaceName?) {
-        viewModelScope.launch {
-            val provisional = WeatherLocation(
-                name = name?.label ?: at.format(),
-                latitude = at.latitude,
-                longitude = at.longitude,
-                zone = ZoneId.systemDefault(),
-                region = name?.region,
-                country = name?.country,
-            )
-            val resolved = repository.refresh(provisional).getOrNull()?.location ?: provisional
-            val point = provisional.copy(zone = resolved.zone)
+        val provisional = WeatherLocation(
+            name = name?.label ?: at.format(),
+            latitude = at.latitude,
+            longitude = at.longitude,
+            zone = ZoneId.systemDefault(),
+            region = name?.region,
+            country = name?.country,
+        )
 
-            savedLocations.save(point)
-            selectedLocation.select(point)
-            preferences.seedFor(point)
+        applicationScope.launch {
+            savedLocations.save(provisional)
+            selectedLocation.select(provisional)
+            preferences.seedFor(provisional)
             // The home screen is looking at the place that was selected a
             // moment ago, and will not find out on its own until its next tick.
+            onPlaceChanged()
+
+            // Then the zone. The forecast request carries it back, and the
+            // saved row is rewritten under the same key - coordinates rounded
+            // to three decimals - so this replaces the place rather than
+            // adding a second one beside it.
+            val resolved = repository.refresh(provisional).getOrNull()?.location ?: return@launch
+            if (resolved.zone == provisional.zone) return@launch
+
+            val corrected = provisional.copy(zone = resolved.zone)
+            savedLocations.save(corrected)
+            selectedLocation.select(corrected)
             onPlaceChanged()
         }
     }

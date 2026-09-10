@@ -34,6 +34,13 @@ internal data class MetarDto(
     val visib: String? = null,
     /** The present-weather group, when there is one. */
     val wxString: String? = null,
+    /**
+     * The report as it was filed.
+     *
+     * Kept for one reason: it is the difference between "the observer saw
+     * nothing falling" and "nobody reported". See [PresentWeather].
+     */
+    val rawOb: String? = null,
 )
 
 /**
@@ -143,7 +150,10 @@ internal class MetarObservationSource(
             windDirection = wdir,
             pressure = altim,
             visibilityMetres = visibilityMetresOf(visib),
-            precipitating = PresentWeather.precipitationFrom(wxString),
+            precipitating = PresentWeather.precipitationFrom(
+                group = wxString,
+                reported = !rawOb.isNullOrBlank(),
+            ),
             intensity = PresentWeather.intensityFrom(wxString),
         )
     }

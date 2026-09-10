@@ -8,7 +8,6 @@ import lv.bolwarra.wetter.domain.hazard.Hazard
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
-import lv.bolwarra.wetter.domain.verification.LearnedBias
 
 /**
  * Everything the weather screen renders from.
@@ -54,16 +53,6 @@ data class WeatherUiState(
     val climatology: Climatology = Climatology(emptyMap()),
     /** Whatever in the next day could hurt somebody, worst first. */
     val hazards: List<Hazard> = emptyList(),
-    /**
-     * What this place's forecasts have been found to get wrong, once enough
-     * records exist to tell. Null for a new location and for the first weeks of
-     * an old one.
-     *
-     * [forecast] already has it applied - this is carried so the screen can say
-     * that it did. A number quietly adjusted behind the reader's back is not an
-     * improvement over an uncorrected one.
-     */
-    val bias: LearnedBias? = null,
     /**
      * Whether the cache has answered yet, in either direction.
      *

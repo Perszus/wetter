@@ -88,4 +88,18 @@ class PresentWeatherTest {
         // Riga, nothing significant at all.
         assertNull(PresentWeather.precipitationFrom(null))
     }
+
+    @Test
+    fun `a filed report with no weather group is dry`() {
+        // A METAR is a complete statement of the weather at one place. No group
+        // in it means the observer saw nothing falling, which is an observation
+        // - and without it the record holds wet hours and no dry ones, which
+        // makes every skill score meaningless.
+        assertFalse(PresentWeather.precipitationFrom(null, reported = true)!!)
+        assertFalse(PresentWeather.precipitationFrom("", reported = true)!!)
+        assertFalse(PresentWeather.precipitationFrom("   ", reported = true)!!)
+
+        // Nothing filed is still nothing known.
+        assertNull(PresentWeather.precipitationFrom(null, reported = false))
+    }
 }
