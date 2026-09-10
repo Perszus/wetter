@@ -138,7 +138,13 @@ object PrecipitationFusion {
      * @param radar the nowcast sampled at this location, possibly empty.
      * @param from first step, inclusive.
      * @param step spacing between steps.
-     * @param steps how many to produce.
+     * @param steps how many to produce, at most. The series is cut short where
+     *   both sources run out rather than padded to length: a step neither the
+     *   radar nor the model can answer carries no sources, and a run of those on
+     *   the end is a gap in the evidence, not a dry spell. Asking for a day of
+     *   ten-minute steps from a provider that only published twelve hours would
+     *   otherwise draw half a day of flat, confident nothing — and would tell
+     *   the sentence under the chart that it does not rain tonight.
      * @param ensemble several models over the same hours, when available. Where
      *   it reaches, the model's confidence is *measured* from how far the models
      *   are apart rather than assumed: an hour they all agree on deserves more
@@ -203,7 +209,7 @@ object PrecipitationFusion {
                     )
                 }
             }
-        }
+        }.dropLastWhile { it.sources == 0 }
     }
 
     /**

@@ -115,8 +115,41 @@ Notable changes to Wetter. The format follows
 - Byte-for-byte reproducible release builds. Two independent builds of a commit
   now produce an identical APK, verified from a fresh shallow clone with no
   keystore. AGP's `vcsInfo` embedding was the only thing standing in the way.
+- **The rain chart now holds a full day and shows six hours of it.** It opens
+  exactly where it did before — the next six hours, at the size they were — and
+  the rest of the day is pushed into view sideways. The reason the chart was six
+  hours was that a day drawn across a phone flattens the part anybody is going
+  to act on into a smear; that argument was about the *screen*, and only ever
+  ruled out drawing a day at once.
+- Pixels per hour is therefore now fixed the way the height is, and for the same
+  reason: an hour is the same width every morning, so a shape means the same
+  thing every morning. A short forecast makes a shorter chart rather than the
+  same chart drawn thinner.
+- Hold to read, drag to travel. A horizontal drag can only mean one thing and it
+  now means moving through the day, so the reading moved to a press-and-hold —
+  which is the right gesture for it anyway, since taking a reading is deliberate
+  and travelling is not. Once held, the cursor still follows a finger as before.
+  What is gone is the tap that used to flash a value instantly.
+- The band names — light, moderate, heavy — stay put on screen while the weather
+  slides underneath them, rather than living at the far end of the chart where
+  finding out what the height means would have meant a trip to tomorrow evening.
+  They are still drawn behind the curve, which is why they are not an overlay.
+- Midnight is marked, with a faint full-height rule and the weekday's name in
+  place of "0:00" on the axis. Six hours crossed a day boundary from one side at
+  most; a day always crosses it, and "3:00" on its own then stops being an
+  answer.
+- The fused radar-and-model timeline runs a day rather than six hours, so the
+  whole scrollable chart is one measurement end to end rather than radar for the
+  visible part and the raw hourly rows for the rest, joined at whatever hour the
+  radar happened to reach.
 
 ### Fixed
+
+- The fused timeline used to pad its tail with zeros when asked for more than
+  the sources could answer. A step neither the radar nor the model covers is an
+  absence of evidence, and returning it as a rate of zero would have drawn
+  confident dry weather out of nothing — and told the line under the chart that
+  it does not rain tonight. The series is now cut where the evidence stops.
 
 - Choosing MET Norway in the Nordics used to mean losing five of seven days of
   hourly forecast, because its six-hourly tail was discarded and nothing

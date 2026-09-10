@@ -193,6 +193,10 @@ class PrecipitationFusionTest {
 
     @Test
     fun `beyond both sources nothing is claimed`() {
+        // Not even a zero. A step neither source can answer is an absence of
+        // evidence, and handing it back as a rate of zero lets a chart draw
+        // confident dry weather out of nothing at all - and lets the sentence
+        // under that chart read it as "no rain tonight".
         val fused = PrecipitationFusion.fuse(
             hourly = hours(1.0, 1.0),
             radar = emptyList(),
@@ -200,8 +204,23 @@ class PrecipitationFusionTest {
             step = Duration.ofMinutes(10),
             steps = 1,
         )
-        assertEquals(0, fused[0].sources)
-        assertEquals(0.0, fused[0].confidence, 0.0001)
+        assertTrue("expected an empty series, got $fused", fused.isEmpty())
+    }
+
+    @Test
+    fun `asked for more than the model has, the series stops where the model does`() {
+        // A day of ten-minute steps out of two hourly rows. The rows describe up
+        // to an hour past the last of them, and the answer ends there rather
+        // than running on for the twenty-two hours that were asked for.
+        val fused = PrecipitationFusion.fuse(
+            hourly = hours(1.0, 1.0),
+            radar = emptyList(),
+            from = start,
+            step = Duration.ofMinutes(10),
+            steps = 144,
+        )
+        assertEquals(start.plus(Duration.ofHours(2)), fused.last().at)
+        assertTrue("a step with no source survived", fused.all { it.sources > 0 })
     }
 
     @Test

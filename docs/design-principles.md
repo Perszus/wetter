@@ -197,6 +197,34 @@ leaving the boundaries exactly on the thirds. **A legibility problem on one
 surface is fixed on that surface**, and never by changing the shared axis, which
 silently redraws the main chart to solve a problem somewhere else.
 
+**Both axes are fixed, and it is the same argument twice.** The height is
+intensity and never adapts to the data, because a reader reads a shape and a
+shape only means something against a scale that has not moved. Width is pixels
+per hour, and the reasoning transfers without a change: an hour must be the same
+width this morning as it was yesterday morning, so the chart is never fitted to
+its content.
+
+What follows from that is that a chart holding more than a screen has to be
+scrolled rather than squeezed. The app's chart holds a day and shows six hours,
+and the six hours are exactly the size they were when six hours was all it held.
+The old objection to a day — that it flattens the near hours into a smear — was
+always an objection to the *screen*, and squeezing was the only thing it ruled
+out.
+
+Two things fall out of that and are worth stating, because both were got wrong
+first:
+
+- **A short series makes a shorter chart, not a thinner one.** A provider that
+  stops at eighteen hours gives three screens, not four screens of the same
+  eighteen hours drawn wider. Fitting the content to the track is the adaptive
+  scale coming back in through the horizontal door.
+- **What is a legend goes on the screen; what is a measurement goes on the
+  chart.** The band captions do not belong to any hour, so they hold still while
+  the weather slides past them — but they are placed on the chart's own canvas at
+  the screen's edge rather than lifted onto an overlay, because everything on the
+  scale is drawn *behind* the curve. A faint word on top of the line that carries
+  the whole reading reads as a smudge on it.
+
 ## Architecture rules
 
 - **The domain model represents weather, not an API response.** No integer

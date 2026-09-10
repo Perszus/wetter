@@ -1,16 +1,17 @@
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.time.Duration
 import java.time.Instant
@@ -45,6 +47,7 @@ import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.ui.format.formatMillimetres
+import lv.bolwarra.wetter.ui.format.formatWeekdayShort
 import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.Emphasis
 import lv.bolwarra.wetter.ui.theme.WetterTheme
@@ -74,6 +77,20 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  *
  * Ordinary smoothing dips below zero approaching a shower and bulges above the
  * peak inside it, drawing rainfall nobody forecast. See [MonotoneCurve].
+ *
+ * ### It holds more than it shows
+ *
+ * [span] is what the chart contains and [window] is what fits on the screen at
+ * once; the rest is pushed into view sideways. Those being two different things
+ * is the whole design. A day drawn across a phone gives each hour a fingertip of
+ * width, which flattens the next two hours — the part anybody is going to act on
+ * — into a smear; a day drawn at the six-hour scale keeps every hour the size it
+ * was and simply runs off the edge, where it can be fetched by a thumb.
+ *
+ * So the scale is fixed in both directions now. Height is intensity and never
+ * adapts; width is pixels per hour and never adapts either. The chart opens at
+ * the left edge, which is now, and that is the only position it is ever put into
+ * on the reader's behalf.
  */
 @Composable
 fun RainCurve(
@@ -81,6 +98,8 @@ fun RainCurve(
     zone: ZoneId,
     from: Instant,
     span: Duration,
+    /** How much of [span] is on screen at once. The rest is scrolled to. */
+    window: Duration,
     modifier: Modifier = Modifier,
     /**
      * The fused radar-and-model timeline, when there is one. It supersedes the
@@ -116,6 +135,11 @@ fun RainCurve(
     if (points.size < 2) return
 
     var scrubbed by remember { mutableStateOf<Int?>(null) }
+    // Deliberately not keyed on anything. The window rolls forward by the minute
+    // and the points are rebuilt with it, and a scroll position that reset every
+    // time that happened would drag the reader back to now once a minute while
+    // they were looking at tonight.
+    val scroll = rememberScrollState()
 
     val axisStyle = WetterTheme.type.axis.copy(color = colors.textTertiary)
 
@@ -130,102 +154,150 @@ fun RainCurve(
             stringResource(PrecipitationIntensity.HEAVY.labelRes()),
     )
 
-    Column(modifier.fillMaxWidth()) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(TRACK_HEIGHT)
-                .pointerInput(points) {
-                    // The value appears on touch-down, so a tap reads a moment.
-                    // After that direction decides the winner: cross the slop
-                    // horizontally and this consumes the pointer and scrubs, move
-                    // vertically and the page scroll takes it. Claiming the
-                    // pointer outright would make the chart a dead zone you
-                    // cannot scroll past.
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        scrubbed = indexAt(down.position.x, size.width, points.size)
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        // Held in a local because the scope it comes from is out of reach from
+        // inside a draw lambda three receivers down.
+        val viewport = maxWidth
+        val track = trackWidth(
+            viewport = viewport,
+            covered = Duration.between(points.first().at, points.last().at),
+            window = window,
+        )
 
-                        val crossed = awaitHorizontalTouchSlopOrCancellation(down.id) { change, _ ->
-                            change.consume()
-                        }
-                        if (crossed != null) {
-                            horizontalDrag(crossed.id) { change ->
+        // Everything that is measured in hours travels together. The track, the
+        // rule and the axis are all as wide as the whole day and are scrolled as
+        // one, so a tick can never drift away from the point it labels.
+        Column(Modifier.horizontalScroll(scroll).width(track)) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(TRACK_HEIGHT)
+                    // Keyed on the count rather than on the series. The series
+                    // is rebuilt every minute as the window rolls, and keying on
+                    // it would tear down a gesture in progress - which mattered
+                    // little when a reading was a tap and matters now that it is
+                    // a hold somebody has waited half a second for. The count is
+                    // all this block uses, so a stale list cannot mislead it.
+                    .pointerInput(points.size) {
+                        // Hold to read, drag to travel.
+                        //
+                        // A horizontal drag can only mean one thing, and now it
+                        // means moving through the day - so reading a value had
+                        // to move off the gesture it used to share. Holding
+                        // still is the only input left that a scroller ignores,
+                        // and it is the right one anyway: taking a reading is a
+                        // deliberate act, and travelling is not.
+                        //
+                        // What is lost is the tap that used to flash a value
+                        // instantly. What is kept is the reading itself, which
+                        // still follows a finger once it has been claimed - and
+                        // the vertical page scroll, which never had to be
+                        // negotiated for, because this gesture starts from
+                        // stillness rather than from a direction.
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { scrubbed = indexAt(it.x, size.width, points.size) },
+                            onDragEnd = { scrubbed = null },
+                            onDragCancel = { scrubbed = null },
+                            onDrag = { change, _ ->
                                 scrubbed = indexAt(change.position.x, size.width, points.size)
                                 change.consume()
-                            }
-                        }
-                        scrubbed = null
-                    }
-                },
-        ) {
-            // Inside the track, not above it.
-            //
-            // This used to be its own 24 dp row with an 8 dp spacer under it,
-            // held blank so the layout would not jump when a finger landed. Held
-            // blank is exactly the problem: 32 dp of nothing sat directly on top
-            // of the chart with no rule between, so it read as part of the heavy
-            // lane and made heavy look 1.65 times the height of the other two
-            // when all three are equal thirds.
-            //
-            // Overlaid, it costs no height at all and still cannot make the
-            // layout jump. It sits in the top of the heavy lane, which is the
-            // one part of the chart that is empty in almost every forecast -
-            // and necessarily empty in any forecast light enough to be worth
-            // scrubbing for a number.
-            Readout(
-                point = scrubbed?.let(points::getOrNull),
-                zone = zone,
-                modifier = Modifier.align(Alignment.TopStart),
-            )
-
-            Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
-                drawIntensityGuides(
-                    guides = guides,
-                    measurer = measurer,
-                    style = axisStyle,
-                    rule = colors.gridline,
-                )
-                val path = curvePath(points)
-                drawPath(
-                    path = Path().apply {
-                        addPath(path)
-                        lineTo(size.width, size.height)
-                        lineTo(0f, size.height)
-                        close()
+                            },
+                        )
                     },
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            colors.precipitation.copy(alpha = FILL_TOP_ALPHA),
-                            colors.precipitation.copy(alpha = FILL_BOTTOM_ALPHA),
-                        ),
-                    ),
-                )
-                drawPath(
-                    path = path,
-                    brush = intensityBrush(colors.precipitationMuted, colors.precipitation),
-                    style = Stroke(width = STROKE.toPx(), cap = StrokeCap.Round),
-                )
-                scrubbed?.let { index ->
-                    drawCursor(
-                        index = index,
-                        points = points,
-                        lineColour = colors.textPrimary.copy(alpha = CURSOR_ALPHA),
-                        dotColour = colors.precipitation,
-                        ringColour = colors.surfaceRaised,
+            ) {
+                Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
+                    drawIntensityRules(guides, colors.gridline)
+                    drawDayBreaks(points, zone, colors.gridline)
+                    // Read here rather than in composition on purpose: the
+                    // labels are the one thing on this canvas that moves with
+                    // the scroll, and taking the offset inside the draw means
+                    // dragging the chart redraws it instead of rebuilding it.
+                    drawIntensityLabels(
+                        guides = guides,
+                        measurer = measurer,
+                        style = axisStyle,
+                        rightEdge = scroll.value + viewport.toPx(),
                     )
+                    val path = curvePath(points)
+                    drawPath(
+                        path = Path().apply {
+                            addPath(path)
+                            lineTo(size.width, size.height)
+                            lineTo(0f, size.height)
+                            close()
+                        },
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                colors.precipitation.copy(alpha = FILL_TOP_ALPHA),
+                                colors.precipitation.copy(alpha = FILL_BOTTOM_ALPHA),
+                            ),
+                        ),
+                    )
+                    drawPath(
+                        path = path,
+                        brush = intensityBrush(colors.precipitationMuted, colors.precipitation),
+                        style = Stroke(width = STROKE.toPx(), cap = StrokeCap.Round),
+                    )
+                    scrubbed?.let { index ->
+                        drawCursor(
+                            index = index,
+                            points = points,
+                            lineColour = colors.textPrimary.copy(alpha = CURSOR_ALPHA),
+                            dotColour = colors.precipitation,
+                            ringColour = colors.surfaceRaised,
+                        )
+                    }
                 }
+            }
+
+            Spacer(Modifier.height(spacing.s))
+            HairlineRule()
+            Spacer(Modifier.height(spacing.xs))
+
+            Canvas(Modifier.fillMaxWidth().height(AXIS_HEIGHT)) {
+                drawTimeAxis(points, zone, measurer, axisStyle, colors.hairline)
             }
         }
 
-        Spacer(Modifier.height(spacing.s))
-        HairlineRule()
-        Spacer(Modifier.height(spacing.xs))
-
-        Canvas(Modifier.fillMaxWidth().height(AXIS_HEIGHT)) {
-            drawTimeAxis(points, zone, measurer, axisStyle, colors.hairline)
-        }
+        // Inside the track, not above it.
+        //
+        // This used to be its own 24 dp row with an 8 dp spacer under it,
+        // held blank so the layout would not jump when a finger landed. Held
+        // blank is exactly the problem: 32 dp of nothing sat directly on top
+        // of the chart with no rule between, so it read as part of the heavy
+        // lane and made heavy look 1.65 times the height of the other two
+        // when all three are equal thirds.
+        //
+        // Overlaid, it costs no height at all and still cannot make the
+        // layout jump. It sits in the top of the heavy lane, which is the
+        // one part of the chart that is empty in almost every forecast -
+        // and necessarily empty in any forecast light enough to be worth
+        // scrubbing for a number.
+        Readout(
+            point = scrubbed?.let(points::getOrNull),
+            zone = zone,
+            modifier = Modifier.align(Alignment.TopStart),
+        )
     }
+}
+
+/**
+ * How wide the whole chart is, given how much of it fits on screen.
+ *
+ * Pixels per hour is set by the window and then held: the track is as wide as
+ * the data it has to carry at that scale, which is four screens for a day at six
+ * hours a screen. Deriving it from what the series actually covers rather than
+ * from the nominal span is what keeps the scale honest when a provider stops
+ * short - eighteen hours of forecast then occupies three screens rather than
+ * being stretched across four and quietly redrawn at a different resolution.
+ *
+ * Never narrower than the screen, so a short series is a full chart with nothing
+ * to scroll rather than a chart with a gap beside it.
+ */
+internal fun trackWidth(viewport: Dp, covered: Duration, window: Duration): Dp {
+    if (window.isZero || window.isNegative) return viewport
+    val screens = covered.toMillis().toFloat() / window.toMillis().toFloat()
+    return viewport * screens.coerceAtLeast(1f)
 }
 
 /**
@@ -467,41 +539,113 @@ private const val HEAVY_MIX = 1f
  * they can read anything. Fixed rules cost a little ink on a quiet day and buy
  * a scale that means the same thing every morning.
  */
-private fun DrawScope.drawIntensityGuides(
-    guides: List<Pair<Float, String>>,
-    measurer: TextMeasurer,
-    style: TextStyle,
-    rule: Color,
-) {
-    guides.forEach { (fraction, label) ->
-        val y = size.height * (1f - fraction)
-
+private fun DrawScope.drawIntensityRules(guides: List<Pair<Float, String>>, rule: Color) {
+    guides.forEach { (fraction, _) ->
         // The lowest band's boundary is the floor of the chart, which is already
         // drawn by the axis beneath it. A second rule on top of it would only
         // thicken the frame.
-        if (fraction > 0f) {
-            drawLine(
-                color = rule,
-                start = Offset(0f, y),
-                end = Offset(size.width, y),
-                strokeWidth = GUIDE_RULE_WIDTH.toPx(),
-            )
-        }
-        val measured = measurer.measure(
-            label,
-            style,
+        if (fraction <= 0f) return@forEach
+        val y = size.height * (1f - fraction)
+        drawLine(
+            color = rule,
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = GUIDE_RULE_WIDTH.toPx(),
         )
-        // Held to the right edge. On the left they sat over the leftmost minutes
-        // of the chart, which are *now* - the one moment on the track somebody
-        // is certain to be looking at. The far right is six hours out, which is
-        // the part it costs least to write under.
+    }
+}
+
+/**
+ * The words on the scale, held to the screen while the chart moves under them.
+ *
+ * They and the rules they belong to used to be one pass, which stopped working
+ * the moment the track grew wider than the screen: a label at the right-hand end
+ * of the *content* is a label a day out, and the reader would have had to travel
+ * to tomorrow evening to find out what the height means.
+ *
+ * The fix is not to lift them onto an overlay, which is the obvious move and the
+ * wrong one — everything here is drawn before the curve so that the line, which
+ * carries the whole reading, passes over it. A faint word laid on top of that
+ * line reads as a smudge on it. So they stay on the chart's own canvas and are
+ * placed against [rightEdge], which is where the screen's right-hand edge
+ * currently falls in the chart's coordinates. They sit still while the weather
+ * slides past, and the line still covers them.
+ *
+ * Right rather than left, and the original reason survives the move intact. On
+ * the left they would sit over the leftmost minutes of what is on screen, and
+ * the left of this chart is *now* on first sight and the thing being approached
+ * for the rest of it.
+ */
+private fun DrawScope.drawIntensityLabels(
+    guides: List<Pair<Float, String>>,
+    measurer: TextMeasurer,
+    style: TextStyle,
+    rightEdge: Float,
+) {
+    guides.forEach { (fraction, label) ->
+        val y = size.height * (1f - fraction)
+        val measured = measurer.measure(label, style)
         drawText(
             textLayoutResult = measured,
             topLeft = Offset(
-                size.width - measured.size.width - GUIDE_LABEL_INSET.toPx(),
+                // Clamped to the content, so an overscroll bounce cannot carry
+                // the words off the end of the chart they belong to.
+                (rightEdge - measured.size.width - GUIDE_LABEL_INSET.toPx())
+                    .coerceIn(0f, size.width - measured.size.width),
                 y - measured.size.height - GUIDE_LABEL_GAP.toPx(),
             ),
         )
+    }
+}
+
+/**
+ * Where one day ends, drawn full height.
+ *
+ * Six hours never crossed midnight from more than one side, so a clock face was
+ * enough to say when a point was. A day always crosses it, and "3:00" alone is
+ * then genuinely ambiguous — it is the hour you are least sure about and the one
+ * most likely to be the answer to *when does this stop*. The rule marks the seam
+ * and the axis names the day that starts at it.
+ *
+ * The same weight as an intensity guide, because it is the same kind of mark: a
+ * faint statement about the grid, sitting behind the line that carries the
+ * reading.
+ */
+private fun DrawScope.drawDayBreaks(points: List<CurvePoint>, zone: ZoneId, colour: Color) {
+    forEachDayBreak(points, zone) { x ->
+        drawLine(
+            color = colour,
+            start = Offset(x, 0f),
+            end = Offset(x, size.height),
+            strokeWidth = GUIDE_RULE_WIDTH.toPx(),
+        )
+    }
+}
+
+/**
+ * Every local midnight inside the drawn window, as a position along it.
+ *
+ * Positioned from the clock rather than from the samples, for the same reason
+ * the hour marks are: a series anchored at whatever minute it was built at lands
+ * on midnight only by accident.
+ */
+private inline fun DrawScope.forEachDayBreak(
+    points: List<CurvePoint>,
+    zone: ZoneId,
+    action: (Float) -> Unit,
+) {
+    if (points.size < 2) return
+    val start = points.first().at
+    val end = points.last().at
+    val span = Duration.between(start, end).toMillis().toFloat()
+    if (span <= 0f) return
+
+    var day = start.atZone(zone).toLocalDate()
+    while (true) {
+        val midnight = day.plusDays(1).atStartOfDay(zone).toInstant()
+        if (midnight.isAfter(end)) return
+        action(Duration.between(start, midnight).toMillis() / span * size.width)
+        day = day.plusDays(1)
     }
 }
 
@@ -542,7 +686,8 @@ private fun DrawScope.drawTimeAxis(
 
     while (!mark.isAfter(end)) {
         val x = Duration.between(start, mark).toMillis() / span * size.width
-        val onTheHour = mark.atZone(zone).minute == 0
+        val local = mark.atZone(zone)
+        val onTheHour = local.minute == 0
 
         drawLine(
             color = tick,
@@ -552,7 +697,16 @@ private fun DrawScope.drawTimeAxis(
         )
 
         if (onTheHour) {
-            val measured = measurer.measure(clockOf(mark, zone), style)
+            // Midnight is labelled with the day it opens rather than with
+            // "0:00", which is the one hour on this axis that says nothing a
+            // reader did not already know. The clock resuming at 1:00 says the
+            // rest.
+            val label = if (local.hour == 0) {
+                formatWeekdayShort(local.toLocalDate())
+            } else {
+                clockOf(mark, zone)
+            }
+            val measured = measurer.measure(label, style)
             // Nudged inside the bounds so the first and last labels are not
             // clipped by the edge of the tile.
             val left = (x - measured.size.width / 2f)

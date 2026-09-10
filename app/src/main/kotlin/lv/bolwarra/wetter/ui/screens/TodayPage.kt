@@ -87,9 +87,10 @@ fun TodayPage(
     val zone = forecast.location.zone
     val spacing = WetterTheme.spacing
     val span = Duration.ofHours(TIMELINE_HOURS)
+    val window = Duration.ofHours(WINDOW_HOURS)
     // One hour more than is drawn. The window rolls by the minute but the data
-    // arrives in whole hours, so covering six hours from 14:45 needs the row
-    // that starts at 20:00.
+    // arrives in whole hours, so covering a day from 14:45 needs the row that
+    // starts at 14:00 tomorrow.
     val ahead = forecast.hourly.window(now, TIMELINE_HOURS + 1)
 
     // What the window is made of, or - when nothing is coming - what would fall
@@ -125,6 +126,7 @@ fun TodayPage(
                     zone = zone,
                     from = now,
                     span = span,
+                    window = window,
                     fused = timeline,
                 )
                 Spacer(Modifier.height(spacing.m))
@@ -490,9 +492,13 @@ private const val PERCENT = 100
  * When it next rains, in one line.
  *
  * It sits under the curve because it answers the question the curve cannot: the
- * chart covers the next six hours, and "nothing in the next six hours" is only
- * half an answer. The other half is usually the one somebody wanted, and it is
- * short enough to be a bar rather than a card of its own.
+ * chart covers the next day, and "nothing in the next day" is only half an
+ * answer. The other half is usually the one somebody wanted, and it is short
+ * enough to be a bar rather than a card of its own.
+ *
+ * It also answers it without asking anybody to travel. The chart now holds four
+ * screens, and a reader who has not scrolled has seen six hours of it; this line
+ * has read the whole thing.
  */
 @Composable
 private fun NextRainBar(
@@ -592,11 +598,25 @@ private fun PrecipitationSpell?.describe(now: Instant, forecast: WeatherForecast
 private val DOT = 7.dp
 
 /**
- * The next six hours, rolling from the current hour.
+ * How much of the day the chart holds, rolling from the current hour.
  *
- * Short on purpose. This is the window in which a forecast is worth acting on
- * and in which it is most likely to be right; a day of it flattened the part
- * anybody was going to use into an eighth of the width. What happens later is
- * the Week page's job, and when it next rains at all is the bar underneath.
+ * This was six hours for a long time, and the reason was sound: a day drawn
+ * across a phone flattens the part anybody is going to act on into an eighth of
+ * the width. What was wrong was the conclusion drawn from it — that the *chart*
+ * had to be six hours, when what had to be six hours was the screen.
+ *
+ * So the day is all here and only six hours of it are in front of you, at
+ * exactly the size those hours were before. Nothing about the near term is any
+ * smaller, and "will it have stopped by the time I come home" stopped being a
+ * question the chart refuses to take.
  */
-private const val TIMELINE_HOURS = 6L
+private const val TIMELINE_HOURS = 24L
+
+/**
+ * How much of it is on screen at once.
+ *
+ * The scale, in other words: six hours to a screen is what one pixel is worth,
+ * and it is fixed the way the height is fixed. A chart that changed its
+ * resolution would have to be re-read every time it was opened.
+ */
+private const val WINDOW_HOURS = 6L

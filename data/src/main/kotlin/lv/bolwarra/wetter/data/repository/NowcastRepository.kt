@@ -507,8 +507,23 @@ class NowcastRepository internal constructor(
 
         val STEP: Duration = Duration.ofMinutes(10)
 
-        /** Six hours, which is what the Today page draws. */
-        const val DEFAULT_STEPS = 36
+        /**
+         * A day, which is what the Today page holds.
+         *
+         * Six hours of it is what the page *shows*; the rest is reached by
+         * pushing the chart sideways. The series has to cover the whole of what
+         * can be scrolled to, because the alternative — fusing the visible part
+         * and handing the tail to the provider's hourly rows — joins two
+         * different measurements halfway along one line, and the seam would land
+         * at whatever hour the radar happened to reach.
+         *
+         * Past radar range every step is the model alone, which is what the
+         * curve's `≈` already says about it. The cost is arithmetic on a
+         * background dispatcher once a minute, and it is small: the radar
+         * lookups are a handful of samples and the model traces are built once
+         * for the whole series rather than per step.
+         */
+        const val DEFAULT_STEPS = 144
 
         /**
          * How long to wait between asks once a sweep is overdue.

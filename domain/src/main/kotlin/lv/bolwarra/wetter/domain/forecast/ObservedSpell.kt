@@ -33,10 +33,10 @@ import lv.bolwarra.wetter.domain.precipitationAt
  * under the threshold, invisible to an hourly scan, and plainly there on a
  * ten-minute curve. Reading both from one series removes that too.
  *
- * The model still answers beyond the timeline's horizon, which is six hours out.
- * Radar has nothing to say about tonight and the hourly rows run for days, so
- * past the end of the fused series the provider's own spells are the only
- * evidence there is.
+ * The model still answers beyond the timeline's horizon, which is a day out.
+ * Radar has nothing to say about the day after tomorrow and the hourly rows run
+ * for days, so past the end of the fused series the provider's own spells are
+ * the only evidence there is.
  */
 object ObservedSpell {
 

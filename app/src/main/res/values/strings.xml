@@ -94,8 +94,17 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="domain_week">Week</string>
     <string name="domain_month">Month</string>
 
-    <!-- Tile headings -->
-    <string name="tile_precipitation">%1$s · next 6 hours</string>
+    <!--
+      Tile headings.
+
+      The rain heading names what is falling and stops there. It used to end
+      "· next 6 hours", which was true when the chart held exactly that and
+      became a lie in both directions when it grew to hold a day: it holds
+      twenty-four hours and it shows six of them, and no single phrase says
+      both. The axis underneath is already answering it in clock time, and
+      answering it as the chart moves, which the heading cannot do.
+    -->
+    <string name="tile_precipitation">%1$s</string>
     <string name="metric_chance_of">Chance of %1$s</string>
     <string name="tile_next_rain">Next rain</string>
     <string name="tile_daylight">Sun</string>
@@ -214,15 +223,20 @@ It appears only for rain at that level between now and midnight, and goes once t
     <string name="tile_week_rain">Seven days</string>
     <string name="tile_week_summary">The week</string>
     <string name="week_today">Today</string>
+    <!--
+      A day past the end of the provider's hourly forecast. MET Norway drops to
+      six-hourly steps after about two and a half days, and six-hourly steps are
+      not hours - so this is a real edge of the data rather than a failure, and
+      it says which.
+    -->
+    <string name="week_no_hours">No hour-by-hour forecast reaches this far ahead.</string>
     <string name="week_days_of">%1$d of %2$d</string>
     <string name="metric_wet_days">Wet days</string>
     <string name="metric_wettest_day">Wettest</string>
     <string name="metric_warmest">Warmest</string>
     <string name="metric_coldest">Coldest</string>
 
-    <string name="tile_month_pending">Month</string>
-    <string name="month_pending">Not built yet.</string>
-    <string name="month_pending_detail">How the month has gone so far against its long-run normal, with the fortnight of forecast that remains.</string>
+    <string name="tile_month">Thirty days</string>
 
     <!-- About -->
     <string name="about_version">Version %1$s</string>
