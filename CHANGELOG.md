@@ -343,6 +343,16 @@ Notable changes to Wetter. The format follows
 
 ### Fixed
 
+- **A summit and its valley shared one climate.** Climatology was keyed to one
+  decimal of latitude, about eleven kilometres, which is fine on a plain and
+  wrong in mountains: Chamonix at 1034 m and the Aiguille du Midi at 3597 m are
+  4.5 km apart, and shared a key. The forecast model tells them apart perfectly
+  well — different grid cells, 12.2 °C against −1.9 °C at the same moment — so
+  the app would have shown one temperature and judged it against the other's
+  climate, with the better part of fifteen degrees between their cold thresholds.
+  Now keyed to two decimals, the same identity a place already has in the
+  verification store.
+
 - **A hard climate meant a danger notification every other day.** Replaying a
   year of archive through the hazard logic: Doha would have been marked on 44% of
   days, Yakutsk on 31%, Everest on 97% — while Rīga sat at 4.9% and Quito at

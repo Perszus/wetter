@@ -3,10 +3,11 @@
 The run of `test.md`. Eighteen places, live provider data, a decade of ERA5, an
 independent almanac, and the verification record off a real phone.
 
-**Fifteen findings. Thirteen fixed, two recorded.** Five were wrong numbers on
+**Sixteen findings. Fifteen fixed, one recorded.** Five were wrong numbers on
 screen with no symptom to notice them by; two were the app nagging or lying about
-a control; one was a warning system that would have been switched off within a
-week in half the climates on earth.
+a control; one was a warning
+system that would have been switched off within a week in half the climates on
+earth.
 
 ---
 
@@ -244,6 +245,28 @@ Doha at about seventy a year is still the highest and is recorded rather than
 tuned away: it is a genuinely hard climate, the figure counts hazard kinds rather
 than days, and the right rate is the tunable already noted in `notes.md`.
 
+### 16. A summit and its valley shared one climate — FIXED
+
+**Silent, and confirmed rather than suspected.** Finding 9 recorded the
+climatology key at one decimal (~11 km) as a worry and left it, because the
+right precision was "a measurement nobody has taken". This is that measurement.
+
+Chamonix in the valley and the Aiguille du Midi above it are 4.5 km apart and
+round to the same key, `45.9,6.9`. The forecast model has no difficulty telling
+them apart — different grid cells, 1034 m against 3597 m, and **12.2 °C against
+−1.9 °C at the same moment**. The climatology handed both whichever set of tails
+was fetched first.
+
+That was tolerable while normals only tinted the month page. It is not tolerable
+now they set the hazard thresholds: a summit would be judged against a valley's
+cold bar, or a valley against a summit's, and the gap between those two is the
+better part of fifteen degrees.
+
+Now keyed to two decimals — about 1.1 km, finer than any global model's grid, and
+the same identity a place already has in the verification store and the
+air-quality cache. The cost is bounded: a rebuild is a month apart and a phone
+holds a handful of places, not a continuum.
+
 ---
 
 ## What passed
@@ -289,6 +312,29 @@ than days, and the right rate is the tunable already noted in `notes.md`.
   edges keep their order. That is the geometry the chart and the widget share,
   so it cannot silently disagree with itself.
 
+- **Hourly sums against daily totals** (C4) — exact to 0.00 mm at all eighteen
+  places. Nothing is being read as an accumulation where it is a rate, or the
+  reverse.
+- **The radar-to-model hand-over is not a cliff** (D1) — with radar at 8 mm/h and
+  the model dry, the join spreads the whole disagreement across the window rather
+  than showing it in one step, and it runs one way without bouncing. Two sources
+  that agree produce no step at all.
+- **Every surface agrees which hours are wet** (C5, E1) — the chart band, the
+  intensity scale and the trace threshold give the same verdict on both sides of
+  the boundary, so the strip cannot be empty under a day headed "rain".
+- **A climate normal can never be drawn as a forecast** (D3) — `DayNormal` and
+  `DailyWeather` are separate types and nothing converts between them, so the
+  month page's fallback is structural rather than a convention.
+- **Provider failover** (G2) — already covered: 500s, timeouts, rate limits,
+  malformed responses, offline, provider rest and recovery, and a failed
+  extension still yielding the forecast that worked.
+- **The fused tail** (D4) — covered: nothing is claimed beyond either source, and
+  the series stops where the model does.
+- **The daily condition and the six-hourly rate** (C3) — covered, including the
+  regression guard for the bug that once marked a day as rain from a six-hour
+  total compared against an hourly threshold.
+- **Verification records match the hour they describe** (H1) — covered.
+
 ## Plausible, not proven
 
 - **The learned bias correction helps** (H4). Replayed walk-forward with no
@@ -309,5 +355,9 @@ than days, and the right rate is the tunable already noted in `notes.md`.
   that is now tested, but the two rendered surfaces were not diffed pixel for
   pixel.
 - Five of the eighteen places could not be replayed for F4: the archive refused
-  those requests after the rate limit and the run went ahead on the thirteen it
-  had.
+  those requests once the day's quota ran out, and the run went ahead on the
+  thirteen it had. The thirteen include both extremes, so the conclusion holds.
+- **The widget bitmap against the chart, pixel for pixel** (E1). They share
+  `RainCurveBands` and that geometry is now tested from both ends, but rendering
+  the two surfaces and diffing them needs an instrumented test this run did not
+  set up.

@@ -159,16 +159,36 @@ class ClimatologyRepository internal constructor(
     }
 
     /**
-     * Coarser than the forecast cache's key on purpose.
+     * Coarser than the forecast cache's key, and no coarser than the terrain.
      *
      * A forecast is keyed to four decimals because a shower is smaller than a
-     * suburb. A climate is not: two points ten kilometres apart have the same
-     * decade of Septembers, and keying this as finely would refetch eighty
-     * kilobytes for every pin nudged across a map.
+     * suburb. A climate is not, so this is deliberately blunter - keying it as
+     * finely would refetch eighty kilobytes for every pin nudged across a map.
+     *
+     * It used to be one decimal, on the reasoning that two points ten kilometres
+     * apart share a decade of Septembers. That is true on a plain and false in
+     * mountains, and it stopped being a matter of taste when these normals began
+     * setting the hazard thresholds rather than tinting the month page.
+     *
+     * Measured: Chamonix at 1034 m and the Aiguille du Midi at 3597 m are four
+     * and a half kilometres apart and shared one key at a decimal place. The
+     * forecast model separates them perfectly well - different grid cells, and
+     * 12.2 C against -1.9 C at the same moment - so the app would have shown one
+     * temperature and judged it against the other one's climate. Whichever place
+     * was looked at first won, and the second got a cold threshold wrong by the
+     * better part of fifteen degrees.
+     *
+     * Two decimals is about 1.1 km, which is finer than any global model's grid
+     * and enough to put a summit and its valley in different rows. It matches
+     * the verification store and the air-quality cache, so a place has one
+     * identity across everything that pools by location.
+     *
+     * The cost is bounded and small: a rebuild is a month apart, and a phone has
+     * a handful of saved places rather than a continuum of them.
      */
     private fun keyOf(location: WeatherLocation): String = String.format(
         java.util.Locale.ROOT,
-        "%.1f,%.1f",
+        "%.2f,%.2f",
         location.latitude,
         location.longitude,
     )
