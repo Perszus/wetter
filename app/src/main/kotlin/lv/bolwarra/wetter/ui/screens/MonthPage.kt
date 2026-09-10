@@ -26,10 +26,10 @@ import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Locale
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.climate.ClimateNormals
 import lv.bolwarra.wetter.domain.climate.Climatology
 import lv.bolwarra.wetter.domain.climate.DayNormal
 import lv.bolwarra.wetter.domain.model.DailyWeather
-import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.components.ConditionGlyph
 import lv.bolwarra.wetter.ui.components.Tile
@@ -168,7 +168,18 @@ private fun RowScope.DayCell(
     val units = WetterTheme.units
     val colors = WetterTheme.colors
     val wet = when {
-        day != null -> PrecipitationIntensity.ofRate(day.precipitationTotal).isWet
+        // A day's total, judged as a total.
+        //
+        // This asked PrecipitationIntensity, whose constants are rates in
+        // millimetres per *hour*, about an accumulation over a whole day - so a
+        // forecast of a tenth of a millimetre spread across twenty-four hours
+        // washed the square. That is the rate-for-accumulation mistake this
+        // project has made twice before, and here it had a second cost: the
+        // climatology squares on the same page use the conventional rain-day
+        // line at a millimetre, so the two halves of one grid were answering
+        // different questions and the forecast half marked far more wet days
+        // than the normals it sits beside.
+        day != null -> (day.precipitationTotal ?: 0.0) >= ClimateNormals.WET_DAY_MM
         // A normal is washed when the date has been wet more often than not. A
         // share of past years is not a forecast and is not drawn as one, but
         // "usually wet" is a fair thing for a square to say at a glance.

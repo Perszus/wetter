@@ -113,7 +113,9 @@ private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
     val units = WetterTheme.units
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
-    val wet = hour.intensity.isWet
+    // The same bar the sentence uses, so a strip cannot contradict the words
+    // above it. A trace hour keeps its place on the curve and loses its mark.
+    val wet = hour.intensity.isWorthNaming
 
     Column(
         modifier = Modifier

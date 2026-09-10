@@ -84,6 +84,10 @@ fun List<HourlyWeather>.hourCovering(instant: Instant): Instant = asSequence()
  * to leave now actually wants: told that it stops at three, they can go at
  * three. Smoothing a gap away to make the chart tidier would be the app
  * inventing a shower that the forecast does not contain.
+ *
+ * "Wet" here means worth calling rain rather than merely measurable, which is a
+ * higher bar than the curve is drawn at - see
+ * [PrecipitationIntensity.isWorthNaming].
  */
 fun List<HourlyWeather>.precipitationSpells(): List<PrecipitationSpell> {
     if (isEmpty()) return emptyList()
@@ -99,7 +103,7 @@ fun List<HourlyWeather>.precipitationSpells(): List<PrecipitationSpell> {
     }
 
     for (hour in hours) {
-        if (hour.intensity.isWet) {
+        if (hour.intensity.isWorthNaming) {
             run += hour
         } else {
             close(openEnded = false)

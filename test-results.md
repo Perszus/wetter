@@ -3,7 +3,7 @@
 The run of `test.md`. Eighteen places, live provider data, a decade of ERA5, an
 independent almanac, and the verification record off a real phone.
 
-**Sixteen findings. Fifteen fixed, one recorded.** Five were wrong numbers on
+**Eighteen findings. Seventeen fixed, one recorded.** Five were wrong numbers on
 screen with no symptom to notice them by; two were the app nagging or lying about
 a control; one was a warning
 system that would have been switched off within a week in half the climates on
@@ -266,6 +266,59 @@ Now keyed to two decimals — about 1.1 km, finer than any global model's grid, 
 the same identity a place already has in the verification store and the
 air-quality cache. The cost is bounded: a rebuild is a month apart and a phone
 holds a handful of places, not a continuum.
+
+### 17. "It is raining" was a coin flip — FIXED
+
+**Reported from use, then measured.** Rīga had weeks of cloud without much rain
+and the bar under the chart said it was raining almost continuously.
+
+Checked against aerodrome reports — 1295 hours at ten airports, model hours
+paired with the METAR for the same hour:
+
+| what the model said | actually raining at the station |
+|---|---|
+| trace, 0.1–0.5 mm/h | **53%** — a coin flip |
+| light or above, ≥0.5 mm/h | 79% |
+
+The app drew both as rain because the wet/dry line was the *measurable*
+threshold. The scale already had the right word for the lower band and its own
+comment already said what it was: `TRACE` — "damp ground, no more".
+
+So there are two bars now, at deliberately different heights. **The curve draws
+anything measurable**, because something is falling and the chart is a picture of
+the data. **The words and the marks wait for rain.** Wrong claims fell by half —
+43 to 20 — and the app went from being right 70% of the time when it says rain to
+79%.
+
+Things that were tried and rejected, because the measurement said so:
+
+- **Raising the measurable threshold** instead. Worse: at 0.5 mm/h the app
+  catches 44% of real rain rather than 60%, and the curve loses hours that
+  genuinely had something in them.
+- **A humidity or dew-point gate**, on the sound physical reasoning that light
+  precipitation into dry air evaporates before it lands. It buys almost nothing:
+  skill +0.557 to +0.559. The diagnostic shows why — light hours that reached the
+  ground averaged 2.72 °C of dew point depression and those that did not averaged
+  3.39 °C. The distributions overlap almost entirely. Virga is real and it is not
+  what is going on here.
+- **The model's own probability** on top of the new bar: 79% to 81%, on three
+  claims out of ninety-four. The two are correlated, so the rate bar has already
+  done the work, and machinery that does not earn its place does not go in.
+
+### 18. The month page had two definitions of wet — FIXED
+
+Found while tracing who consumes the wet/dry decision. `MonthPage` asked
+`PrecipitationIntensity.ofRate` — whose constants are millimetres per **hour** —
+about `day.precipitationTotal`, which is millimetres over a whole **day**. So a
+forecast day with a tenth of a millimetre spread across twenty-four hours washed
+the square.
+
+That is the rate-for-accumulation confusion this project has now made three
+times, and here it had a second cost: the climatology squares on the same grid
+use the conventional rain-day line at a millimetre, so the forecast half and the
+normals half of one page were answering different questions, and the forecast
+half marked far more wet days than the decade beside it. Both now use
+`ClimateNormals.WET_DAY_MM`.
 
 ---
 

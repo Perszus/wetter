@@ -107,8 +107,17 @@ object ObservedSpell {
         return PrecipitationKind.likelyAt(row?.temperature)
     }
 
+    /**
+     * Wet enough to put into a sentence.
+     *
+     * This is the bar for the words - "Rain starts at 21:00" - and it is higher
+     * than the bar for the curve on purpose. See
+     * [PrecipitationIntensity.isWorthNaming]: an hour in the trace band is
+     * actually raining about half the time, so a sentence built on it is a coin
+     * flip stated as a fact.
+     */
     private val FusedPrecipitation.isWet: Boolean
-        get() = millimetresPerHour >= PrecipitationIntensity.TRACE_MM_PER_HOUR
+        get() = PrecipitationIntensity.ofRate(millimetresPerHour).isWorthNaming
 
     /** The spacing the fused timeline is produced at. */
     private val STEP: Duration = Duration.ofMinutes(10)

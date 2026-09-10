@@ -343,6 +343,26 @@ Notable changes to Wetter. The format follows
 
 ### Fixed
 
+- **"It is raining" was close to a coin flip.** Weeks of cloud over Rīga with
+  little actual rain, and the bar under the chart said it was raining almost
+  continuously. Measured against aerodrome reports across 1295 hours at ten
+  airports: an hour the model placed in the trace band, 0.1–0.5 mm/h, was
+  actually precipitating at the station **53%** of the time; an hour at light or
+  above, 79%. The app drew both as rain because the wet line was the
+  *measurable* threshold, though the scale already called the lower band `TRACE`
+  and its own comment already said what that meant — damp ground, no more.
+  There are now two bars: the curve draws anything measurable, because something
+  is falling, and the words and the marks wait for rain. Wrong claims fell by
+  half, and the app went from being right 70% of the time when it says rain to
+  79%. Raising the measurable threshold instead was tried and is worse — it loses
+  a quarter of real rain — and so were a humidity gate and the model's own
+  probability, neither of which earned its place.
+- **The month page had two definitions of a wet day.** The forecast squares asked
+  an hourly-rate scale about a whole day's accumulation, so a tenth of a
+  millimetre spread over twenty-four hours washed the square, while the
+  climatology squares beside them used the conventional rain-day line at a
+  millimetre. One grid, two questions. Both now use the same threshold.
+
 - **A summit and its valley shared one climate.** Climatology was keyed to one
   decimal of latitude, about eleven kilometres, which is fine on a plain and
   wrong in mountains: Chamonix at 1034 m and the Aiguille du Midi at 3597 m are
