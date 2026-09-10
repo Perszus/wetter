@@ -190,18 +190,55 @@ internal object MetNorwayMapper {
      *
      * A day of sun with one heavy shower in it is a day you take a coat, and the
      * daily row is the only place that can say so.
+     *
+     * ### Rates, not totals
+     *
+     * This compared each step's raw *amount* against [TRACE_MM_PER_HOUR], which
+     * is a rate, and the two are only the same number for a step that covers one
+     * hour. A six-hourly step carrying 0.4 mm cleared an hourly threshold it was
+     * never measured against, so it became the day's wettest step and the day
+     * was marked rain — while every hourly row underneath it sat at a fifteenth
+     * of a millimetre and drew nothing at all.
+     *
+     * That was visible on screen the moment the week's rows could be opened: a
+     * Saturday headed with a rain mark whose twenty-four hours were, every one of
+     * them, dry. A reader's fair conclusion is that the mark is lying, and the
+     * mark was the honest half — it was reading a real 0.4 mm. It was the
+     * comparison that was wrong.
+     *
+     * So each step is asked how hard it is raining rather than how much it has,
+     * and the answer is compared against a threshold in the same unit.
+     *
+     * ### And an hour-by-hour day is named by its hours
+     *
+     * Fixing the unit was not enough on its own, because a six-hourly step can
+     * also win the fallback: with nothing over a trace all day, the sky was taken
+     * from whichever step sat nearest midday, and where both kinds overlap that
+     * can be the six-hour one. The day went back to saying rain over
+     * twenty-four dry hours by a different route.
+     *
+     * So a day that is covered hour by hour is named only from those hours. The
+     * six-hourly steps still count towards its total — that rain is real — but
+     * they are not allowed to put a word on a day whose every hour the reader can
+     * open and check. This is the same rule `precipitationHours` above already
+     * follows, and the reason is the one in ObservedSpell: two readings of one
+     * day, at two resolutions, must not be shown contradicting each other.
+     *
+     * Past the hourly forecast's reach there is nothing to contradict, so the
+     * six-hourly steps name the day as they always did.
      */
     private fun dominantCondition(steps: List<ParsedStep>, zone: ZoneId): WeatherCondition {
-        val wettest = steps
-            .filter {
-                (it.precipitationContribution() ?: 0.0) >=
-                    PrecipitationIntensity.TRACE_MM_PER_HOUR
-            }
-            .maxByOrNull { it.precipitationContribution() ?: 0.0 }
+        val candidates = steps
+            .filter { it.step.data.next1Hours != null }
+            .ifEmpty { steps }
 
-        val chosen = wettest ?: steps.minByOrNull { step ->
+        val wettest = candidates
+            .filter { (it.precipitationRate() ?: 0.0) >= PrecipitationIntensity.TRACE_MM_PER_HOUR }
+            .maxByOrNull { it.precipitationRate() ?: 0.0 }
+
+        val chosen = wettest ?: candidates.minByOrNull { step ->
             val hour = step.at.atZone(zone).hour
-            kotlin.math.abs(hour - 12)
+            kotlin.math.abs(hour - MIDDAY)
         }
 
         return weatherConditionFromMetSymbol(chosen?.finestPeriod()?.summary?.symbolCode)
@@ -222,6 +259,31 @@ internal object MetNorwayMapper {
         fun finestPeriod(): MetNorwayPeriod? =
             step.data.next1Hours ?: step.data.next6Hours ?: step.data.next12Hours
 
+        /** How many hours the window chosen by [finestPeriod] covers. */
+        fun finestPeriodHours(): Int = when {
+            step.data.next1Hours != null -> 1
+            step.data.next6Hours != null -> SIX
+            else -> TWELVE
+        }
+
+        /** What this step adds to a day's total: an accumulation, in millimetres. */
         fun precipitationContribution(): Double? = finestPeriod()?.details?.precipitationAmount
+
+        /**
+         * The same rain as a rate, which is the only form comparable to a
+         * threshold in millimetres per hour.
+         *
+         * Flat across the window, because that is all a window total can
+         * support. It is a floor on how hard it rained at the worst moment and
+         * never an overstatement, which is the right direction for a figure that
+         * decides whether a day gets called wet.
+         */
+        fun precipitationRate(): Double? = precipitationContribution()?.div(finestPeriodHours())
     }
+
+    private const val SIX = 6
+    private const val TWELVE = 12
+
+    /** The hour a day is judged by when nothing in it stands out. */
+    private const val MIDDAY = 12
 }

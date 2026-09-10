@@ -134,6 +134,44 @@ class MetNorwayProviderTest {
     }
 
     @Test
+    fun `a day covered hour by hour is named by its hours`() = runTest {
+        // The bug this exists for was visible on screen: a Saturday headed with a
+        // rain mark whose twenty-four hours were, every one of them, dry. The
+        // six-hourly step sitting over the top of that day said rain, and it was
+        // reading a real 8.7 mm - but a reader who opens the day sees the hours,
+        // and the hours are what the day has to be named from.
+        val day = provider(DRY_HOURS_UNDER_A_WET_SIX).getForecast(riga).getOrThrow().daily
+            .single { it.date == LocalDate.of(2026, 3, 14) }
+
+        assertEquals(WeatherCondition.PARTLY_CLOUDY, day.condition)
+    }
+
+    @Test
+    fun `past the hourly reach, a six-hourly total is judged as a rate`() = runTest {
+        // No hourly steps here, so a six-hourly one may name the day - but only
+        // on the same terms. 0.4 mm is over the trace threshold as a number and
+        // is a fifteenth of it as a rate, and the threshold is a rate.
+        val day = provider(sixHourlyDay(0.4)).getForecast(riga).getOrThrow().daily
+            .single { it.date == LocalDate.of(2026, 3, 14) }
+
+        assertEquals(WeatherCondition.PARTLY_CLOUDY, day.condition)
+        // The rain is still real and still counted. It is only too thin to name
+        // the day after.
+        assertEquals(0.4, day.precipitationTotal!!, 1e-9)
+    }
+
+    @Test
+    fun `past the hourly reach, six hours of real rain still names its day`() = runTest {
+        // The other side of the same threshold, so the fix cannot be "ignore
+        // six-hourly steps". 4.2 mm over six hours is 0.7 an hour, which is rain
+        // by any reading and worth putting on the day.
+        val day = provider(sixHourlyDay(4.2)).getForecast(riga).getOrThrow().daily
+            .single { it.date == LocalDate.of(2026, 3, 14) }
+
+        assertEquals(WeatherCondition.RAIN, day.condition)
+    }
+
+    @Test
     fun `sunrise and sunset are computed because the provider omits them`() = runTest {
         val today = provider().getForecast(riga).getOrThrow().daily
             .single { it.date == LocalDate.of(2026, 3, 14) }
@@ -162,3 +200,83 @@ class MetNorwayProviderTest {
         assertFalse(forecast.current.condition.isPrecipitating)
     }
 }
+
+/**
+ * A day whose hours are all dry, with a wet six-hourly step laid over the top.
+ *
+ * MET Norway really does publish both for the same moment, and this is the shape
+ * that put a rain mark on a dry Saturday. Written out here rather than added to
+ * the shared fixture: everything else reads that one, and this is a shape that
+ * has to stay exactly as it is.
+ */
+private val DRY_HOURS_UNDER_A_WET_SIX = """
+{
+  "type": "Feature",
+  "properties": {
+    "meta": { "updated_at": "2026-03-14T08:31:52Z" },
+    "timeseries": [
+      {
+        "time": "2026-03-14T10:00:00Z",
+        "data": {
+          "instant": { "details": { "air_temperature": 6.0 } },
+          "next_1_hours": {
+            "summary": { "symbol_code": "partlycloudy_day" },
+            "details": { "precipitation_amount": 0.0 }
+          },
+          "next_6_hours": {
+            "summary": { "symbol_code": "rain" },
+            "details": { "precipitation_amount": 8.7 }
+          }
+        }
+      },
+      {
+        "time": "2026-03-14T11:00:00Z",
+        "data": {
+          "instant": { "details": { "air_temperature": 6.4 } },
+          "next_1_hours": {
+            "summary": { "symbol_code": "cloudy" },
+            "details": { "precipitation_amount": 0.0 }
+          }
+        }
+      }
+    ]
+  }
+}
+"""
+
+/**
+ * A day past the hourly forecast's reach: two six-hourly steps and nothing finer.
+ *
+ * The clear one sits nearest midday, so it is what the day falls back to when the
+ * wet one is too thin to count - which is the thing being measured.
+ */
+private fun sixHourlyDay(millimetres: Double) = """
+{
+  "type": "Feature",
+  "properties": {
+    "meta": { "updated_at": "2026-03-14T08:31:52Z" },
+    "timeseries": [
+      {
+        "time": "2026-03-14T06:00:00Z",
+        "data": {
+          "instant": { "details": { "air_temperature": 4.0 } },
+          "next_6_hours": {
+            "summary": { "symbol_code": "rain" },
+            "details": { "precipitation_amount": $millimetres }
+          }
+        }
+      },
+      {
+        "time": "2026-03-14T12:00:00Z",
+        "data": {
+          "instant": { "details": { "air_temperature": 7.0 } },
+          "next_6_hours": {
+            "summary": { "symbol_code": "partlycloudy_day" },
+            "details": { "precipitation_amount": 0.0 }
+          }
+        }
+      }
+    ]
+  }
+}
+"""

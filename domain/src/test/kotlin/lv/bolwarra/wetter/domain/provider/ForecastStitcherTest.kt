@@ -147,9 +147,43 @@ class ForecastStitcherTest {
             primary.daily.single { it.date == firstDate },
             stitched.daily.single { it.date == firstDate },
         )
+
+        val wholeExtensionDay = seamDate.plusDays(1)
         assertSame(
-            "a day the extension drew is summarised by the extension",
-            extension.daily.single { it.date == seamDate },
+            "a day the extension drew every hour of is summarised by the extension",
+            extension.daily.single { it.date == wholeExtensionDay },
+            stitched.daily.single { it.date == wholeExtensionDay },
+        )
+    }
+
+    @Test
+    fun `the day the seam falls in stays with whoever drew most of it`() {
+        // The bug this exists for was visible on screen: a Saturday headed with a
+        // rain mark, opened, and every one of its hours dry. The seam landed in
+        // the evening, so the global model had supplied three of that day's hours
+        // and the regional model the other twenty-one - and the summary went to
+        // the global model, which had forecast drizzle into an afternoon the
+        // reader could see was clear.
+        //
+        // Neither source was wrong. They were describing the same afternoon and
+        // only one of them was drawn, so only that one may put a word on it.
+        val primary = forecast("regional", hours = 30)
+        val extension = forecast("global", hours = 168)
+        val zone = riga.zone
+
+        val stitched = ForecastStitcher.stitch(primary, extension)
+        val seamDate = stitched.supplement!!.from.atZone(zone).toLocalDate()
+
+        val drawn = stitched.hourly
+            .filter { it.timestamp.atZone(zone).toLocalDate() == seamDate }
+        val fromPrimary = drawn.count { hour -> primary.hourly.any { it === hour } }
+        assertTrue(
+            "the seam day should be mostly the primary's for this to test anything",
+            fromPrimary > drawn.size - fromPrimary,
+        )
+
+        assertSame(
+            primary.daily.single { it.date == seamDate },
             stitched.daily.single { it.date == seamDate },
         )
     }
