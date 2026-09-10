@@ -4,6 +4,7 @@ import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -103,6 +104,16 @@ fun formatWeekdayShort(date: LocalDate): String =
 
 /** Day of the month, for the second line of a daily row. */
 fun formatDayOfMonth(date: LocalDate): String = date.dayOfMonth.toString()
+
+/**
+ * A weekday's initial, for the head of a calendar column.
+ *
+ * NARROW rather than a hand-cut first letter, because the initial that
+ * identifies a day is not the first letter of its name in every language, and in
+ * several it is not one letter at all.
+ */
+fun formatWeekdayInitial(day: DayOfWeek): String =
+    day.getDisplayName(TextStyle.NARROW, Locale.getDefault())
 
 /** Full weekday, for a sentence rather than a column. */
 fun formatWeekday(date: LocalDate): String =

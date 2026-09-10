@@ -25,6 +25,7 @@ object WetterViewModels {
                 container.nowcasts,
                 container.verification,
                 container.airQuality,
+                container.climatology,
                 container.selectedLocation,
             )
         }

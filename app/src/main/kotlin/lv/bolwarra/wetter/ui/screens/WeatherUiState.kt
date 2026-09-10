@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.ui.screens
 
 import androidx.compose.runtime.Immutable
 import lv.bolwarra.wetter.domain.air.AirQuality
+import lv.bolwarra.wetter.domain.climate.Climatology
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.hazard.Hazard
 import lv.bolwarra.wetter.domain.model.WeatherError
@@ -45,6 +46,12 @@ data class WeatherUiState(
      * air, and is shown as nothing rather than as a reassuring word.
      */
     val airQuality: AirQuality? = null,
+    /**
+     * What each date usually does here. Empty until it has been built, and
+     * empty for good where the archive could not be reached - both of which the
+     * Month page draws as squares it has nothing to say about.
+     */
+    val climatology: Climatology = Climatology(emptyMap()),
     /** Whatever in the next day could hurt somebody, worst first. */
     val hazards: List<Hazard> = emptyList(),
     /**

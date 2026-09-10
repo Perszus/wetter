@@ -19,10 +19,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
+import lv.bolwarra.wetter.data.repository.ClimatologyRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
 import lv.bolwarra.wetter.domain.air.AirQuality
+import lv.bolwarra.wetter.domain.climate.Climatology
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.hazard.Hazards
 import lv.bolwarra.wetter.domain.model.WeatherError
@@ -44,6 +46,7 @@ class WeatherViewModel(
     private val nowcasts: NowcastRepository,
     private val verification: VerificationRepository,
     private val airQuality: AirQualityRepository,
+    private val climate: ClimatologyRepository,
     private val selectedLocation: SelectedLocationStore,
 ) : ViewModel() {
 
@@ -60,6 +63,7 @@ class WeatherViewModel(
         val timeline: List<FusedPrecipitation> = emptyList(),
         val bias: LearnedBias? = null,
         val air: AirQuality? = null,
+        val climatology: Climatology = Climatology(emptyMap()),
     )
 
     /**
@@ -138,7 +142,20 @@ class WeatherViewModel(
     }
 
     /**
-     * The three derived things, each arriving on its own.
+     * What this place usually does at this time of year.
+     *
+     * Re-read when the forecast changes, which is far more often than it needs
+     * to be: the repository answers from disk for a month at a time and only
+     * goes to the archive when the decade behind it has rolled far enough to be
+     * worth rebuilding.
+     */
+    private val normals: Flow<Climatology> = forecasts.map { held ->
+        held.value?.let { runCatching { climate.normals(it.location) }.getOrNull() }
+            ?: Climatology(emptyMap())
+    }
+
+    /**
+     * The derived things, each arriving on its own.
      *
      * `combine` waits for every source to emit once before it emits at all, so
      * these three were gated on the slowest of them - and one of them is an air
@@ -156,8 +173,9 @@ class WeatherViewModel(
         timelines.onStart { emit(emptyList()) },
         biases.onStart { emit(null) },
         air.onStart { emit(null) },
-    ) { timeline, bias, air ->
-        Derived(timeline = timeline, bias = bias, air = air)
+        normals.onStart { emit(Climatology(emptyMap())) },
+    ) { timeline, bias, air, normals ->
+        Derived(timeline = timeline, bias = bias, air = air, climatology = normals)
     }
 
     val state: StateFlow<WeatherUiState> = combine(
@@ -183,6 +201,7 @@ class WeatherViewModel(
             timeline = if (forecast != null) extra.timeline else emptyList(),
             bias = if (forecast != null) extra.bias else null,
             airQuality = if (forecast != null) extra.air else null,
+            climatology = if (forecast != null) extra.climatology else Climatology(emptyMap()),
             // Read off the forecast on screen and the air beside it, so a
             // warning cannot outlive the forecast that raised it.
             hazards = if (forecast != null) {

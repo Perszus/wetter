@@ -7,6 +7,7 @@ import lv.bolwarra.wetter.data.location.SelectedLocationStore
 import lv.bolwarra.wetter.data.map.MapTileSource
 import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
+import lv.bolwarra.wetter.data.repository.ClimatologyRepository
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.VerificationRepository
 import lv.bolwarra.wetter.data.repository.WeatherRepository
@@ -34,6 +35,9 @@ class WetterContainer(context: Context) {
 
     /** The record of what was forecast against what actually happened. */
     val verification: VerificationRepository get() = weatherData.verification
+
+    /** What each date usually does here, past where any forecast reaches. */
+    val climatology: ClimatologyRepository get() = weatherData.climatology
 
     /** What is in the air here. */
     val airQuality: AirQualityRepository get() = weatherData.airQuality

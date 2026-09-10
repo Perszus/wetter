@@ -336,6 +336,34 @@ internal interface SelectedLocationDao {
     suspend fun write(location: SelectedLocationEntity)
 }
 
+/**
+ * The computed normals for a place, as one row.
+ *
+ * The eighty kilobytes of archive they were built from are not kept. A decade of
+ * daily rows is raw material, the three hundred and sixty-six normals are the
+ * answer, and the answer does not change until the location does - so what is
+ * stored is the answer.
+ */
+@Entity(tableName = "climate_normals")
+internal data class ClimateNormalsEntity(
+    @PrimaryKey val cacheKey: String,
+    val builtAtEpochSecond: Long,
+    val payload: String,
+)
+
+@Dao
+internal interface ClimateNormalsDao {
+
+    @Query("SELECT * FROM climate_normals WHERE cacheKey = :cacheKey")
+    suspend fun read(cacheKey: String): ClimateNormalsEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun write(normals: ClimateNormalsEntity)
+
+    @Query("DELETE FROM climate_normals WHERE builtAtEpochSecond < :cutoffEpochSecond")
+    suspend fun deleteOlderThan(cutoffEpochSecond: Long)
+}
+
 @Database(
     entities = [
         ForecastEntity::class,
@@ -345,8 +373,9 @@ internal interface SelectedLocationDao {
         RadarSeriesEntity::class,
         EnsembleEntity::class,
         ProviderHealthEntity::class,
+        ClimateNormalsEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 internal abstract class WetterDatabase : RoomDatabase() {
@@ -364,6 +393,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
     abstract fun radarSeries(): RadarSeriesDao
 
     abstract fun ensembles(): EnsembleDao
+
+    abstract fun climateNormals(): ClimateNormalsDao
 
     companion object {
 
@@ -486,6 +517,24 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the climate normals store.
+         *
+         * Purely additive, like every migration before it: a new table and
+         * nothing touched that already exists.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `climate_normals` (" +
+                        "`cacheKey` TEXT NOT NULL, " +
+                        "`builtAtEpochSecond` INTEGER NOT NULL, " +
+                        "`payload` TEXT NOT NULL, " +
+                        "PRIMARY KEY(`cacheKey`))",
+                )
+            }
+        }
+
         fun create(context: Context): WetterDatabase = Room.databaseBuilder(
             context.applicationContext,
             WetterDatabase::class.java,
@@ -508,6 +557,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
                 MIGRATION_4_5,
                 MIGRATION_5_6,
                 MIGRATION_6_7,
+                MIGRATION_7_8,
             )
             .build()
     }

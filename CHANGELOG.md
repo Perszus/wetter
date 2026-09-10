@@ -167,6 +167,29 @@ Notable changes to Wetter. The format follows
   the row summarises the whole day and rightly includes the morning that has
   been; an hour-by-hour forecast of hours that have already happened is a stretch
   of strip to scroll past before reaching anything anybody can act on.
+- **The month is a calendar of thirty days**, weekday columns in the reader's own
+  week order, today outlined, wet days washed in the rain colour. Each square
+  carries the sky and the day's high. It replaces the stub.
+- Days past the forecast carry a **ten-year median** instead — what that date has
+  actually done here — drawn so they can never be mistaken for a forecast: no
+  condition mark where every forecast square has one, and a rank lighter in the
+  ink. No service forecasts a month, and the ensembles that reach that far stop
+  carrying information well before they stop producing numbers: measured at Rīga,
+  day 33 of a 31-member run had two fifths of its members wet, which is the base
+  rate for October there, and 16.8 °C between its warmest and coldest member.
+- The boundary between the two is worked out on every draw and stored nowhere.
+  Each square asks for a forecast and falls back to a normal only where there is
+  none, so a square stops being a median the morning the forecast first reaches
+  it — nothing to invalidate, nothing that can be left stale.
+- The normals pool five days either side over ten years, about a hundred and ten
+  samples a date. Ten samples is not a climate: the raw medians for late
+  September ran 16.5, 14.2, 13.9, 13.1 °C on consecutive days, and September does
+  not cool by 2.3 degrees in a day and warm back up. Wet is counted as a share of
+  past days rather than averaged, so one year's storm cannot become a normal
+  Tuesday.
+- Open-Meteo is asked for all sixteen days it will give rather than seven — 14 KB
+  to 31 KB per fetch. Its declared `maximumForecastDays` had been claiming reach
+  the request never asked for, and the router ranks on that.
 
 ### Fixed
 

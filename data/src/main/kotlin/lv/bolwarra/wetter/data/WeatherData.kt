@@ -15,12 +15,14 @@ import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
 import lv.bolwarra.wetter.data.provider.metar.MetarObservationSource
 import lv.bolwarra.wetter.data.provider.metnorway.MetNorwayProvider
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoAirQuality
+import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoArchive
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoEnsemble
 import lv.bolwarra.wetter.data.provider.openmeteo.OpenMeteoProvider
 import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.provider.rainviewer.AndroidTileDecoder
 import lv.bolwarra.wetter.data.provider.rainviewer.RainViewerRadarSource
 import lv.bolwarra.wetter.data.repository.AirQualityRepository
+import lv.bolwarra.wetter.data.repository.ClimatologyRepository
 import lv.bolwarra.wetter.data.repository.EnsembleStore
 import lv.bolwarra.wetter.data.repository.NowcastRepository
 import lv.bolwarra.wetter.data.repository.ProviderHealthStore
@@ -116,6 +118,20 @@ class WeatherData(
             // So a screen answered from disk still goes and fetches a fresher
             // one behind itself.
             scope = scope,
+        )
+    }
+
+    /**
+     * What each date usually does here, for the far end of the Month page.
+     *
+     * Separate from the providers on purpose - it answers what has happened, not
+     * what will, and has nothing to be ranked against. See ClimatologyRepository.
+     */
+    val climatology: ClimatologyRepository by lazy {
+        ClimatologyRepository(
+            archive = OpenMeteoArchive(httpClient),
+            dao = database.climateNormals(),
+            json = WetterHttpClient.json,
         )
     }
 

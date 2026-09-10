@@ -105,7 +105,21 @@ internal class OpenMeteoProvider(
         /** Required by Open-Meteo's terms, shown verbatim in About. */
         const val ATTRIBUTION = "Weather data by Open-Meteo.com, licensed CC BY 4.0"
 
-        private const val FORECAST_DAYS = 7
+        /**
+         * Everything this service will give, which is sixteen days.
+         *
+         * It asked for seven for as long as the Week page was the furthest
+         * anything looked. The Month page looks as far as there is, so the
+         * request now matches what [capabilities] has always claimed — and a
+         * capability the request quietly contradicts is worse than a modest one,
+         * because the router ranks on it.
+         *
+         * Measured cost of the other nine days: 14 KB to 31 KB per fetch,
+         * hourly rows included, once or twice an hour. Small enough that
+         * fetching the daily rows separately would cost more in a second
+         * request than it saved in bytes.
+         */
+        private const val FORECAST_DAYS = 16
 
         private const val CURRENT_VARIABLES =
             "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation," +
