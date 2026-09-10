@@ -88,7 +88,7 @@ object Hazards {
 
         val found = HazardKind.entries.mapNotNull { kind ->
             runsOf(hours, { severityOf(kind, it) }, { readingOf(kind, it) })
-                .maxByOrNull { it.severity }
+                .bestOf(now)
                 ?.let { Hazard(kind, it.severity, it.from, it.until, it.peak) }
         }.toMutableList()
 
@@ -201,6 +201,48 @@ object Hazards {
         val until: Instant?,
         val peak: Double?,
     )
+
+    /**
+     * Which stretch of a kind is *the* one, when there are several.
+     *
+     * This used to be `maxByOrNull { it.severity }`, which quietly meant "the
+     * earliest, among equals" - Kotlin returns the first maximum. Measured on a
+     * real forecast for Kolkata, apparent temperature crossed the heat
+     * threshold in three separate stretches: a two-hour tail of that evening
+     * peaking at 33, four hours the next morning peaking at 36.2, and nine
+     * hours the next afternoon peaking at 35.4. All three were warnings, so it
+     * took the two-hour tail - the shortest, weakest and most nearly finished
+     * of them - and never mentioned the nine-hour one.
+     *
+     * That is tolerable on a dial and wrong in a warning, which exists to say
+     * what the day is going to be like.
+     *
+     * So: worst first, then whatever is already happening, then whatever lasts
+     * longest, then whatever goes furthest. Something underway keeps its place
+     * at the front because the mark on the dial has to agree with what is out
+     * of the window; among stretches that have not started, the one that runs
+     * for nine hours is the one worth naming.
+     */
+    private fun List<Run>.bestOf(now: Instant): Run? = maxWithOrNull(
+        compareBy<Run> { it.severity }
+            .thenBy { !it.from.isAfter(now) }
+            .thenBy { it.lengthFrom(now) }
+            .thenBy { it.peak ?: Double.NEGATIVE_INFINITY },
+    )
+
+    /**
+     * How long a stretch runs for, from now rather than from its start, so a
+     * stretch that is mostly behind us does not outrank one still to come on
+     * the strength of the part already spent.
+     *
+     * An open end - a stretch still going where the forecast stops - counts as
+     * running to the horizon, because that is the least it can be.
+     */
+    private fun Run.lengthFrom(now: Instant): Duration {
+        val begins = maxOf(from, now)
+        val ends = until ?: now.plus(HORIZON)
+        return Duration.between(begins, ends).coerceAtLeast(Duration.ZERO)
+    }
 
     /**
      * The unbroken stretches where a hazard holds.

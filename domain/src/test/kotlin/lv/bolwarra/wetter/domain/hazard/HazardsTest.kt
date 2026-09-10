@@ -236,4 +236,40 @@ class HazardsTest {
         val gale = scan(List(4) { hour(it, gust = 19.0) }).single()
         assertTrue(gale.peak!! < Hazards.HURRICANE_MS)
     }
+
+    @Test
+    fun `the stretch named is the significant one, not the first one`() {
+        // Measured on a real forecast for Kolkata: apparent temperature crossed
+        // the heat threshold three times over two days - a short tail that
+        // evening, and two longer stretches the next day. All three were
+        // warnings, and taking the first meant naming the two-hour tail and
+        // never mentioning the nine-hour afternoon.
+        // None of them underway: the tail began an hour out, the way it did
+        // there - the app was looked at at ten past nine and the evening's
+        // stretch ran from ten.
+        val hours = buildList {
+            add(hour(0, temperature = 20.0, apparent = 24.0))
+            addAll(List(2) { hour(it + 1, temperature = 27.0, apparent = 33.0) })
+            addAll(List(6) { hour(it + 3, temperature = 20.0, apparent = 24.0) })
+            addAll(List(9) { hour(it + 9, temperature = 29.0, apparent = 35.4) })
+        }
+
+        val heat = scan(hours).single { it.kind == HazardKind.EXTREME_HEAT }
+        assertEquals(now.plus(Duration.ofHours(9)), heat.from)
+        assertEquals(35.4, heat.peak!!, 0.001)
+    }
+
+    @Test
+    fun `something already happening keeps its place over something larger later`() {
+        // The mark on the dial has to agree with what is out of the window. A
+        // gale blowing right now is not displaced by a bigger one tomorrow.
+        val hours = buildList {
+            addAll(List(2) { hour(it, gust = 18.0) })
+            addAll(List(4) { hour(it + 2, gust = 5.0) })
+            addAll(List(9) { hour(it + 6, gust = 20.0) })
+        }
+
+        val wind = scan(hours).single { it.kind == HazardKind.DAMAGING_WIND }
+        assertEquals(now, wind.from)
+    }
 }
