@@ -280,4 +280,4 @@ symptom), **visible** (wrong or missing, a reader would notice), **cosmetic**.
 
 ## Findings
 
-Filled in by the run. See `test-results.md` for the full log.
+Filled in by the run. See `reliability-run-2026-09-10.md` for the full log.

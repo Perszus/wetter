@@ -1,6 +1,6 @@
 # Visual states: what the app can actually resolve
 
-A row-by-row reading of `exhaustive_weather_visual_state_catalogue.md` against
+A row-by-row reading of `weather-state-catalogue.md` against
 what this app holds today. The catalogue lists **338 states**, which is
 **169 conditions x day/night**. This is the answer to "do we have them all":
 **70 yes, 21 partly, 76 no**, plus two that

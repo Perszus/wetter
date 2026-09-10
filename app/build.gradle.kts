@@ -142,6 +142,14 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
 
+    // Instrumented tests. The widget draws to a Bitmap through the platform's
+    // Canvas, which has no behaviour on a JVM - android.jar's stubs return
+    // zero and draw nothing - so the only place its geometry can actually be
+    // checked is on a device.
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

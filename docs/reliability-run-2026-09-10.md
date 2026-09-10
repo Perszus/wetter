@@ -1,6 +1,6 @@
 # Reliability run — 10 September 2026
 
-The run of `test.md`. Eighteen places, live provider data, a decade of ERA5, an
+The run of `reliability-testing.md`. Eighteen places, live provider data, a decade of ERA5, an
 independent almanac, and the verification record off a real phone.
 
 **Eighteen findings. Seventeen fixed, one recorded.** Five were wrong numbers on
@@ -241,9 +241,16 @@ Re-measured after the fix, counting notifications rather than marks:
 | Rīga | 18 | 18 |
 | Tromsø | 29 | 27 |
 
-Doha at about seventy a year is still the highest and is recorded rather than
-tuned away: it is a genuinely hard climate, the figure counts hazard kinds rather
-than days, and the right rate is the tunable already noted in `notes.md`.
+All eighteen places have now been replayed. The full picture, as a share of days
+that would reach a notification: Quito 0%, Null Island 1.4%, Yakutsk 3.8%,
+Everest 3.6%, Rīga and La Rinconada 4.9%, Apia 5.2%, Kathmandu 5.5%, Chatham
+6.8%, Tromsø 7.4%, Phoenix 7.7%, Longyearbyen 7.9%, Lord Howe 8.2%, Ushuaia 9.0%,
+Kolkata 10.7%, Reykjavík 11.5%, Nuku'alofa 16.4%, Doha 19.7%. The median is about
+seven per cent — roughly one warned day a fortnight.
+
+Doha and Nuku'alofa remain the highest and are recorded rather than tuned away:
+both are genuinely hard climates, the figure counts hazard kinds rather than
+days, and the right rate is the tunable already noted in `notes.md`.
 
 ### 16. A summit and its valley shared one climate — FIXED
 
@@ -378,10 +385,19 @@ half marked far more wet days than the decade beside it. Both now use
 - **Missing and absurd input** (G3, G4) — an empty series, a forecast entirely in
   the past, a single hour, null temperature, null gust, null precipitation, NaN,
   infinity, ±1000 °C. Nothing throws, and nothing becomes a zero.
-- **The shared intensity axis** (D5, partly) — `RainCurveBands` holds its 0..1
-  bounds at every edge including negative and `Float.MAX_VALUE`, and its band
-  edges keep their order. That is the geometry the chart and the widget share,
-  so it cannot silently disagree with itself.
+- **The shared intensity axis** (D5) — `RainCurveBands` holds its 0..1 bounds at
+  every edge including negative and `Float.MAX_VALUE`, its band edges keep their
+  order, and the short-track lift leaves both ends of the light band as fixed
+  points so every band is the same height on both surfaces.
+- **The widget's drawn geometry, on a device** (D5, E1) — the one part of the app
+  that cannot be checked on the JVM, since `android.graphics`' desktop stubs draw
+  nothing and a unit test of it would pass against a blank bitmap. Four
+  instrumented tests read the rendered pixels: the three levels come out equal
+  thirds on the glass, the curve climbs strictly across every band, and a drizzle
+  steps clear of the floor while dry stays on it. Found by rendering two strips
+  and diffing them rather than by matching colours — antialiasing means a drawn
+  pixel is a blend of the mark and the plate, and the first version of this test
+  failed on every assertion for exactly that reason.
 
 - **Hourly sums against daily totals** (C4) — exact to 0.00 mm at all eighteen
   places. Nothing is being read as an accumulation where it is a rate, or the
@@ -431,16 +447,13 @@ half marked far more wet days than the decade beside it. Both now use
 - **The widget bitmap against the chart** (E1) — they share `RainCurveBands` and
   that is now tested, but the two rendered surfaces were not diffed pixel for
   pixel.
-- **The widget bitmap against the chart, pixel for pixel.** The geometry they
-  share is now tested from both ends — the band edges are fixed points of the
-  short-track lift, and every band is the same height on both surfaces, so the
-  two cannot disagree about which band an hour falls in. Only positions *within*
-  the light band differ, which is a documented legibility adjustment for a
-  third-height track. Rendering the two surfaces and diffing them still needs an
-  instrumented test.
-- Five of the eighteen places could not be replayed for F4: the archive refused
-  those requests once the day's quota ran out, and the run went ahead on the
-  thirteen it had. The thirteen include both extremes, so the conclusion holds.
+- **Thunder relative to its place.** The archive cannot measure it: its daily
+  `weather_code` is one representative code per day and storm hours always lose
+  to the prevailing rain — across eight cities, including Kolkata and Rīga in
+  July, it reports a thunder share of zero everywhere. Counting real storm hours
+  needs the hourly codes, roughly four times the payload of the whole archive
+  fetch, for one boolean. Deliberately not shipped as a check that silently never
+  fires.
 - **The widget bitmap against the chart, pixel for pixel** (E1). They share
   `RainCurveBands` and that geometry is now tested from both ends, but rendering
   the two surfaces and diffing them needs an instrumented test this run did not
