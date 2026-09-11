@@ -8,8 +8,8 @@ actually open one to answer is narrower and more urgent: **is it going to rain,
 when, how hard, and when will it stop?** Wetter is built around that question.
 
 > **Status: not released yet.** The app is built and tested — the precipitation
-> timeline, radar, the widget, severe-weather warnings and offline persistence
-> all work. What remains is release engineering and store submission. See
+> timeline, radar, severe-weather warnings and offline persistence all work.
+> Home-screen widgets are under way, with the first one done. See
 > [Where it is now](#where-it-is-now).
 
 ---
@@ -76,7 +76,7 @@ can be shown to contain this code and nothing else.
 | Advanced conditions — sun and moon, air quality, pressure, humidity, dew point | done |
 | Offline-first repository, Room persistence | done |
 | Location search, saved locations, map pin | done |
-| Home-screen widget | done — a resizable rain strip, three cells by one by default |
+| Home-screen widgets | in progress — a resizable rain strip is the first; more to come |
 | Background refresh | done |
 | Severe-weather notifications | done |
 | Settings | done |
