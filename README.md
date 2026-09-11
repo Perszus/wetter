@@ -4,7 +4,7 @@ A precipitation-first weather app for Android. No account, no tracking, no
 advertising, no backend of its own.
 
 The question people open a weather app to answer is usually narrow: **is it
-going to rain, when, how hard, and when will it stop?** Wetter is built around
+going to rain, when, how heavy, and when will it stop?** Wetter is built around
 that one.
 
 > **Status: not released yet.** The app is built and tested. Home-screen widgets
