@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The logo's own sky, continued past the icon's edge.
+
+    An adaptive icon is drawn on a 108dp canvas of which only the middle 72dp is
+    guaranteed; every launcher masks the rest to its own shape. So the ground has to
+    bleed all the way out and be safe to cut anywhere, and the artwork sits inside
+    the guarantee as a separate layer.
+
+    These two stops are the gradient measured off wetter_logo.png, not picked by eye.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#C1E1FC"
+        android:endColor="#97CAFC"
+        android:type="linear" />
+</shape>
