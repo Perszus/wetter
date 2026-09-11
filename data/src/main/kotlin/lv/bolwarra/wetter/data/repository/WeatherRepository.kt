@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import lv.bolwarra.wetter.data.provider.WeatherProviderRouter
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
+import lv.bolwarra.wetter.domain.model.withDailyReadFromHours
 
 /**
  * The one way to get weather.
@@ -43,6 +44,10 @@ class WeatherRepository internal constructor(
     suspend fun refresh(location: WeatherLocation): Result<WeatherForecast> {
         val incumbentId = cache.read(location)?.provider?.id
         return router.getForecast(location, incumbentId)
+            // After the router, because the router is where two services get
+            // joined and a joined forecast can have a day summarised by one and
+            // drawn by the other. See withDailyReadFromHours.
+            .map { it.withDailyReadFromHours() }
             .onSuccess { cache.write(it) }
     }
 
