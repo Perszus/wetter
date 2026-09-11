@@ -98,11 +98,6 @@ See [docs/reliability-testing.md](docs/reliability-testing.md).
 
 Not published yet. When it ships it will be on **F-Droid** and **Google Play**.
 
-One thing worth knowing in advance: Google Play holds the signing key for
-anything distributed through it, so the Play build and the F-Droid build cannot
-share a signature and **Android will not update one over the other**. Pick a
-store and stay with it. See [docs/RELEASING.md](docs/RELEASING.md).
-
 ---
 
 ## Permissions
@@ -193,6 +188,8 @@ Further reading:
 - [docs/reliability-testing.md](docs/reliability-testing.md) — how the readings
   are checked against sources outside the app
 - [docs/decisions.md](docs/decisions.md) — decisions that are settled, and why
+- [docs/RELEASING.md](docs/RELEASING.md) — how a release is cut, and the store
+  constraints that shape the build
 
 ---
 
