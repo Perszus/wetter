@@ -141,10 +141,11 @@ Submitting the app the first time follows F-Droid's own documented process
 (<https://gitlab.com/fdroid/fdroiddata/-/blob/master/CONTRIBUTING.md>), and it
 uses their tooling rather than hand-written YAML.
 
-**1. Open a Request For Packaging.** First-time contributors are asked to do this
-before anything else: <https://gitlab.com/fdroid/rfp/-/issues>.
+The metadata is ready in this repository, so the submission is a merge request
+straight to fdroiddata; a Request For Packaging is for asking somebody else to
+package an app and is not needed.
 
-**2. Install fdroidserver and fork fdroiddata.**
+**1. Install fdroidserver and fork fdroiddata.**
 
 ```sh
 pip install git+https://gitlab.com/fdroid/fdroidserver.git
@@ -152,7 +153,7 @@ git clone https://gitlab.com/YOUR_USERNAME/fdroiddata.git
 cd fdroiddata
 ```
 
-**3. Generate the metadata rather than writing it.**
+**2. Generate the metadata rather than writing it.**
 
 ```sh
 fdroid import --url https://github.com/Perszus/wetter --subdir app
@@ -164,7 +165,7 @@ to add what it cannot infer. The finished result is kept in this repository at
 copied across verbatim — it is already in `fdroid rewritemeta` canonical form and
 passes `fdroid lint` with no findings.
 
-**4. Check it with their tools before opening anything.**
+**3. Check it with their tools before opening anything.**
 
 ```sh
 fdroid readmeta                        # the file parses
@@ -178,7 +179,7 @@ fdroid build -v -l lv.bolwarra.wetter  # builds the way their servers will
 fdroiddata checkout, so it only means anything when run from inside one. There is
 no category called `Time` — the app is `Weather`.
 
-**5. Open a merge request** against <https://gitlab.com/fdroid/fdroiddata> once
+**4. Open a merge request** against <https://gitlab.com/fdroid/fdroiddata> once
 the CI pipeline on your fork passes.
 
 After that, `AutoUpdateMode: Version v%v` means F-Droid picks up new tags on its

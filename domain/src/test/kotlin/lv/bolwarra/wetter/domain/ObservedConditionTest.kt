@@ -47,6 +47,18 @@ class ObservedConditionTest {
     }
 
     @Test
+    fun `the measured rate names how hard it falls`() {
+        assertEquals(
+            WeatherCondition.RAIN,
+            observed(WeatherCondition.DRIZZLE, rate = 0.7),
+        )
+        assertEquals(
+            WeatherCondition.DRIZZLE,
+            observed(WeatherCondition.RAIN, rate = 0.2),
+        )
+    }
+
+    @Test
     fun `rain nobody can see is not rain`() {
         // The hard half. Radar says nothing is falling, so the screen may not
         // say it is raining - and radar cannot see the sky, so the word comes

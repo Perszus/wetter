@@ -16,8 +16,9 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition
  *
  * Upgrading is easy: radar sees rain the model missed. Downgrading drops the
  * precipitation but cannot name the sky, since radar does not see cloud, so the
- * sky is named from the model's cloud cover. Thunder, fog and freezing rain are
- * invisible to radar and keep the provider's word.
+ * sky is named from the model's cloud cover. Where both say something is falling,
+ * the measured rate names how hard, so the word agrees with the rate shown under it.
+ * Thunder, fog and freezing rain are invisible to radar and keep the provider's word.
  */
 object ObservedCondition {
 
@@ -43,7 +44,7 @@ object ObservedCondition {
         return when {
             falling && !reported.isPrecipitating -> observedPrecipitation(observedRate, temperature)
             !falling && reported.isPrecipitating -> skyOf(cloudCover)
-            else -> reported
+            else -> reported.atRate(observedRate)
         }
     }
 

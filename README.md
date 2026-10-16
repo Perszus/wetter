@@ -1,138 +1,94 @@
 # Wetter
 
-A precipitation-first weather app for Android. No account, no tracking, no
-advertising, no backend of its own.
+A weather app for Android built around rain: whether it will rain, when, how
+heavily, and when it will stop. It has no account, no tracking, no ads and no
+server of its own.
 
-The question people open a weather app to answer is usually narrow: **is it
-going to rain, when, how heavy, and when will it stop?** Wetter is built around
-that one.
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.jpg" width="15%" alt="Today: when the rain starts">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.jpg" width="15%" alt="The rain map">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.jpg" width="15%" alt="The week, with a day open">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.jpg" width="15%" alt="The five widgets">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.jpg" width="15%" alt="Advanced conditions">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.jpg" width="15%" alt="About">
+</p>
 
-> **Status: not released yet.** The app is built and tested. See
-> [Where it is now](#where-it-is-now).
+Version 0.1.0 · GPL-3.0-or-later · Android 8.0 and later · coming to F-Droid
 
 ---
 
 ## What it does
 
-- **Rain, down to the minute.** When precipitation starts, how it develops, and
-  when it clears.
-- **Radar for the near term.** Inside the hour the forecast comes from what radar
-  is measuring now, handing over to the models after that.
-- **A rain map.** The last hour of radar and the next two projected, played as a
-  loop over the surrounding region.
-- **A timeline that stays hourly.** Where a regional model runs out, a global one
-  continues it, joined where the first stops.
-- **The right source for the place.** Several meteorological services, chosen per
-  location, with failover when one is unavailable.
-- **"Rain" means rain.** Below half a millimetre an hour it is called drizzle.
-- **Works offline.** The last forecast stays on screen with its age, and survives
-  the app being closed.
-- **Widgets.** Five, each answering one question: the next four hours of rain,
-  the weather now, the coming hours, the week, and an overview of all of them.
-  Each lays itself out for the size it is given.
-- **Severe weather warnings.** Gales, torrential rain, heavy snow, ice,
-  thunderstorms and dangerous temperatures — nothing else.
-- **Depth when you want it.** Cloud decks, air quality, pressure, humidity, dew
-  point, sun and moon.
-- **Free and open source.** GPL-3.0-or-later, and the release build is
-  reproducible: build it yourself and you get a byte-identical APK.
+- It shows rain to the minute, from radar for the next two hours and from the
+  forecast models after that, on one timeline.
+- A rain map plays the last hour of radar and the next two as a loop.
+- Today, the week and the month each have a page, and any day of the week
+  opens to its hours.
+- Five home-screen widgets show the next four hours of rain, the weather now,
+  the coming hours, the week, or all of them together.
+- It warns only about gales, torrential rain, heavy snow, ice, thunderstorms and
+  dangerous temperatures.
+- Without a connection, the last forecast stays on screen with its age.
 
----
+## Services it uses
 
-## Where it is now
+The app has no server. The phone asks these services directly, with no account,
+identifier or cookie:
 
-| | |
-|---|---|
-| Providers, selection, failover | done |
-| Precipitation timeline | done |
-| Radar nowcast | done |
-| Today, week and month views | done |
-| Advanced conditions | done |
-| Offline persistence | done |
-| Location search, saved locations, map pin | done |
-| Background refresh | done |
-| Severe-weather notifications | done |
-| Settings | done |
-| Home-screen widgets | done |
-| Published to a store | not yet |
+| Service | Used for | What is sent |
+|---|---|---|
+| [Open-Meteo](https://open-meteo.com) | Forecasts, air quality, place search | The place's coordinates; what you type into search |
+| [MET Norway](https://api.met.no) | Forecasts (a 2.5 km Nordic model, a global one elsewhere) | The place's coordinates, truncated to four decimals |
+| [RainViewer](https://www.rainviewer.com) | Radar | The map tiles around the place |
+| [NOAA/NWS Aviation Weather Center](https://aviationweather.gov) | Airport reports, to check past forecasts | A box around the place |
+| [Photon](https://photon.komoot.io) | Names for points placed on the map | The point's coordinates |
+| [OpenStreetMap](https://www.openstreetmap.org) | Map tiles | The map tiles around the place |
 
-Tested in all three modules, with instrumented tests for the widgets and release
-checks that hold the README, privacy policy and store text to the code.
-
----
-
-## Getting it
-
-Not published yet. When it ships it will be on **F-Droid**.
-
----
+Open-Meteo and MET Norway data are licensed
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), MET Norway's under its
+[terms of service](https://api.met.no/doc/TermsOfService). Place names and map
+tiles are © OpenStreetMap contributors. Every source is credited on the app's
+About screen.
 
 ## Permissions
 
 | | |
 |---|---|
-| `INTERNET` | Asking a weather service about a place. |
-| `ACCESS_NETWORK_STATE` | Checking whether a refresh can succeed. |
-| `ACCESS_COARSE_LOCATION` | Optional. A single fix when you ask for your current location, discarded once the pin is placed. |
-| `POST_NOTIFICATIONS` | Optional. Severe weather warnings, switchable in Settings. |
-| `RECEIVE_BOOT_COMPLETED` | Restarting the background refresh after the phone restarts. |
+| `INTERNET` | Used to ask the services above about a place. |
+| `ACCESS_NETWORK_STATE` | Used to tell "offline" apart from "the service is not answering". |
+| `ACCESS_COARSE_LOCATION` | Optional, and used for a single fix when you ask for your current location, never in the background. |
+| `POST_NOTIFICATIONS` | Optional, and used for severe-weather warnings, which can be switched off in Settings. |
+| `RECEIVE_BOOT_COMPLETED` | Used to restart the background refresh after the phone restarts. |
 | `WAKE_LOCK` | Added by WorkManager, which keeps the phone awake while a background refresh runs. |
 
-The optional ones are requested when first needed, or offered in Settings.
-Refusing any of them leaves everything else working.
-
----
+Refusing an optional permission leaves everything else working.
 
 ## Privacy
 
-Wetter collects nothing. No analytics, no crash reporter, no advertising
-identifier, no account. Cloud backup and device-to-device transfer are disabled,
-so what the app stores stays on the device.
+Wetter collects nothing, and it has no analytics, crash reporter or
+advertising identifier. Saved places, settings and cached forecasts stay in the app's
+private storage, with cloud backup and device-to-device transfer switched off.
+The full policy is in [docs/privacy-policy.md](docs/privacy-policy.md).
 
-What leaves your device is the coordinates of the places you have chosen (and,
-for the maps, the tiles around them) and what you type into search, sent directly
-to the services that answer. Coordinates sent to MET Norway are truncated to four
-decimals.
+## Build and install
 
-See [docs/privacy-policy.md](docs/privacy-policy.md).
-
----
-
-## Weather data
-
-Each service below requires attribution, and each is credited in the app's About
-screen as well as here.
-
-- **Open-Meteo** — <https://open-meteo.com> — weather, air quality and place
-  search, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- **MET Norway** — <https://api.met.no> — weather data from the Norwegian
-  Meteorological Institute, licensed
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), used under its
-  [terms of service](https://api.met.no/doc/TermsOfService).
-- **RainViewer** — <https://www.rainviewer.com> — the global radar composite.
-- **NOAA / NWS Aviation Weather Center** — <https://aviationweather.gov> —
-  aerodrome observations.
-- **Photon** — <https://photon.komoot.io> — place names, © OpenStreetMap
-  contributors.
-- **OpenStreetMap** — map tiles, © OpenStreetMap contributors.
-
----
-
-## Building
-
-JDK 17 and the Android SDK. Compile and target API 36, minimum API 26.
+Needs JDK 17 and the Android SDK (platform 36). Point Gradle at the SDK with
+`ANDROID_HOME`, or a `local.properties` file containing `sdk.dir=/path/to/sdk`.
+No keys, accounts or signing material are needed.
 
 ```sh
-./gradlew test            # unit tests
-./gradlew check           # tests, lint and formatting — what CI runs
-./gradlew ktlintFormat    # fix formatting
-./gradlew assembleDebug   # a runnable APK
+git clone https://github.com/Perszus/wetter.git
+cd wetter
+./gradlew installDebug       # build and install on a connected phone
 ```
 
-No signing configuration is in the repository, and none is needed for a debug
-build.
+```sh
+./gradlew assembleRelease    # unsigned release APK in app/build/outputs/apk/release/
+./gradlew check              # tests, lint and formatting, as CI runs them
+```
 
----
+The release build is reproducible: two builds of the same commit produce a
+byte-identical APK ([how to check](docs/RELEASING.md#the-release-build-is-reproducible--check-it)).
 
 ## How it is put together
 
@@ -140,71 +96,30 @@ build.
 :app  ──▶  :data  ──▶  :domain
 ```
 
-```text
-:domain     plain Kotlin — no Android, no networking
-├── model/          forecasts, hours, conditions
-├── provider/       the provider port, coverage, selection, stitching
-├── forecast/       fusion, rain windows and the readings the UI asks for
-├── hazard/         severe-weather thresholds and warnings
-├── radar/          nowcasting from radar frames
-├── curve/, chart/  the precipitation curve and its bands
-├── air/, sky/      air quality, stargazing, tides
-├── climate/        local climatology
-├── observation/    station reports
-├── verification/   scoring forecasts and learning local bias
-├── glass/          what the weather leaves on the dial
-├── location/, settings/  coordinates, place names, preferences
-└── SolarTime.kt    sunrise, sunset, daylight
+- **`:domain`** is plain Kotlin, with no Android and no networking. It holds the
+  forecasts, provider selection, the rain timeline, radar nowcasting and
+  warnings.
+- **`:data`** holds the providers, the router that picks one per place and fails
+  over to the next, and the offline cache.
+- **`:app`** holds the Compose UI, the widgets, notifications and background
+  refresh.
 
-:data       an Android library — where weather comes from
-├── network/        the shared HTTP client
-├── provider/       Open-Meteo, MET Norway, RainViewer, METAR, the router
-├── repository/     offline-first forecast access
-├── db/             Room persistence
-├── location/       geocoding, saved locations, the device fix
-├── map/            basemap tiles
-└── WeatherData.kt  the module's entry point
-
-:app        the application
-├── ui/screens/     today, week, month, locations, settings
-├── ui/components/  the dial, the rain curve, the glyphs
-├── ui/map/         the rain map and the pin picker
-├── ui/theme/       colour, type, spacing
-├── widget/         home-screen widgets
-├── notify/         severe-weather warnings
-└── work/           background refresh
-```
-
-Further reading:
-
-- [docs/design-principles.md](docs/design-principles.md) — what the app is for
-- [docs/providers.md](docs/providers.md) — the provider architecture, the radar
-  handover, and each provider's terms
-- [docs/visual-language.md](docs/visual-language.md) — how colour and type are
-  derived
-- [docs/decisions.md](docs/decisions.md) — settled decisions
-- [docs/RELEASING.md](docs/RELEASING.md) — cutting a release
-
----
+Further reading: [providers](docs/providers.md) ·
+[design principles](docs/design-principles.md) ·
+[visual language](docs/visual-language.md) · [decisions](docs/decisions.md) ·
+[releasing](docs/RELEASING.md)
 
 ## Contributing
 
-Bug reports and patches are welcome — see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
-
-Adding a weather provider means implementing `WeatherProvider` and adding one
-line to `WeatherData`. Dependencies must be free software that F-Droid can
-build.
-
----
+Bug reports and patches are welcome; see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+Dependencies must be free software that F-Droid can build.
 
 ## Licence
 
-GNU General Public License v3.0 or later. See [LICENSE](LICENSE).
-
-One additional permission is granted under section 7, allowing distribution
-through application stores whose terms would otherwise conflict with section 6.
-It grants nothing else: the source stays copyleft and a closed fork is still
-forbidden. See [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt).
+GNU General Public License v3.0 or later; see [LICENSE](LICENSE). One
+additional permission under section 7 allows distribution through app stores
+whose terms would otherwise conflict with section 6, and grants nothing else;
+see [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt).
 
 All artwork, including the icon and the pictures on the dial's glass, is part of
 Wetter and licensed under the same terms.

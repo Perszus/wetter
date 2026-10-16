@@ -2,7 +2,7 @@ Most weather apps lead with a temperature and a picture of a sun. The question p
 
 Is it going to rain, when, how heavy, and when will it stop?
 
-Wetter is built around that question. Precipitation gets the emphasis, the colour and the space. Temperature is deliberately quieter.
+Wetter is built around that question. Precipitation gets the emphasis, the colour and the space, and temperature stays quieter.
 
 <b>Rain, down to the minute</b>
 
@@ -14,15 +14,15 @@ Wetter knows several meteorological services and what each is good at. It prefer
 
 <b>Widgets</b>
 
-Five home-screen widgets, each answering one question: the next four hours of rain, the weather now, the coming hours, the week, and an overview of all of them. Each lays itself out for the size it is given.
+There are five home-screen widgets, each answering one question: the next four hours of rain, the weather now, the coming hours, the week, and an overview of all of them. Each lays itself out for the size it is given.
 
 <b>Warnings worth having</b>
 
-Notifications for gales, torrential rain, heavy snow, ice, thunderstorms and dangerous temperatures, judged against what is normal for your location. Nothing else interrupts you, and warnings can be switched off.
+Wetter notifies you of gales, torrential rain, heavy snow, ice, thunderstorms and dangerous temperatures, judged against what is normal for your location. Nothing else interrupts you, and warnings can be switched off.
 
 <b>A precision instrument, not a dashboard</b>
 
-No cartoon weather and no stacks of cards. Restrained typography, hairline rules, and a palette where rain owns the only saturated colour. Light and dark themes, and Celsius or Fahrenheit, millimetres or inches, as you prefer.
+There is no cartoon weather and no stack of cards, only restrained type, hairline rules and a palette in which rain owns the only saturated colour. It has light and dark themes, and Celsius or Fahrenheit, millimetres or inches, as you prefer.
 
 <b>It works without a connection</b>
 
@@ -35,10 +35,10 @@ The forecast you already have appears immediately. A failed update leaves it on 
 • Location access is optional, and used once, when you ask for your current location
 • What leaves your device is the location's coordinates, sent to the services that answer, and on the maps the tiles around it
 
-Permissions: internet and network state; location and notifications, both optional; and starting after a reboot, so the background refresh carries on.
+Wetter asks for internet and network access, for location and notifications (both optional), and to start after a reboot so the background refresh carries on.
 
 <b>Free software</b>
 
-Licensed under the GNU General Public License v3.0 or later. Source code and issue tracker: https://github.com/Perszus/wetter
+Wetter is licensed under the GNU General Public License v3.0 or later, and its source code and issue tracker are at https://github.com/Perszus/wetter
 
-Weather data by Open-Meteo.com and MET Norway (met.no), both licensed CC BY 4.0. Radar by RainViewer. Aerodrome observations from the NOAA/NWS Aviation Weather Center. Place names from Photon and map tiles from OpenStreetMap, © OpenStreetMap contributors.
+Weather data comes from Open-Meteo.com and MET Norway (met.no), both licensed CC BY 4.0. Radar is by RainViewer, and aerodrome observations come from the NOAA/NWS Aviation Weather Center. Place names come from Photon and map tiles from OpenStreetMap, © OpenStreetMap contributors.
