@@ -29,19 +29,49 @@ problem it does not actually solve.
 
 ## Before any release
 
-In order:
+### What `./gradlew check` holds
 
-1. `./gradlew clean check assembleDebug` — everything green.
-2. Update `CHANGELOG.md`: date the version being released.
-3. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
-   `versionCode` is a plain integer, incremented by one, never reused and never
-   decreased. Both are written by hand — see the comment in that file for why
-   they are not derived from git.
-4. Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`. Both
-   stores read it. Play truncates at 500 characters.
+Run `./gradlew clean check`. Besides the tests, lint and formatting, it fails on:
+
+- any compiler warning, in any module or test source set;
+- an unused resource, or a version check the minimum SDK makes pointless;
+- a widget picker preview that no longer matches what the widget draws
+  (`WIDGET_PREVIEWS=write ./gradlew :app:testDebugUnitTest --tests
+  '*WidgetGalleryTest.pickerPreviewsAreCurrent'` redraws them);
+- a manifest permission missing from the README or the privacy policy;
+- a contacted service missing from the privacy policy, the README, the store text
+  or the About credits;
+- store text over F-Droid's limits, or no changelog for the `versionCode`;
+- a version that disagrees between the build, the changelog and
+  `fdroid/lv.bolwarra.wetter.yml`;
+- a source file without its licence header;
+- a document mentioned anywhere that is not published.
+
+### What a person checks
+
+On a phone or emulator, with the build being released:
+
+1. Every screen in both themes: Today, Week with a day open, Month, Advanced,
+   Places, the pin picker, the rain map, every Settings page.
+2. The same at the largest system font size, and once on a tablet-sized window.
+3. Each widget placed and resized, in light and dark mode, against its picker
+   preview.
+4. A place in a half-hour time zone and one near the date line, against the
+   local clock.
+5. Release notes and store text against what the build actually does.
+
+### Cutting it
+
+1. Update `CHANGELOG.md`: date the version being released.
+2. Bump `versionCode` and `versionName` in `app/build.gradle.kts`, and both in
+   `fdroid/lv.bolwarra.wetter.yml`. `versionCode` is a plain integer, incremented
+   by one, never reused and never decreased.
+3. Add `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`, at most
+   500 characters.
+4. Check the release build is reproducible (below).
 5. Commit, then tag: `git tag -a v0.2.0 -m "Wetter 0.2.0"` and
-   `git push --follow-tags`. The tag must match the pattern F-Droid watches,
-   `^v[0-9.]+$`, and must point at the commit whose `versionCode` you just set.
+   `git push --follow-tags`. The tag must match `^v[0-9.]+$` and point at the
+   commit whose `versionCode` was just set. A published tag is never moved.
 
 ## Google Play
 

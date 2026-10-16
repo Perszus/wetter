@@ -35,7 +35,7 @@ The forecast you already have appears immediately. A failed update leaves it on 
 • Location access is optional, and used once, when you ask for your current location
 • What leaves your device is the location's coordinates, sent to the services that answer, and on the maps the tiles around it
 
-Permissions: internet and network state; location and notifications, both optional; and restarting after a reboot and exact alarms, which keep the background refresh in step with the radar.
+Permissions: internet and network state; location and notifications, both optional; and starting after a reboot, so the background refresh carries on.
 
 <b>Free software</b>
 

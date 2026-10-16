@@ -1,293 +1,130 @@
 # Design principles
 
-What Wetter is for, and what it refuses to become. Code comments refer back to
-this file; if a change contradicts something here, the discussion belongs in the
-pull request rather than in the diff.
+What Wetter is for, and what it does not become. Code comments refer back to
+this file; a change that contradicts something here should say so in the pull
+request.
 
 ## The question the app answers
 
 > Is it going to rain, when, how hard, how long, and when will it stop?
 
 Everything else on the screen is context for that. A conventional weather app
-leads with a large temperature and a weather illustration, then buries the
-hourly precipitation two scrolls down in a row of cards. Wetter inverts that.
-
-The instrument this is modelled on is a rain gauge and a barometer, not a
-dashboard. It should read as measured, quiet, and precise.
+leads with a large temperature and an illustration, and puts the hourly
+precipitation two scrolls down. Wetter inverts that. It is modelled on a rain
+gauge and a barometer, not a dashboard: measured, quiet, precise.
 
 ## Product rules
 
 1. **Precipitation is the primary signal.** It gets the emphasis, the only
-   saturated colour in the palette, and the most screen area. Temperature is
-   deliberately quieter than rain.
-2. **Show what is known at once; go and get newer; show it the moment it
-   lands.** Every surface - the app, the dial, the widget - draws from disk
-   immediately and never waits on the network. Behind it the app is hungry
-   rather than patient: opening it asks for the newest at once, an open screen
-   keeps asking, and in the background a clock timed to the radar wakes just
-   after each new sweep is published, every ten minutes, and redraws the widget
-   whether or not the network answered (work/Heartbeat.kt). A failed fetch never
-   removes what is on screen. The next half hour is what people open a weather
-   app for, so radar - which carries it - is always fetched first.
-3. **Staleness is the app's problem, not the reader's.** There is deliberately
-   no "updated 42 minutes ago" line. Somebody opening a weather app wants the
-   weather, not a report on the app's own housekeeping; keeping the forecast
-   current is work the app should simply do. The cost of this is real and worth
-   knowing: a device offline for a day shows day-old numbers without saying so.
+   saturated colour, and the most screen area. Temperature is quieter than rain.
+2. **Show what is known at once, then fetch newer.** Every surface (the app,
+   the dial, the widgets) draws from disk immediately and never waits on the
+   network. Opening the app asks for the newest data, an open screen keeps
+   asking, and in the background a clock timed to the radar wakes after each new
+   sweep (`work/Heartbeat.kt`). A failed fetch never removes what is on screen.
+   Radar, which carries the next half hour, is fetched first.
+3. **Staleness is the app's problem, not the reader's.** The forecast screen
+   carries no "updated 42 minutes ago" line; keeping the forecast current is work
+   the app does. The cost: a device offline for a day shows day-old numbers
+   without saying so. The age is in Settings for anyone who wants it.
 4. **No account, no telemetry, no advertising, no backend of ours.**
-5. **Few permissions, each for one stated reason.** `INTERNET` to ask a weather
-   service about a place. Location is optional and only requested when somebody
-   chooses to use it; notifications only carry severe-weather warnings. Boot and
-   exact alarms exist for the background clock alone - the first restarts it
-   after a reboot, the second lets it land on the minute, and the app works,
-   minutes less precisely, without it.
+5. **Few permissions, each for one stated reason.** `INTERNET` to ask the
+   services about a place. Location is optional and requested only when somebody
+   asks for their current location; notifications carry severe-weather warnings
+   only; boot restarts the background clock.
 6. **Free software, buildable from source**, with no proprietary dependency and
-   nothing that F-Droid cannot reproduce.
+   nothing F-Droid cannot reproduce.
 7. **Most evidence, least speculation.** Where two sources disagree, the one
-   that actually looked wins. Radar sees the rain that is falling; a model
-   computed its next two hours before breakfast and cannot improve on them as
-   the hour approaches. This is why the near term is radar-led and why the
-   hand-over happens where the projection stops being an observation and starts
-   being a guess of its own (docs/providers.md).
-
-   The rule cuts both ways and that is the hard half. When the radar says
-   nothing is falling, the screen may not say it is raining — even if a model
-   does, and even though radar cannot see the sky and so cannot say what to put
-   there instead. Naming what is *not* happening from an observation, and
-   filling the rest from the model's cloud cover, is the honest reading; keeping
-   the model's word for it because it is tidier is not.
-
-   This rule is about what the app *does*, never about what it says. See rule 8.
-
-8. **The machinery is our problem, not the reader's.** Somebody who downloads a
-   weather app judges it by whether it matched the weather outside. They do not
-   care which satellite, which model, which sweep, or how the two were weighed
-   against each other, and telling them is not honesty - it is us showing our
-   work in a place reserved for their answer.
-
-   So no provenance labels, no "radar-backed" badges, no note that coverage is
-   thin here, no explanation of how a threshold was chosen or a warning
-   dismissed. Every one of those is a sentence about Wetter appearing on a
-   screen whose whole job is to be a sentence about the sky.
-
-   The same rule governs failure, and there it is about accountability rather
-   than clutter. When a car's engine goes, the dealership does not get to
-   explain that their piston supplier had a defective batch. The buyer bought a
-   car from the dealership; checking the pistons was the dealership's job. So
-   Wetter never names the service that let it down, and never says "the weather
-   service did not answer" - Wetter is the one that did not answer. Every
-   failure sentence takes Wetter as its subject.
-
-   The two exceptions are the reader's own business rather than ours: no network
-   (their connection, which they may want to do something about) and no location
-   chosen yet (we are waiting on them). Neither mentions a provider, because
-   **no screen in Wetter mentions a provider at all.** Where something cannot be
-   shown, show what can be shown and say nothing about why.
-
-   The single exception is the Sources block in About, and only because the
-   RainViewer and MET Norway licences require the credit. It sits behind a tap,
-   phrased as attribution and as the evidence for rule 4's no-backend claim -
-   never as an explanation of a reading or an excuse for a failure.
-
-   This does not soften rule 7 by one degree - it is why rule 7 has to be
-   carried properly. The reader has no way to discount a bad reading, because
-   they are not being told which readings to discount. Correctness is the only
-   thing standing between them and a wrong answer, so it gets paid for in the
-   engine and never in the interface.
-
-9. **The finest the sky will give us, as fast as it will give it.** This is a
-   precision instrument, not a shovel for a playground.
-
-   **Resolution.** The unit is a point in time. If a source can tell us the
-   second, we take the second; if not the minute; if not the minute, two
-   minutes - and so on down, taking the finest thing that genuinely exists.
-   Never coarser because it is tidier to compute.
-
-   **A source's publishing cadence is not the app's unit.** This is where it
-   actually goes wrong, and it has gone wrong twice. One provider publishes on
-   the hour, and "the hour" crept out of that provider and into the arithmetic,
-   then into the drawing - first as a staircase of hourly steps, then as a curve
-   through hourly middles. An hour is not a thing the weather does. It is where
-   one source happened to put a number. Every source is a line through time;
-   read every line at the moment being answered and combine there
-   (`PrecipitationFusion`).
-
-   **Speed.** Fetch the moment data can exist, keep it where a cold start can
-   reach it, and never make the reader wait for it. Everything on disk, nothing
-   on the critical path, each part arriving on its own rather than behind the
-   slowest. A screen that is right in thirty seconds was wrong for thirty
-   seconds.
-
-   **The guard, and it is the important half.** Precision is not the appearance
-   of precision. Finer *stamping* is not finer *information*: Open-Meteo will
-   serve quarter-hour stamps everywhere, and outside a few regional models the
-   values are the hour divided evenly, or do not even add up to it - measured,
-   not assumed (docs/providers.md). Fetching that would quadruple the
-   payload to learn nothing, and drawing it as though it were quarter-hourly
-   truth would be a lie told in high resolution. So: take the finest signal that
-   is real, interpolate honestly between the points a source actually gave, and
-   never manufacture detail to fill a gap. Radar is currently the only source
-   that genuinely re-observes inside the hour, which is why it leads the first
-   one.
+   that looked wins. Radar sees the rain that is falling; a model's next two
+   hours were computed in advance. So the near term is radar-led, and hands over
+   to the models where the projection stops being an observation
+   ([providers.md](providers.md)). When radar sees nothing falling, the screen
+   does not say it is raining, even if a model does.
+8. **The machinery is our problem, not the reader's.** Somebody judges a weather
+   app by whether it matched the weather outside. No screen names a provider,
+   carries a "radar-backed" badge, shows a confidence number or explains how a
+   threshold was chosen. Failures take Wetter as their subject: Wetter did not
+   answer, not "the weather service". The two exceptions are the reader's own
+   business: no network, and no location chosen yet. Credits appear only where
+   licences require them: in About, and on the maps.
+9. **The finest resolution that is real.** The unit is a point in time. Take
+   the finest signal a source genuinely has, and never let one source's
+   publishing cadence (an hour, say) become the app's unit: every source is a
+   line through time, read at the moment being answered (`PrecipitationFusion`).
+   Finer stamps are not finer information. Open-Meteo serves quarter-hour stamps
+   whose values are mostly the hour divided evenly, so they are not used, and no
+   detail is manufactured to fill a gap. Radar is the only source that
+   re-observes within the hour, which is why it leads the first one.
 
 ## Visual language
 
-The app should feel elegant, quiet, technical and highly legible. Specifically,
-it avoids:
+Elegant, quiet, technical, legible. Wetter avoids weather illustrations and
+oversized icons, shadowed card stacks, decorative gradients, animation that
+carries no information, and the default Material look.
 
-- weather illustrations and oversized icons
-- stacks of rounded cards with shadows
-- gradients used as decoration
-- animation that does not carry information
-- the default Material look applied wholesale
+Material 3 is a toolkit, not the design. The app defines its own colour roles
+(`precipitation`, `temperatureWarm`, `night`, `hairline`) and derives a Material
+`ColorScheme` from them, so the few Material components in use inherit the
+app's ground. There is no dynamic colour: the palette encodes meaning, and a
+wallpaper-derived scheme would break it.
 
-Material 3 is a toolkit here, not the design. The app defines its own colour
-roles — `precipitation`, `temperatureWarm`, `night`, `hairline` — because
-Material's role names describe a component library and give no place to say
-"this is rain". A Material `ColorScheme` is derived from those roles afterwards,
-so the handful of Material components in use inherit the app's ground rather
-than introducing a second palette.
-
-Two rules hold the palette together:
-
-- Precipitation owns the only saturated hue.
-- Neither the light nor the dark plate uses pure white or pure black. Both
-  grounds are tinted slightly cool, so the rain hue reads as part of the same
-  instrument rather than as an accent stuck onto grey.
-
-Dynamic colour (Material You) is not supported, and this is deliberate: the
-palette encodes meaning, and a wallpaper-derived scheme would break the
-relationship between rain and everything else.
-
-Sections are separated by a hairline and a gap rather than by cards. Cards imply
-each block is a separate object; these are consecutive readings from the same
-instrument, and the eye should run straight down them.
-
-Every number that can change is set in tabular figures. A temperature ticking
-from 9 to 10 that shifts the layout is exactly the kind of imprecision an
-instrument must not show.
+The app has two plates, Pure White and Pure Black, both true grey; the widgets
+follow the phone's light or dark mode on paper and night plates with a trace of
+blue. Rain is the one saturated hue on all of them. Tiles are a single step of tone, with no shadow or
+border. The dial is always dark, whatever the plate, so the pictures on its
+glass always show ([visual-language.md](visual-language.md)). Every number that
+can change is set in tabular figures, so a temperature ticking from 9 to 10
+never shifts the layout.
 
 ## The rain axis
 
-The vertical axis of every rain curve is `RainCurveBands` in `:domain`, shared by
-the app's chart and the widget's bitmap. It is **not** a scale of millimetres and
-does not pretend to be: rates are wildly unevenly spaced, a trace being a tenth
-of a millimetre and torrential fifty, so drawn linearly against a real downpour
-drizzle is two percent of the height and reads as nothing — when it is precisely
-the difference between nothing and take a coat.
+Every rain curve's vertical axis is `RainCurveBands` in `:domain`, shared by the
+app's chart and the widgets. It is not a scale of millimetres: rates are wildly
+unevenly spaced (a trace is a tenth of a millimetre, torrential fifty), so the
+axis is anchored to the intensity bands instead.
 
-**The three levels are the same height, and must look it.** They are a scale of
-the three words anybody acts on; a scale whose steps are different sizes asks the
-reader to remember which step is which. Three things broke that, all of them
-arithmetic that said "equal" over a picture that was not:
-
-- the light band being given a fifth less than the other two, on the reasoning
-  that it is the least of them — there is no reading of the chart that wants that
-- the trace floor being added *under* all three rather than sitting inside the
-  light one, which made light 38.7% against 30.7%. A trace is not a fourth level;
-  it is the bottom of the light one
-- blank space directly above the chart with no rule under it, which reads as more
-  chart. A 24 dp readout row and an 8 dp spacer made heavy look **1.65×** the
-  others while all three measured identical. Anything above the track has to earn
-  its height or be overlaid inside it
-
-The lesson in all three is the same: **measure the rendered pixels, not the
-constants.** Equal-looking arithmetic is not the claim being made.
-
-What the two painters must agree on is **which band a rate is in**, because a
-widget placing a peak in moderate while the app puts the same hour in heavy
-leaves the reader with two pictures of one afternoon and no way to tell which
-lied. That is what `RainCurveBandsTest` is for.
-
-What they need not agree on is where a rate lands *within* a band. The app
-captions its bands, so eight percent of the track is enough to say "it is
-raining"; the widget has no captions and a third of the height, so it lifts low
-rain with a square root that has the light band's ceiling as a fixed point —
-leaving the boundaries exactly on the thirds. **A legibility problem on one
-surface is fixed on that surface**, and never by changing the shared axis, which
-silently redraws the main chart to solve a problem somewhere else.
-
-**Both axes are fixed, and it is the same argument twice.** The height is
-intensity and never adapts to the data, because a reader reads a shape and a
-shape only means something against a scale that has not moved. Width is pixels
-per hour, and the reasoning transfers without a change: an hour must be the same
-width this morning as it was yesterday morning, so the chart is never fitted to
-its content.
-
-What follows from that is that a chart holding more than a screen has to be
-scrolled rather than squeezed. The app's chart holds a day and shows six hours,
-and the six hours are exactly the size they were when six hours was all it held.
-The old objection to a day — that it flattens the near hours into a smear — was
-always an objection to the *screen*, and squeezing was the only thing it ruled
-out.
-
-Two things fall out of that and are worth stating, because both were got wrong
-first:
-
-- **A short series makes a shorter chart, not a thinner one.** A provider that
-  stops at eighteen hours gives three screens, not four screens of the same
-  eighteen hours drawn wider. Fitting the content to the track is the adaptive
-  scale coming back in through the horizontal door.
-- **What is a legend goes on the screen; what is a measurement goes on the
-  chart.** The band captions do not belong to any hour, so they hold still while
-  the weather slides past them — but they are placed on the chart's own canvas at
-  the screen's edge rather than lifted onto an overlay, because everything on the
-  scale is drawn *behind* the curve. A faint word on top of the line that carries
-  the whole reading reads as a smudge on it.
+- **The three levels take the same height.** They are a scale of the three words
+  anybody acts on. A trace is the bottom of the light band, not a fourth level,
+  and nothing sits above the chart that could read as more of it. Checked on the
+  rendered pixels, not the constants.
+- **Every surface agrees which band a rate is in** (`RainCurveBandsTest`). Where
+  a rate lands within a band may differ: the widgets lift low rain within the
+  light band, keeping its ceiling fixed, because they have no captions and a
+  third of the height. A legibility problem on one surface is fixed on that
+  surface, never by changing the shared axis.
+- **Both axes are fixed.** Height is intensity and never adapts to the data;
+  width is pixels per hour, the same every morning. A chart holding more than a
+  screen scrolls rather than squeezes, and a short series makes a shorter chart,
+  not a wider-drawn one.
+- **Legends stay on the screen, measurements on the chart.** The band captions
+  hold still while the hours slide past, drawn behind the curve so they never sit
+  on the line being read.
 
 ## Architecture rules
 
 - **The domain model represents weather, not an API response.** No integer
-  weather codes, no provider-shaped field names, no wire formats above `data/`.
-- **Units are canonical throughout the domain**: Celsius, millimetres, metres
-  per second, hectopascals, percent. Conversion happens once, at the point of
-  rendering.
-- **Abstractions need a reason.** An interface with one implementation is a
-  smell unless a second is genuinely coming. There is no dependency-injection
-  framework, no event bus and no charting library: the whole object graph is a
-  handful of lines in `WetterContainer` and `WeatherData`.
-- **The module boundary is the architecture rule made enforceable.** Three
-  modules, `:app -> :data -> :domain`, and the arrow only points one way.
-  `:domain` is a plain Kotlin library, so Android and networking cannot leak
-  into the models or the policy even by accident. Three is the necessary
-  number, not an architecture demonstration: the UI is not split into feature
-  modules and should not be.
-- **Prefer the simpler of two valid designs** unless the more complicated one
-  buys something concrete and nameable.
-- **Files stay small and single-purpose.** Screens are composed of components;
-  a component that cannot be understood on its own screen is too big.
+  weather codes, provider-shaped field names or wire formats above `data/`.
+- **Units are canonical in the domain** (Celsius, millimetres, metres per second,
+  hectopascals, percent) and converted once, when drawn.
+- **Abstractions need a reason.** An interface with one implementation needs a
+  second that is genuinely coming. No dependency-injection framework, event bus
+  or charting library: the object graph is a handful of lines in
+  `WetterContainer` and `WeatherData`.
+- **Three modules, `:app -> :data -> :domain`, and the arrow points one way.**
+  `:domain` is plain Kotlin, so Android and networking cannot reach the models
+  or the policy. The UI is not split into feature modules.
+- **Prefer the simpler of two valid designs** unless the other buys something
+  concrete and nameable.
 - **Comments explain why.** What the code does is visible; why it does it that
-  way, and what was rejected, is not.
+  way is not.
 
 ## What gets tested
 
-Things that can actually break, rather than a coverage number:
+Things that can actually break, rather than a coverage number: the arithmetic
+(solar position, intensity bands, forecast age), the policy (which provider is
+chosen, when failover happens), the mappers (each provider's real responses,
+awkward parts included), the offline contract, the widgets' layout at every size
+they can be given, and the release documents against the code.
 
-- the arithmetic — solar position, precipitation intensity bands, forecast age
-- the policy — which provider is chosen, when failover happens, when it does not
-- the mappers — each provider's real response shape, including its awkward parts
-- the offline contract — cache-first reads, and a failed refresh preserving data
-
-Tests assert things that must be true rather than values copied from elsewhere.
-Where an absolute check is needed, the expected value is derived in the test
-itself, so a future reader can re-derive it instead of trusting it.
-
-## Build order
-
-The app is built in phases, each one compiling and testable, rather than in one
-pass. Roughly:
-
-1. Foundation — project, theme, navigation, domain model *(done)*
-2. Weather data — HTTP, providers, repository *(done)*
-3. Persistence — Room, a cache that survives the process
-4. The visual phase — precipitation timeline, temperature curve, daily forecast
-5. Locations — search, saved places, optional device position
-6. Widgets — rain, now, hours, week and an overview *(done)*
-7. Background refresh *(done)*
-8. Settings
-9. Polish, accessibility, tablets
-10. F-Droid preparation
-
-Advanced visualisation waits until the data flow underneath it is stable. A
-placeholder chart drawn from invented data only teaches you that invented data
-looks good.
+Tests assert what must be true rather than values copied from elsewhere. Where
+an absolute value is needed, it is derived in the test, so a reader can check it.

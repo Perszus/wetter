@@ -56,7 +56,8 @@ that one.
 | Home-screen widgets | done |
 | Published to a store | not yet |
 
-672 tests: 663 unit and 9 instrumented, across the three modules.
+Tested in all three modules, with instrumented tests for the widgets and release
+checks that hold the README, privacy policy and store text to the code.
 
 ---
 
@@ -75,7 +76,7 @@ Not published yet. When it ships it will be on **F-Droid**.
 | `ACCESS_COARSE_LOCATION` | Optional. A single fix when you ask for your current location, discarded once the pin is placed. |
 | `POST_NOTIFICATIONS` | Optional. Severe weather warnings, switchable in Settings. |
 | `RECEIVE_BOOT_COMPLETED` | Restarting the background refresh after the phone restarts. |
-| `SCHEDULE_EXACT_ALARM` | Optional. Timing the background refresh to each new radar sweep; without it the refresh runs a few minutes late. |
+| `WAKE_LOCK` | Added by WorkManager, which keeps the phone awake while a background refresh runs. |
 
 The optional ones are requested when first needed, or offered in Settings.
 Refusing any of them leaves everything else working.
@@ -88,8 +89,10 @@ Wetter collects nothing. No analytics, no crash reporter, no advertising
 identifier, no account. Cloud backup and device-to-device transfer are disabled,
 so what the app stores stays on the device.
 
-What leaves your device is a pair of coordinates, sent to a weather service so
-it can answer. Coordinates sent to MET Norway are truncated to four decimals.
+What leaves your device is the coordinates of the places you have chosen (and,
+for the maps, the tiles around them) and what you type into search, sent directly
+to the services that answer. Coordinates sent to MET Norway are truncated to four
+decimals.
 
 See [docs/privacy-policy.md](docs/privacy-policy.md).
 
@@ -179,8 +182,6 @@ Further reading:
   handover, and each provider's terms
 - [docs/visual-language.md](docs/visual-language.md) — how colour and type are
   derived
-- [docs/reliability-testing.md](docs/reliability-testing.md) — how the readings
-  are verified
 - [docs/decisions.md](docs/decisions.md) — settled decisions
 - [docs/RELEASING.md](docs/RELEASING.md) — cutting a release
 
@@ -204,5 +205,8 @@ One additional permission is granted under section 7, allowing distribution
 through application stores whose terms would otherwise conflict with section 6.
 It grants nothing else: the source stays copyleft and a closed fork is still
 forbidden. See [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt).
+
+All artwork, including the icon and the pictures on the dial's glass, is part of
+Wetter and licensed under the same terms.
 
 Copyright © 2026 Roberts Kains.

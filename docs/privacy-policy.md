@@ -60,7 +60,7 @@ system does not copy it off the device. Uninstalling the app deletes it.
 | `ACCESS_COARSE_LOCATION` | Optional. One approximate fix when you ask the map for your current location. The app does not follow your location, in the background or otherwise. |
 | `POST_NOTIFICATIONS` | Optional. Severe weather warnings, which can be switched off in Settings. |
 | `RECEIVE_BOOT_COMPLETED` | To restart the background refresh after the phone restarts. |
-| `SCHEDULE_EXACT_ALARM` | Optional. To time the background refresh to each new radar image. |
+| `WAKE_LOCK` | Added by WorkManager, which keeps the phone awake while a background refresh runs. |
 
 The optional permissions are asked for when they are first needed, or offered in
 Settings. Declining any of them leaves the rest of the app working.

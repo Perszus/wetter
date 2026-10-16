@@ -266,17 +266,16 @@ hour overwhelms drainage anywhere. Ice keeps its because freezing rain is rare
 and dangerous everywhere.
 
 **One source of truth for how hard it is falling.**
-A provider's symbol carries two claims in one word — *what* is falling and *how
-hard*. The first is theirs to make; the second this app measures against its own
-published scale. They were displayed side by side and never reconciled, so the
-week could show a drizzle mark on a day whose own bar said rain. Measured on a
-real MET Norway forecast for Rīga: a 1.0 mm/h day came back as `DRIZZLE`, while
-the app calls anything from 0.5 mm/h light rain.
+A provider's symbol carries two claims in one word: *what* is falling and *how
+hard*. The first is the provider's to make; the second the app measures against
+its own scale, so a word can never disagree with the bar drawn under it (a MET
+Norway day peaking at 1.0 mm/h arrives as `DRIZZLE`, which the scale calls light
+rain).
 
 The rule: **the temperature decides what is falling, the rate decides how
-hard, and the symbol keeps only what it alone knows** — the sky, the character of
-the fall, the hazard. `WeatherCondition.atRate` is the intensity counterpart to
-the older `appropriateFor(temperature)`, and every surface draws `.appearance`
+hard, and the symbol keeps only what it alone knows**: the sky, the character of
+the fall, the hazard. `WeatherCondition.atRate` handles intensity and
+`appropriateFor(temperature)` the kind, and every surface draws `.appearance`
 rather than the raw symbol: the hour, the day, and the current conditions on the
 dial.
 

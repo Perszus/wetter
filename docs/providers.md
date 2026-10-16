@@ -1,8 +1,8 @@
 # Weather providers
 
-Wetter is not an Open-Meteo client. It knows about several meteorological
-services, what each can supply and where each is worth using, and picks one per
-location. The rest of the app never learns which.
+Wetter is not an Open-Meteo client. It knows several meteorological services,
+what each can supply and where each is worth using, and picks one per location.
+The rest of the app never learns which.
 
 ```text
                          Wetter UI
@@ -22,9 +22,8 @@ location. The rest of the app never learns which.
                        WeatherForecast
 ```
 
-`ui/` and `domain/` contain no provider-specific code at all. A provider's
-response types are `internal` to its own package and are converted by a mapper
-that sits beside them; nothing else can name them.
+`ui/` and `domain/` contain no provider-specific code. A provider's response
+types are `internal` to its own package and converted by a mapper beside them.
 
 ## The abstraction
 
@@ -40,22 +39,18 @@ interface WeatherProvider {
 }
 ```
 
-`getForecast` returns a `Result` rather than throwing. A provider failing is an
-ordinary event in a multi-provider system — it is the router's cue to try the
-next candidate, not an exception to propagate upwards.
+`getForecast` returns a `Result`: a provider failing is the router's cue to try
+the next candidate, not an exception.
 
 **Capabilities** are a set of `WeatherVariable`, a maximum forecast length, an
-hourly horizon, a model resolution and an update interval. They record what a provider actually
-delivers, not what its documentation promises.
+hourly horizon, a model resolution and an update interval, recording what a
+provider actually delivers rather than what its documentation promises.
 
-**Coverage** is whether the provider answers globally, plus a list of rectangles
-where it is a regional speciality. Each region carries a strength between 0 and
-1 and, optionally, the finer resolution of the model that runs there.
-
-Rectangles are crude — a box around the Nordics also contains a slice of the
-Atlantic. They are used anyway, because provider coverage genuinely is coarse
-and the alternative is shipping a polygon dataset to answer a question that only
-ever ranks two or three candidates.
+**Coverage** is whether the provider answers globally, plus rectangles where it
+is a regional speciality, each with a strength between 0 and 1 and, optionally,
+the finer resolution of the model that runs there. Rectangles are crude, but
+provider coverage is coarse and the question only ever ranks two or three
+candidates.
 
 ## Selection
 
@@ -70,85 +65,58 @@ ever ranks two or three candidates.
 | Update frequency | 5 | How often a new run is published |
 | Health penalty | −5 each, −100 resting | Recent failures |
 
-Two things are exclusions rather than penalties: a provider that does not serve
-the location, and one that cannot supply a *required* variable. Everything else
-is a score.
+A provider that does not serve the location, or cannot supply a *required*
+variable, is excluded; everything else is a score. Adding a provider is a data
+change, and adjusting policy is an edit to six constants.
 
-There is no chain of `if (country == …)`. Adding a provider is a data change,
-and adjusting policy is an edit to six constants.
-
-**Boundaries are soft.** A regional preference decays linearly to zero over two
-degrees beyond its rectangle, so a provider does not change the instant a border
-is crossed. Weather does not respect the edge of a rectangle and neither should
-a forecast somebody is watching while they walk down a street.
-
-**Ranking is deterministic.** The same location, providers and health always
-produce the same order, with ties broken by provider id. This is what makes the
-behaviour testable and debuggable.
-
-**The current source is preferred in a near-tie.** If the provider that supplied
-what is on screen is within 8 points of the leader, it keeps its place. Swapping
-sources for a point of score would change the numbers under someone's eyes for
-no reason they could perceive.
-
-**A resting provider stays eligible.** It is penalised heavily enough to lose to
-anything healthy, but not excluded — otherwise an outage on both sides of a
-fallback pair would leave the app unable to recover on its own.
+- **Boundaries are soft.** A regional preference decays to zero over two degrees
+  beyond its rectangle, so the provider does not change the instant a border is
+  crossed.
+- **Ranking is deterministic.** The same location, providers and health always
+  give the same order, ties broken by provider id.
+- **The current source is kept in a near-tie.** Within 8 points of the leader,
+  the provider behind what is on screen keeps its place, so numbers do not change
+  under somebody's eyes for nothing.
+- **A resting provider stays eligible**, penalised enough to lose to anything
+  healthy, so an outage on both sides of a fallback pair can still recover.
 
 ## Keeping the timeline hourly
 
 The best provider for a place is often not the one that reaches furthest. MET
-Norway runs a 2.5 km model over the Nordics and is the right source for whether
-it rains this afternoon — but it is hourly for only about sixty hours, after
-which its series drops to six-hourly steps. Choosing it naively would mean a
-better forecast for two days and *no hourly timeline at all* for the other five.
-
-So a forecast is assembled adaptively. The winner supplies the hours it has, and
-the next-best candidate supplies the rest:
+Norway's 2.5 km Nordic model is the right source for this afternoon, but it is
+hourly for only about sixty hours, then six-hourly. So the winner supplies the
+hours it has and the next candidate the rest:
 
 ```text
 hours 0–60      MET Norway        2.5 km, the model that knows this coastline
 hours 60–168    Open-Meteo        global blend, still hour by hour
-                     ↑ the join, exactly where MET Norway stops being hourly
+                     ↑ the join, where MET Norway stops being hourly
 ```
 
-`ProviderCapabilities.hourlyHorizonHours` is what makes this decidable, and it is
-deliberately separate from `maximumForecastDays` — MET Norway forecasts nine days
-and is hourly for two and a half of them.
+`ProviderCapabilities.hourlyHorizonHours` makes this decidable; it is separate
+from `maximumForecastDays`, since MET Norway forecasts nine days and is hourly
+for two and a half. The rules, enforced in `ForecastStitcher`:
 
-The rules, all enforced in `ForecastStitcher`:
+- **Nothing is invented.** Six-hourly steps are never spread into hours.
+- **The join lands where the first source stops**, not on a day boundary.
+- **A day's summary comes from whoever drew most of that day's hours**, so the
+  daily row describes the same model as the bars under it.
+- **The extension is optional.** At most one extra request, requested alongside
+  the first when the first is known to fall short; if it fails, the forecast that
+  succeeded is kept.
+- **A small shortfall is ignored.** Only a gap over twelve hours is worth a
+  second request.
 
-- **Nothing is invented.** Six-hourly steps are never spread into hours. A bar
-  six times too wide is worse than no bar, because it is wrong about *when*.
-- **The join lands where the first source stops.** It is not moved to a day
-  boundary, because that would throw away up to a day of the better model to
-  make the seam tidier.
-- **A day's summary comes from whoever drew that day's hours**, so the daily row
-  can never describe one model while the bars above it draw another.
-- **The extension is optional.** It costs at most one extra request, and if that
-  request fails the user still gets the forecast that already succeeded.
-  Extending a forecast must never be able to cost somebody one.
-- **A small shortfall is ignored.** A forecast starting at local midnight is
-  always a few hours short of any round horizon by mid-morning; only a gap over
-  twelve hours is worth a second request.
-
-`ForecastRequirements.hourlyHorizon` is six days rather than seven: the daily
-forecast runs a week, and six guarantees hour-by-hour detail for every day of it
-bar the tail of the last.
-
-The result records both sources — `provider` stays the primary, and `supplement`
-names the second and the instant it took over. Neither is shown on the main
-screen. Both are credited in About, as their licences require.
+`ForecastRequirements.hourlyHorizon` is six days: the week view gets hourly
+detail for every day bar the tail of the last. The forecast records both
+sources: `provider` is the primary, `supplement` the second and when it took
+over. Neither is shown on the main screen; both are credited in About.
 
 ## Failover
 
-The router tries the preferred provider, then at most one fallback. It never
-retries the same provider inside a single refresh: one that just timed out will
-most likely time out again a second later, and the alternative is already ranked
-and waiting.
-
-Whether a second provider is tried depends on whether the failure was about
-*this* provider:
+The router tries the preferred provider, then at most one fallback, and never
+retries the same provider within a refresh. Whether a second is tried depends on
+whether the failure was about *this* provider:
 
 | Failure | Fail over? | Why |
 |---|---|---|
@@ -163,405 +131,189 @@ Whether a second provider is tried depends on whether the failure was about
 
 `ProviderHealth` records consecutive failures and, when a provider sends
 `Retry-After`, an explicit cooldown. One failure is treated as noise; from the
-second, an exponential backoff starts at 5 minutes and is capped at 2 hours.
-Backoff happens *between* refreshes rather than inside one, which is what keeps
-the app from hammering a service that is having a bad afternoon.
-
-Failures caused by having no connection are not counted against any provider. A
-week without signal would otherwise demote every provider the app has.
-
-Health is kept in memory. An app that has been closed long enough to be evicted
-should start from a clean slate rather than resume a stale grudge.
+second, an exponential backoff starts at 5 minutes and is capped at 2 hours,
+applied between refreshes. Failures from having no connection count against no
+provider. Health is kept on disk (`ProviderHealthStore`), so an app waking to a
+service that has been down for hours does not try it from scratch.
 
 ## Adding a provider
 
-1. Check the terms first — see the checklist below. This is the step that
-   disqualifies most candidates, and doing it last wastes the implementation.
-2. Add a package under `data/provider/`, containing the response types
-   (`internal`), a mapper, and the `WeatherProvider` implementation.
-3. Declare honest capabilities. If a documented field is null in practice, leave
-   it out: the selector's job is to predict what will arrive. Take particular
-   care with `hourlyHorizonHours` — it is how far the provider is *genuinely*
-   hour by hour, which for several services is much less than how far it
-   forecasts at all.
-4. Declare coverage. Give a region its own `resolutionKm` if a finer model runs
+1. Check the terms first, against the checklist below. This step disqualifies
+   most candidates.
+2. Add a package under `data/provider/` with the response types (`internal`), a
+   mapper, and the `WeatherProvider` implementation.
+3. Declare honest capabilities. Leave out a documented field that is null in
+   practice, and set `hourlyHorizonHours` to how far the provider is genuinely
+   hour by hour.
+4. Declare coverage, with a region's own `resolutionKm` if a finer model runs
    there.
-5. Register it in `WetterContainer.providers`. Nothing else changes.
-6. Add a recorded response under `src/test/resources` and a mapper test that
-   covers its awkward parts, not its easy ones.
-7. Add the attribution to the list in this file and in the README.
+5. Register it in `WeatherData.providers`. Nothing else changes.
+6. Add a recorded response under `src/test/resources` and a mapper test covering
+   its awkward parts.
+7. Add the attribution here, in the README and in the privacy policy;
+   `ReleaseReadinessTest` checks the last two against the code.
 
 ### Terms-of-service checklist
 
-Technical accessibility is not permission. Before adding a provider, confirm and
-record:
-
 - [ ] Is the service usable by a free, open-source client at all?
-- [ ] Does it require an API key? A key that must be embedded in a public
-      repository is a non-starter.
-- [ ] What attribution is required, and in what exact wording?
-- [ ] What is the licence of the data itself, and is redistribution allowed?
-- [ ] What are the rate limits, and does it require an identifying User-Agent?
-- [ ] Is non-commercial-only use a condition? Wetter is free, but a restriction
-      that forbids commercial use makes the data non-free and may be
-      incompatible with the app's licence.
+- [ ] Does it need an API key? One embedded in a public repository is a non-starter.
+- [ ] What attribution is required, and in what wording?
+- [ ] What is the licence of the data, and is redistribution allowed?
+- [ ] What are the rate limits, and is an identifying User-Agent required?
+- [ ] Is use restricted to non-commercial purposes?
 - [ ] Does it ask for caching behaviour or coordinate truncation?
 
 ## Current providers
 
-### Open-Meteo — the global baseline
+### Open-Meteo: the global baseline
 
-- <https://open-meteo.com>
-- Data licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
-  attribution: *"Weather data by Open-Meteo.com, licensed CC BY 4.0"*
-- No API key. Free for non-commercial use.
-- Supplies every variable Wetter can draw, up to 16 days.
-- Global, with no regional preference. It is the fallback everywhere, which is
-  precisely what makes it valuable.
+- <https://open-meteo.com>, data licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); attribution
+  *"Weather data by Open-Meteo.com, licensed CC BY 4.0"*.
+- No API key; free for non-commercial use.
+- Every variable Wetter draws, up to 16 days, globally. The fallback everywhere.
 - `baseUrl` is a constructor parameter, so a self-hosted instance can be used
-  instead without any other change.
+  without other changes.
 
-### MET Norway — the regional specialist
+### MET Norway: the regional specialist
 
-- <https://api.met.no>
-- Data licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
-  attribution: *"Weather data from MET Norway (met.no), licensed CC BY 4.0"*
-- Terms: <https://api.met.no/doc/TermsOfService>
-- **Requires an identifying User-Agent** with a means of contact. This is
-  installed once on the shared HTTP client; sending a generic one is grounds for
-  being blocked.
-- **Coordinates are truncated to four decimals**, as the terms ask, so requests
-  land on shared cache entries rather than one per user. This is a privacy
-  benefit as well as a courtesy: it caps how precisely a request describes where
-  somebody is.
-- Runs a 2.5 km model over the Nordic area and a global model elsewhere, which
-  is why its Nordic region carries its own resolution.
-- Hourly for about 60 hours, then six-hourly to day nine. Wetter uses the hourly
-  part and extends the rest from Open-Meteo — see
-  [Keeping the timeline hourly](#keeping-the-timeline-hourly).
-- Publishes no snow depth, no sunrise and no sunset. The first is left absent;
-  the other two are computed from the sun's position, which is why the provider
-  claims the sunrise capability.
-- Its response is one timeseries of instants rather than separate hourly and
-  daily blocks, and it drops from hourly to six-hourly after about two and a
-  half days. The mapper handles both, and takes care that a six-hourly step is
-  not drawn as an hour or counted twice.
+- <https://api.met.no>, data licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); attribution
+  *"Weather data from MET Norway (met.no), licensed CC BY 4.0"*; terms
+  <https://api.met.no/doc/TermsOfService>.
+- **Requires an identifying User-Agent** with a means of contact, set once on the
+  shared HTTP client.
+- **Coordinates are truncated to four decimals**, as the terms ask, which also
+  caps how precisely a request describes where somebody is.
+- A 2.5 km model over the Nordic area and a global model elsewhere. Preferred
+  where the fine grid runs; an ordinary global source everywhere else.
+- Hourly for about 60 hours, then six-hourly to day nine, in one timeseries of
+  instants that the mapper splits without counting a six-hourly step twice.
+- No snow depth, sunrise or sunset: the first is left absent, the others are
+  computed from the sun's position.
 
-MET Norway is **not** presented as globally better than Open-Meteo. It is
-preferred where its fine grid runs, and treated as an ordinary global source
-everywhere else.
+## Radar and nowcasting
 
-## Radar, and who does the nowcasting
+Radar is not routed as a forecast provider; it answers a different question. A
+numerical model predicts from a simulated atmosphere initialised hours ago, which
+is why models are weakest about the next twenty minutes. Radar observes the
+precipitation that exists now, at about a kilometre, and says nothing about
+tonight.
 
-Radar is not another forecast provider and is deliberately not routed as one. It
-answers a different question.
+Wetter does its own nowcasting: the observed field is carried forward (motion
+estimated by block matching, backward trajectories, growth and decay with a
+saturating limit) and blended with the models by lead time. RainViewer stopped
+publishing forecast frames at the start of 2026, so past the present moment there
+is nothing to fetch.
 
-A numerical model predicts how the atmosphere will evolve. It has to be *told*
-what is currently overhead, and by the time a run reaches a phone that state is
-already an hour or two old — which is why models are weakest about the next
-twenty minutes and why "is it about to rain on me" is the question they answer
-worst. Radar is the opposite: it observes precipitation that exists, right now,
-at roughly a kilometre. It cannot tell you about tonight at all.
+The first half hour is stepped at five minutes, the rest at ten, so a projected
+value is always within a few minutes of the moment being read.
 
-So Wetter does its own nowcasting rather than asking anyone for one. The
-observed field is projected forward — motion estimated by block matching,
-carried on backward trajectories, with growth and decay on a saturating leash —
-and the result is blended with the models by lead time. This became the only
-option available as well as the right one: RainViewer withdrew their own
-forecast frames at the start of 2026, so past the present moment there is
-nothing to fetch.
+### The hand-over
 
-### Where the handover happens
-
-**Radar is the immediate layer.** Not because it stops being a prediction — it
-does not. Carrying a field forward is a forecast, and it rests on an assumption
-that gets worse every minute: that the rain keeps doing what it was measured
-doing. The difference is what the prediction is *built on*.
-
-A model predicts from a simulated atmosphere initialised hours ago. The nowcast
-predicts from what is in the sky right now — where the rain actually is, how
-dense it actually is, which way it was actually observed to move. Both are
-guesses about the future; one of them starts from a look out of the window.
-
-That is the whole claim, and it is a narrow one. It is also why the claim
-expires: the shorter the extrapolation, the more of the answer is observation
-and the less is assumption. An hour in, most of it is still the observation.
-
-**And the first half hour is stepped finer.** Zero lead is not *now*: sweeps
-land about every ten minutes, so by the time somebody looks the observation can
-be nine minutes old and the rain has moved on without it. On ten-minute steps
-the nearest value to the present could be five minutes away from it, which is a
-long time in a shower. Five-minute steps for the first thirty minutes put a
-value within two and a half minutes of any instant, and reaching it costs the
-smallest extrapolation the app ever makes — a couple of minutes of drift from a
-sweep that has just landed. It is the most reliable projection available, spent
-on the number people actually read.
-
-**So inside an hour the radar decides.** It is not one opinion of two there; it is
-the only source that has actually looked. It sees where the cloud is, how dense
-it is and which way it is moving, and it looks again every ten minutes. A
-model's next hours were computed hours ago from an analysis older still, and
-nothing about them improves as the hour approaches — whatever was sent is what
-you get. We do not need a report from half an hour ago to tell us there is rain
-overhead when we can see it.
-
-| Lead | Radar | Why |
+| Lead | Radar's share | Why |
 |---|---|---|
-| 0 – 1 h | 80% | The window where the sky is being watched rather than predicted. The remaining fifth is the models', for the snow, the drizzle under the beam and the coverage holes radar structurally cannot see. |
-| the next 20 min | eased to nothing | The projection does not stop being an observation at a stroke. |
-| after that | 0% | Extrapolation is spent, and a spent extrapolation gets no vote. |
+| 0 – 1 h | 80% | The sky is being watched rather than predicted. The models keep a fifth for snow, drizzle under the beam and coverage holes radar cannot see. |
+| next 20 min | eased to nothing | A smoothstep, so neither the value nor its rate of change steps. |
+| after that | 0% | Carrying a frozen field further is no longer worth a vote. |
 
-**Past its window radar is out, not merely quieter.** Even a gently fading share
-leaves radar carrying a real part of the answer two hours out, where a dry
-projection can hold a whole evening at zero while the models forecast rain.
+An hour, because advection assumes the field is only carried along: nearly true
+over ten minutes, strained by an hour, and by two hours cells have formed and
+died. The window shortens with the quality of the motion match, from the full
+hour for a field with edges and cells down to 15 minutes for a featureless sheet.
+At zero lead the sample is the observation itself, which no motion error can
+corrupt, so a poor match costs reach, never the present.
 
-**And past that window no single model decides either.** The provider chosen for
-a place is one deterministic run, wrong in ways nothing in its own output
-reveals. On one wet evening in Riga the chosen provider reported 0.0 mm for
-every hour after the next, symbol "cloudy", while the ensemble had ECMWF at 1.3,
-UKMO at 1.7 and DMI at 1.9 over the same hours. Drawing the provider alone would
-have shown a flat dry evening in the rain.
+Confidence is carried separately and is not raised to match: a value taken from
+radar two hours out is still less certain than one ten minutes out.
 
-So the provider is a vote rather than the verdict: the model term is the **median
-across the ensemble members and the provider together**. Genuinely together — a
-median over seven values and a median over those seven plus an eighth are
-different ranks of a different list, which is why the member values are carried
-rather than just their summary. A median rather than a mean because it ignores
-*how* wrong an outlier is: one model forecasting a deluge cannot carry the hour
-any more than one forecasting nothing can empty it, and on this evidence both
-happen.
+### The model term
 
-### Who votes
+Past the radar window no single model decides. The model term is the **median of
+the ensemble members and the chosen provider together**: one deterministic run
+can be wrong in ways its own output never reveals. On one wet evening in Riga the
+chosen provider reported 0.0 mm for every hour after the next while ECMWF, UKMO
+and DMI had 1.3, 1.7 and 1.9 mm over the same hours. A median, so one outlying
+model can neither carry an hour nor empty it.
 
-A median is only as good as the independence of what goes into it, and two
-things quietly undermined that. Both were found by measuring the members
-rather than trusting their names.
-
-- **Three votes were one model everywhere outside Europe.** KNMI's and DMI's
-  "seamless" products are their regional model inside their own domain and
-  ECMWF outside it. In Tokyo, New York, Sydney, São Paulo, Delhi and Lagos their
-  series were ECMWF's byte for byte, so ECMWF's answer was being counted three
-  times and called a consensus. Members with identical series are now counted
-  once, which keeps KNMI and DMI as the genuinely separate votes they are over
-  Europe.
-- **One vote was a staircase.** ECMWF's 0.25° product is three-hourly, spread
-  evenly across its hours - two thirds of its wet hour-to-hour steps over Rīga
-  were exact repeats. The native 9 km `ecmwf_ifs` is hourly and replaced it.
-
-Canada's GEM joined to restore the count outside Europe: global, hourly and its
-own analysis. Measured and left out: JMA and CMA, three-hourly staircases away
-from home (48 of 55 wet steps repeated over Rīga), and BOM's and KMA's globals,
-which the service returns empty. So the vote is ECMWF, ICON, GFS, UKMO,
-Météo-France, GEM and the chosen provider everywhere, plus KNMI's and DMI's own
-models over Europe.
+The members are ECMWF (native 9 km, hourly), ICON, GFS, UKMO, Météo-France and
+GEM everywhere, plus KNMI's and DMI's own models over Europe. Outside their
+domains KNMI's and DMI's products return ECMWF's series byte for byte, so
+identical members are counted once. ECMWF's 0.25° product, JMA and CMA are left
+out as three-hourly series spread across hours; BOM's and KMA's globals return
+empty.
 
 ### Why not quarter-hourly model data
 
-Open-Meteo serves a `minutely_15` series everywhere, and it is genuine only in
-a few places. Measured on one wet afternoon: over Berlin, inside ICON-D2's
-domain, the quarters vary and add up to the hour. Over Rīga they are the hour
-divided evenly. Over New York and Tokyo they are neither - quarters of 1.6 mm
-beside an hourly total of 2.7 mm, so they cannot both be the same rain. Taking
-them would put a series that contradicts its own hourly total into the one
-place this app is most careful, and the sub-hourly near term is radar's job
-wherever radar exists. The finest *real* resolution is the rule; this is not it.
+Open-Meteo serves a `minutely_15` series everywhere, and it is genuine only in a
+few places. Over Berlin, inside ICON-D2's domain, the quarters vary and add up to
+the hour; over Rīga they are the hour divided evenly; over New York and Tokyo
+they disagree with their own hourly totals. The sub-hourly near term is radar's
+job wherever radar exists.
 
-The hand-over is eased with a smoothstep rather than dropped at the boundary. A
-step in the weighting is a step in the answer, and nothing in the sky steps at
-the moment a projection turns an hour old — it showed as a kink in the curve at
-the same place every time, which is the signature of an artefact rather than of
-weather. Smoothstep rather than a straight ramp because its slope is zero at
-both ends: a linear fade removes the step in the value and leaves one in its
-rate of change, which the eye still finds.
+### RainViewer: the radar source
 
-An hour rather than two, and the reason is the method. Underneath is advection:
-the field is assumed frozen and only carried along. Over ten minutes that is
-very nearly true; by an hour it is strained; by two the cell that was coming may
-have rained itself out while something new built overhead that no amount of
-looking at old frames could have shown. Physics can model formation and decay,
-which is the one thing advection cannot — so the hand-over belongs where the
-assumption stops paying.
+- <https://www.rainviewer.com/api.html>. No key, no registration.
+- **Attribution is required**: *"Radar by RainViewer"*, shown in About and on the
+  rain map beside the OpenStreetMap credit.
+- **The free tier is described as personal and educational use**; commercial or
+  high-volume use is arranged case by case, and RainViewer disclaims rights in
+  the underlying national radar data. This is the least settled licence position
+  of any source here, recorded as a decision rather than overlooked.
+- National networks composited worldwide, refreshed every ten minutes, with two
+  hours of history. Tiles are cached for two days at a path unique to each sweep.
+- The chart reads a three-by-three block of tiles at zoom 7, about 510 km across
+  at mid-latitudes. The rain map reads a four-by-four block a zoom out, about
+  1,360 km, and shows the middle three, so its projection always has observed sky
+  upwind of the screen.
 
-Past the window the share is **not** read off a table at runtime. It is derived
-from the nowcast's own confidence, the product of two independent things: how far
-radar can usefully see at all, and how well *this* sweep matched the last one. A
-fixed table is right on average and blind to the second — and the second is what
-separates a good estimate from the one over Dublin that came out fifty degrees
-wrong on a thin, structureless field.
+**The tiles are pictures, not numbers.** The rain field is read back out of the
+colour scale (`RainViewerPalette`). Its ordering is established from the
+stratification of storms; its absolute calibration is not, so the span is the
+conventional one for a radar composite, capped at 55 dBZ where the echo stops
+being rain. Radar rates are reliable in shape (where, which way, growing or not)
+and approximate in magnitude, and the fusion weights them accordingly.
 
-**Confidence is not raised to match.** Taking the value from the radar says where
-the number came from; it does not claim the number is certain. A reading two
-hours out is less certain than one ten minutes out however it was arrived at, and
-the confidence carried alongside each point still says so. That is where the
-sharpening lives now: as a shower approaches, the answer does not become *more
-radar*, it becomes more certain.
-
-**The window's length is earned.** A bad motion estimate does not corrupt the
-whole hour evenly. At zero lead there is no advection at all — the sample is the
-observed field at those coordinates, and a vector fifty degrees wrong cannot
-touch it. The error a bad vector introduces grows with lead and with speed. So
-what a poor match costs is *reach*, not the observation:
-
-| Match quality | Radar decides for |
-|---|---|
-| sharp — a field with edges and cells | the full hour |
-| ambiguous — a flat sheet with nothing to track | 15 minutes |
-
-scaling linearly between. This is deliberately not a quality gate. A gate asks
-*whether* radar leads and can therefore hand a near-observation back to a model
-that has not looked; this asks only how far the look can be carried, and the
-observation itself is never taken away. The Dublin case — a thin, structureless
-field whose vector came out fifty degrees wrong — now keeps its first quarter
-hour and loses the rest, which is exactly the part it could not support.
-
-Two properties of that split are worth keeping:
-
-- **The present moment does not depend on the motion estimate.** A flat rain
-  field gives a poor match, but the sweep still shows rain that is falling. Only
-  the projection needs the motion — which is why a featureless field is still
-  worth believing about now, and why its confidence falls away with lead even
-  though its share no longer does.
-- **The model is never switched off.** Radar sees precipitation, not the sky. It
-  misses what falls below the beam, misses snow it cannot detect, and cannot see
-  past its own coverage. A standing model share means those gaps degrade the
-  answer rather than emptying it.
-
-### Current radar source
-
-#### RainViewer — global composite
-
-- <https://www.rainviewer.com/api.html>
-- No key, no registration.
-- **Attribution is mandatory** under their free terms: *"Weather data by
-  RainViewer"* with a link back. Shown in About, and on the rain map itself,
-  beside the OpenStreetMap credit, because there the picture is theirs.
-- **Their free tier is described as personal and educational use.** Commercial or
-  high-volume integration is arranged case by case, and they explicitly disclaim
-  rights in the underlying national radar data. This is the least settled licence
-  position of any source here and is a deliberate, recorded decision rather than
-  an oversight — see the [terms-of-service
-  checklist](#terms-of-service-checklist).
-- Composites national networks worldwide, refreshed every ten minutes, thirteen
-  frames of history. Coverage over the Baltic is real and continuous; MET
-  Norway's nowcast reports *no coverage* for Rīga because that is its own Nordic
-  composite, not this one.
-- Tiles are marked good for two days at a path unique to their sweep, and
-  are kept in the HTTP disk cache, so a fresh process does not download the
-  sweeps behind it again.
-- The chart reads a three-by-three block at zoom 7,
-  about 510 km across over the Baltic. The rain map reads its own four-by-four
-  block a zoom out, about 1,360 km, and shows only the middle three by three,
-  so its projection always has observed sky upwind of what is on screen.
-
-### What the tiles cannot tell us
-
-The API serves **pictures, not numbers**. There is no numeric endpoint, so the
-rain field is read back out of the colour scale, and two things follow.
-
-The *ordering* of the scale is established: translucent tan at the faint end,
-then opaque cool colours, then warm, with magenta above. Storms are stratified,
-so intensity should fall with distance from a core and each family should be
-enclosed by the one below it — both hold across a large sample of central
-Europe, which is what pins the order down.
-
-The *absolute calibration* is not established. Fitting the scale against
-Open-Meteo's precipitation gave a correlation of only 0.37 and implied half a
-millimetre an hour at full scale, which is nonsense for a saturated echo: an
-11 km forecast quantised to tenths is too coarse a ruler for kilometre
-observations. The span used is therefore the conventional one for a radar
-composite, capped at 55 dBZ where the echo stops being rain — read literally,
-the top of the scale came out at 1300 mm/h, a rain relation applied to hail.
-
-**So radar rates here are reliable in shape and approximate in magnitude.**
-Where the rain is, which way it is going and whether it is growing are all
-trustworthy; the exact millimetres are not. The fusion weights them accordingly,
-and the two constants to revisit are `MIN_DBZ` and `MAX_DBZ`, once the
-verification store holds enough observed rain to fit against something measured.
-
-### Where the radar actually reaches
-
-The composite is global in address and regional in fact. Sampling a nine-tile
-block at zoom 5 around fifteen cities on one September afternoon, the share of
-pixels carrying any echo at all came out:
-
-| | |
-|---|---|
-| Rīga 14.4% · New York 12.4% · London 11.3% | dense |
-| Sydney 6.3% · Reykjavík 5.6% · Tokyo 5.5% | usable |
-| Ulaanbaatar 3.2% · Delhi 1.5% · São Paulo 1.4% · Jakarta 1.1% · Cairo 1.1% | thin |
-| La Paz 0.1% · Nairobi 0.1% · **Lagos 0.0%** · **mid-Atlantic 0.0%** | none |
-
-One afternoon confounds coverage with weather — a dry day over a well-covered
-country also reads low. The ordering is the finding, not the numbers, and the
-ordering is that most of the world is in the bottom two rows.
-
-That matters more than it looks, because **the tile source draws "no echo" and
-"outside coverage" as the same fully transparent pixel** (`RainViewerPalette`).
-Inside the authority window radar now carries 95% of the answer, so reading that
-pixel as *dry* would have Wetter confidently contradict a model forecasting rain
-in exactly the places with no radar to correct it. The failure would not be a
-wrong number; it would be a confident one, shown to somebody standing in the
-rain.
-
-**So a dry pixel only counts as an observation when there is echo near it.**
-`RadarNowcast.seriesAt` returns nothing at all unless some step has echo within
-64 px of the point — one motion block, about 40 km at the zoom used here. Rain
-passing a few tens of kilometres away is proof the radar is watching, and a dry
-reading beside it is real evidence worth acting on. Nothing anywhere near is not
-evidence of anything, and the model keeps the answer to itself.
-
-The check runs across every step rather than the nearest one, so a shower still
-approaching from beyond the neighbourhood is not silenced — that being the one
-thing a nowcast exists to say.
-
-The model layer needs none of this: both providers are global, and Open-Meteo's
-ensemble members simply drop out where they do not reach.
+**"No echo" and "no coverage" are the same transparent pixel.** Most of the world
+has thin coverage or none, and reading an empty pixel as dry would contradict the
+models exactly where no radar can correct them. So a dry pixel counts as an
+observation only when some step has echo within one motion block (about 40 km);
+otherwise the models answer alone. Every step is checked, so a shower approaching
+from beyond the neighbourhood still counts.
 
 ## Air quality
 
-Not weather, and not fetched with it. Open-Meteo's air quality service is a
-separate host backed by different models — Copernicus CAMS, 40 km globally and
-11 km over Europe — so it lives behind its own `AirQualitySource` for the same
-reason radar does: it answers a different question on its own cadence, and a
-weather provider failing must not take it down with it.
+Open-Meteo's air quality service is a separate host backed by Copernicus CAMS
+(40 km globally, 11 km over Europe), behind its own `AirQualitySource` so a
+weather provider failing cannot take it down. Coverage is global.
 
-Coverage was checked rather than assumed. Riga, Nairobi, Delhi, São Paulo,
-Sydney and Longyearbyen all return values, so this is not a European feature
-that degrades elsewhere.
+There is no AQI. National indices turn the same micrograms into different
+verdicts, so Wetter reports concentrations and bands PM2.5 against the WHO's 2021
+global guidelines: the guideline value and its four interim targets. The band is
+judged on a 24-hour mean, as the guideline is defined (`past_hours=24`); the
+current hour is shown as the number. Values are cached in memory for 30 minutes
+and never persisted.
 
-### Why there is no AQI
+## Other services
 
-An air quality index is a national instrument. The European AQI, the US AQI,
-India's NAQI and China's take the same micrograms and return different verdicts,
-because each encodes what its own regulator decided was acceptable. Open-Meteo
-will compute the European and US indices anywhere on Earth, which is precisely
-the trap: a Delhi reading judged by European thresholds is not a measurement, it
-is an opinion imported from 6,000 km away.
-
-So Wetter reports the concentration and bands it against the one threshold set
-that is not national — the WHO's 2021 global air quality guidelines. The bands
-are the guideline value and its four interim targets, which exist because most
-of the world is a long way above the guideline and needed a ladder rather than a
-pass/fail line. The same air reads the same everywhere.
-
-### The 24-hour mean
-
-The WHO's PM2.5 threshold is defined on a 24-hour mean, so a 24-hour mean is
-what gets banded. `past_hours=24` costs one parameter on a request already being
-made, and it is the difference between "the air here is bad" and "somebody had a
-bonfire an hour ago". The current hour is still shown as the number; the mean
-only decides the word. Where fewer than 18 of the 24 hours came back, no mean is
-claimed and the current hour stands in.
-
-Nothing is persisted. The source publishes hourly values, and unlike a forecast
-there is nothing here worth showing stale — "the air was clean when you last
-opened this" is not an answer to "is the air clean". A 30-minute in-memory cache
-is the whole of it.
+- **Open-Meteo archive** (ERA5 reanalysis): a decade of daily history per place,
+  fetched about once a month, for the Month page's normals and the local hazard
+  thresholds.
+- **Open-Meteo geocoding**: place search by name, returning an IANA time zone and
+  an elevation with each place.
+- **NOAA/NWS Aviation Weather Center** (<https://aviationweather.gov>): METAR
+  reports near a place, used only to score past forecasts and learn a local
+  temperature bias. Nothing from them is shown.
+- **Photon** by komoot (<https://photon.komoot.io>): the name of a point placed
+  on the map or typed as coordinates, asked once the map settles. Data
+  © OpenStreetMap contributors.
+- **OpenStreetMap tiles** (<https://tile.openstreetmap.org>): the basemap for the
+  pin picker and the rain map. Only tiles in view are requested, under the app's
+  User-Agent, with the credit on the map, as the tile usage policy asks.
 
 ## Debugging a decision
 
-In debug builds the router logs its ranking and the reason each provider scored
-what it did:
+In debug builds the router logs its ranking and the reason for each score:
 
 ```text
 WeatherProviderRouter  ranking for 56.9, 24.1
@@ -572,6 +324,4 @@ WeatherProviderRouter    open-meteo: 78.6 — Covers this location; Supplies eve
                          variable Wetter uses; Resolution about 11.0 km here
 ```
 
-Coordinates are rounded to one decimal before they reach the log. A debug log is
-still a file on a device, and there is no reason for it to record where somebody
-lives to five decimal places.
+Coordinates are rounded to one decimal before they reach the log.
