@@ -131,7 +131,7 @@ the nowcast at three (110 m), but climatology keys at **one** (11 km). That was
 harmless when normals only tinted the month page. They now set the hazard
 thresholds, and in mountainous terrain 11 km can be a thousand metres of
 elevation — a valley's climate imported to a village above it. Written into
-`notes.md` rather than changed, because tightening the key costs an archive fetch
+the project notes rather than changed, because tightening the key costs an archive fetch
 per place and the right precision is a measurement nobody has taken.
 
 ### 10. The verification loop threw away the location's height — FIXED
@@ -250,7 +250,7 @@ seven per cent — roughly one warned day a fortnight.
 
 Doha and Nuku'alofa remain the highest and are recorded rather than tuned away:
 both are genuinely hard climates, the figure counts hazard kinds rather than
-days, and the right rate is the tunable already noted in `notes.md`.
+days, and the right rate is a tunable left open.
 
 ### 16. A summit and its valley shared one climate — FIXED
 
@@ -441,7 +441,7 @@ half marked far more wet days than the decade beside it. Both now use
   `weather_code` is one representative code per day and storm hours always lose to
   the prevailing rain: across eight cities including Kolkata and Rīga in July it
   reports a thunder share of *zero everywhere*. Needs hourly codes, about four
-  times the payload of the whole archive fetch. In `notes.md`.
+  times the payload of the whole archive fetch. Left open.
 - **Provider failover under a 5xx** (G2) — the ranking and health store are
   covered by their own tests, but a live failure was not induced in this run.
 - **The widget bitmap against the chart** (E1) — they share `RainCurveBands` and

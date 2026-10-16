@@ -1,5 +1,6 @@
 The first release.
 
-Forecasts from two meteorological services, chosen automatically for your
-location, with an hourly timeline that does not run out. Works offline, asks for
-one permission, and collects nothing.
+When the rain starts and stops: from the radar for the next two hours, and from
+the best weather model for your location after that, with an hourly timeline
+that does not run out. A rain map, five home-screen widgets and severe-weather
+warnings. Works offline and collects nothing.

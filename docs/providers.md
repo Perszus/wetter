@@ -311,19 +311,16 @@ overhead when we can see it.
 | the next 20 min | eased to nothing | The projection does not stop being an observation at a stroke. |
 | after that | 0% | Extrapolation is spent, and a spent extrapolation gets no vote. |
 
-**Past its window radar is out, not merely quieter.** It used to fade to
-`confidence × 95%`, which sounds like a gentle retreat and is not one: two hours
-out that still left radar carrying about a third of the answer. Measured on a wet
-evening in Riga, a dry projection at that weight held the whole evening down to
-zero while six of seven models forecast rain.
+**Past its window radar is out, not merely quieter.** Even a gently fading share
+leaves radar carrying a real part of the answer two hours out, where a dry
+projection can hold a whole evening at zero while the models forecast rain.
 
 **And past that window no single model decides either.** The provider chosen for
 a place is one deterministic run, wrong in ways nothing in its own output
-reveals. That same evening the chosen provider reported 0.0 mm for every hour
-after the next, symbol "cloudy", while the seven-model ensemble the app was
-*already downloading* had ECMWF at 1.3, UKMO at 1.7 and DMI at 1.9 over the same
-hours — used only to tint a confidence number. The screen drew a flat dry evening
-in the rain, with the contradicting evidence already on the device.
+reveals. On one wet evening in Riga the chosen provider reported 0.0 mm for
+every hour after the next, symbol "cloudy", while the ensemble had ECMWF at 1.3,
+UKMO at 1.7 and DMI at 1.9 over the same hours. Drawing the provider alone would
+have shown a flat dry evening in the rain.
 
 So the provider is a vote rather than the verdict: the model term is the **median
 across the ensemble members and the provider together**. Genuinely together — a

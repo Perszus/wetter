@@ -21,7 +21,7 @@ There is no way around this. What it means in practice:
 
 - Somebody who installs from F-Droid must uninstall before installing from Play,
   and vice versa. Uninstalling deletes their saved locations.
-- The README says so, and the store listings should not imply otherwise.
+- The store listings should not imply otherwise.
 
 The `applicationId` stays the same on both (`lv.bolwarra.wetter`). Forking it per
 store would split the listing, the reviews and the install count to solve a
@@ -29,15 +29,10 @@ problem it does not actually solve.
 
 ## Before any release
 
-The listing should not go live until the app does the thing the listing
-describes. As of 0.1.0 there is no precipitation timeline, which means there is
-nothing worth screenshotting and the store copy would be describing an
-intention. **Publish the first release when the timeline exists.**
-
-Then, in order:
+In order:
 
 1. `./gradlew clean check assembleDebug` — everything green.
-2. Update `CHANGELOG.md`: move `Unreleased` to the new version, dated.
+2. Update `CHANGELOG.md`: date the version being released.
 3. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
    `versionCode` is a plain integer, incremented by one, never reused and never
    decreased. Both are written by hand — see the comment in that file for why
@@ -181,7 +176,7 @@ already true, and the point is not to break it:
 - **Binary dependencies only from trusted sources** — Maven Central, Google's
   Maven repository for AndroidX, the Android SDK. No vendored blobs.
 - **No executable downloaded at runtime** without explicit opt-in. Wetter
-  downloads nothing but JSON.
+  downloads JSON and map and radar images, nothing executable.
 - **A distinct application id.** Duplicates are automatically rejected.
 - **Actually maintained and actually useful** — not a demo, not a rebranding,
   not a website in a WebView.
@@ -193,8 +188,8 @@ satisfied; the point is not to break them.
 
 - **No proprietary dependency**, nothing from Google Play Services, no
   library that F-Droid's scanner flags as non-free.
-- **No API key baked into the source.** Neither weather service needs one, which
-  is part of why they were chosen.
+- **No API key baked into the source.** None of the services the app uses needs
+  one, which is part of why they were chosen.
 - **Buildable from a clean checkout** with `./gradlew assembleRelease` and
   nothing else — no prebuild step, no network fetch outside Gradle, no binary
   blob that cannot be rebuilt.

@@ -63,8 +63,7 @@ anything.
 **The two stores will carry different signatures, and this is not fixable.**
 Play App Signing is mandatory for new apps, so Google holds the key for anything
 distributed there. Android will not update an F-Droid install over a Play one or
-the reverse. The README says so plainly rather than letting somebody discover it
-when their saved locations vanish.
+the reverse.
 
 **Release signing is optional, and deliberately so.**
 `assembleRelease` succeeds without a keystore and produces an unsigned APK,
@@ -99,6 +98,16 @@ obstacle the moment somebody else contributes, and it is far easier to grant now
 than to collect from a dozen people later. The permission is narrow: it removes
 an obstacle to distribution and grants nothing else. See LICENSE-EXCEPTION.txt.
 
+**No NonFreeNet anti-feature; every service is disclosed instead.**
+The flag is for an app that promotes, or depends entirely on, a non-free network
+service. Wetter promotes none and depends entirely on none: forecast providers
+are interchangeable behind the router and fail over to one another, Open-Meteo
+is itself free software that the provider can be pointed at a self-hosted copy
+of, and radar, observations, place names and map tiles each degrade to nothing
+rather than breaking the app. The submission lists every service the app
+contacts — Open-Meteo, MET Norway, RainViewer, the NOAA/NWS Aviation Weather
+Center, Photon and OpenStreetMap — so reviewers can judge it themselves.
+
 **Backup is off, explicitly and twice.**
 `allowBackup="false"` covers older releases, and a `data_extraction_rules` file
 excludes everything from both cloud backup and device transfer, because the
@@ -121,9 +130,7 @@ mistake. Its tests run without the Android Gradle plugin, in about a second.
 
 `:data` cannot see the UI. The concrete providers, the router, the HTTP client
 and the cache are `internal` to it; the only way in is `WeatherData`, and the
-only way out is a `WeatherRepository` and a list of attributions. The split paid
-for itself immediately — it turned up that the application had been holding a
-Ktor `HttpClient`, which it had no business knowing existed.
+only way out is a `WeatherRepository` and a list of attributions.
 
 **The UI is deliberately not split into feature modules.** Three is the number
 that buys enforcement. More would be an architecture demonstration, which is
@@ -148,7 +155,7 @@ They are properties of a day at a place, and the timeline needs them for every
 day it draws, not only for today.
 
 **`WeatherCondition` includes `SLEET`, which no WMO code produces.**
-MET Norway reports it, and in a Baltic winter it is most of what falls.
+MET Norway reports it, and in a northern winter it is much of what falls.
 
 **Sunrise, sunset and daylight are computed rather than fetched.**
 The NOAA solar position equations, in `SolarTime`. Not every provider publishes
@@ -165,21 +172,21 @@ network call to a second service with a second set of terms.
 `WeatherRepository.observe` answers from the cache. `refresh` is a separate
 call, and its failure leaves what is on screen exactly where it is.
 
-**Thirty minutes of freshness.**
-Roughly how often the models publish a new run. Refreshing more often spends
-battery and somebody else's bandwidth to redraw the same numbers. A manual
-refresh ignores the window — somebody who asks has a reason.
+**Ten minutes of freshness.**
+The radar's cadence. Models publish at a different minute for every service and
+run, and asking costs little when nothing has changed: MET Norway answers "not
+modified" to a conditional request and the HTTP cache answers inside `Expires`.
+A manual refresh ignores the window — somebody who asks has a reason.
 
 **Cache keys round coordinates to four decimals.**
 A position read from the device differs in the far decimals every time. An
 exact-match key would make every refresh a miss and every cached forecast
 unreachable.
 
-**The forecast cache is in memory, for now.**
-Explicitly a placeholder. It gives the offline-first *flow* without yet giving
-offline-first *behaviour*: closing the app empties it, and a widget could not
-read it. `ForecastCache` is the interface Room will implement in the persistence
-phase, which is the whole reason it exists with one implementation today.
+**The forecast cache is Room, one JSON row per place.**
+A forecast is read and written whole, so it is stored whole, and a payload that
+no longer parses after an update is a cache miss that costs one request. The
+widgets and the background refresh read the same rows as the screen.
 
 **Ktor over OkHttp, not Ktor's Android engine.**
 Connection reuse and correct coroutine cancellation matter when two providers
@@ -200,9 +207,9 @@ bottom. A framework would add a compiler plugin, an annotation vocabulary and a
 layer of indirection to solve a problem this app does not have.
 
 **No charting library.**
-The precipitation timeline will be ordinary Compose layout, with `Canvas`
-confined to the one component that genuinely needs to draw. Making `Canvas` the
-foundation of the app would make every future change a drawing problem.
+The rain curve, the dial and the hour strips are drawn directly. A library would
+bring its own axis, its own interpolation, which overshoots, and its own styling,
+and each of those is a decision this app makes for itself.
 
 **No Material You dynamic colour.**
 The palette encodes meaning: precipitation owns the only saturated hue, and
@@ -219,11 +226,9 @@ No destination carries an argument, so the generated route types would buy
 nothing. Revisit if one ever does.
 
 **One notification, and it is severe weather.**
-This used to read "notifications are not built and will not be until the core
-app is good", which was right at the time and stopped being true. What was built
-is deliberately the narrow version: storms, gales, torrential rain, heavy snow,
-ice and the two ends of the thermometer, up to a day ahead, at the same
-thresholds the amber mark on the dial uses.
+Deliberately narrow: storms, gales, torrential rain, heavy snow, ice and the two
+ends of the thermometer, up to a day ahead, at the same thresholds the amber mark
+on the dial uses.
 
 Extreme ultraviolet and unhealthy air are detected and drawn but never notified.
 The first is most summer days across half the world; the second is a condition a
@@ -263,7 +268,7 @@ week could show a drizzle mark on a day whose own bar said rain. Measured on a
 real MET Norway forecast for Rīga: a 1.0 mm/h day came back as `DRIZZLE`, while
 the app calls anything from 0.5 mm/h light rain.
 
-The rule is now: **the temperature decides what is falling, the rate decides how
+The rule: **the temperature decides what is falling, the rate decides how
 hard, and the symbol keeps only what it alone knows** — the sky, the character of
 the fall, the hazard. `WeatherCondition.atRate` is the intensity counterpart to
 the older `appropriateFor(temperature)`, and every surface draws `.appearance`
@@ -278,6 +283,29 @@ provider that has said which one it is knows more than a millimetre count.
 
 An absent rate changes nothing. Null is not evidence of a light hour.
 
+**Provider health persists.**
+What is known about each provider's recent failures is kept on disk, so an app
+waking to a service that has been down for hours does not try it from scratch.
+Nothing is aggregated and nothing leaves the device.
+
+**Precipitation probability is a figure, not a mark.**
+Intensity drives the curve's height. Probability is given as a number in the
+hour's details rather than as opacity or a second mark, so the chart encodes one
+thing well instead of two badly.
+
+**The map is OpenStreetMap's own tiles; addresses come from Photon.**
+OSM's tile policy prohibits bulk and pre-emptive fetching and offline downloads,
+and asks for an identifying User-Agent and attribution on the map. Interactive
+viewing is what it serves, so only the tiles in view are requested and the
+credit sits on the map. No mapping library: the app already owns Web Mercator
+for the radar.
+
+Photon rather than Nominatim, although Nominatim measured faster: Nominatim's
+policy forbids interactive type-and-see use, which Photon is built for. It is
+asked once the map has been still for a moment, never during a drag, and nothing
+depends on an answer arriving: a point is identified by its coordinates and only
+described by its address.
+
 **No feature modules.**
 See Modules above. `:app` holds the whole UI and will keep holding it.
 
@@ -289,51 +317,3 @@ See Modules above. `:app` holds the whole UI and will keep holding it.
 The app currently uses the system sans, whose tabular figures are good and which
 costs no APK size. A bundled face under the SIL Open Font License would give
 tighter control of the numerals the whole design leans on. Not decided.
-
-**Where provider health should live.**
-In memory today. If real use shows the app repeatedly waking to a provider that
-has been down for hours, it should persist.
-
-**Street addresses, and a pin on a map.** *(shipped)*
-
-Both are in. What unparked them was re-reading the terms rather than any new
-effort — the note below was wrong on the point that mattered.
-
-*The map.* This said OpenStreetMap's own tiles forbid app use, leaving MapTiler,
-Stadia or Protomaps: a key, possibly a bill, and a native library that would
-dominate the APK. The policy says something narrower. It prohibits **bulk
-downloading**, defined as "pre-emptive fetching of tiles other than those a user
-is actively viewing", and offline-download features; it requires a "distinct,
-stable User-Agent naming your app", which every request here already carries,
-and attribution shown on the map rather than behind a toggle. Interactive
-viewing is contemplated, not forbidden.
-
-So the constraint is on behaviour and the code is written to it: `visibleTiles`
-returns exactly what the viewport covers and never a ring around it to smooth
-panning, which is the one obvious kindness that would breach it. No dependency
-either — the app already owns Web Mercator for the radar and already draws on a
-canvas, so the picker is a few hundred lines rather than a rendering engine. The
-residual exposure is scale, not conduct: a popular app is heavy however politely
-it behaves, and the answer then is to pay somebody, which is one class to change.
-
-CARTO was the alternative worth measuring and is now out for the opposite reason
-to the one recorded below: their basemaps grew an API key requirement.
-
-*Addresses.* Photon, as recorded. Measured again against Nominatim on real
-points: both resolve a pin in Mežaparks to a house number on Stendera iela, and
-Nominatim is about three times faster and slightly richer. Photon is used anyway,
-because latency is not the constraint — Nominatim's policy is built around a hard
-rate cap and forbids interactive type-and-see use, while Photon exists for
-exactly that. It is one volunteer-run instance with no promise of being up, so
-nothing depends on an answer arriving: a point is identified by its coordinates
-and merely *described* by its address.
-
-It is asked once the map has been still for 700 ms, never during a drag. A pin
-dragged across a city would otherwise fire one lookup per frame at a donated
-server, which is what gets an app blocked — a question of manners rather than of
-rate limits.
-
-**How precipitation probability should be shown.**
-Intensity drives bar height. Probability could be opacity, a second mark, or
-nothing at all — showing both risks a chart that encodes two things badly rather
-than one thing well. To be settled when the timeline is built.

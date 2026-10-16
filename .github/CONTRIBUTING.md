@@ -2,7 +2,7 @@
 
 Bug reports and patches are welcome. This file is the short version of what the
 project expects; the reasoning lives in
-[docs/design-principles.md](docs/design-principles.md).
+[docs/design-principles.md](../docs/design-principles.md).
 
 ## Getting it building
 
@@ -69,7 +69,7 @@ adding one needs a case that names what it buys.
 This is the extension point the architecture exists for, and it should not
 require touching anything else.
 
-1. **Read the terms first.** [docs/providers.md](docs/providers.md) has a
+1. **Read the terms first.** [docs/providers.md](../docs/providers.md) has a
    checklist. This is the step that disqualifies most candidates, and doing it
    last wastes the implementation.
 2. Add a package under `data/src/main/kotlin/…/data/provider/`, with the
@@ -99,7 +99,7 @@ and what is already here do not.
 
 By contributing you agree that your work is licensed under the GNU General
 Public License v3.0 or later, the same as the rest of the project, **including
-the additional permission in [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt)**.
+the additional permission in [LICENSE-EXCEPTION.txt](../LICENSE-EXCEPTION.txt)**.
 
 That permission allows Wetter to be distributed through application stores whose
 terms would otherwise conflict with section 6 of the GPL. It is asked for up

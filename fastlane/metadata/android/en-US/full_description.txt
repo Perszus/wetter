@@ -1,35 +1,44 @@
 Most weather apps lead with a temperature and a picture of a sun. The question people actually open one to answer is narrower and more urgent:
 
-Is it going to rain, when, how hard, and when will it stop?
+Is it going to rain, when, how heavy, and when will it stop?
 
 Wetter is built around that question. Precipitation gets the emphasis, the colour and the space. Temperature is deliberately quieter.
 
+<b>Rain, down to the minute</b>
+
+For the next two hours the forecast comes from the rain radar: where the rain is now and where it is moving. After that it hands over to the weather models. A rain map plays the last hour of radar and the next two hours ahead.
+
+<b>The right source for where you are</b>
+
+Wetter knows several meteorological services and what each is good at. It prefers a regional model where one runs a fine grid, uses a global one elsewhere, and switches when a service is unavailable. Where the regional model has the finer forecast but the shorter reach, a longer-range source continues it, so the timeline stays hour by hour.
+
+<b>Widgets</b>
+
+Five home-screen widgets, each answering one question: the next four hours of rain, the weather now, the coming hours, the week, and an overview of all of them. Each lays itself out for the size it is given.
+
+<b>Warnings worth having</b>
+
+Notifications for gales, torrential rain, heavy snow, ice, thunderstorms and dangerous temperatures, judged against what is normal for your location. Nothing else interrupts you, and warnings can be switched off.
+
 <b>A precision instrument, not a dashboard</b>
 
-No cartoon weather, no stacks of cards, no gradients used as decoration. Restrained typography, hairline rules, and a palette where rain owns the only saturated colour — so a glance tells you what is coming without anything competing for your attention. It looks right in both light and dark.
-
-<b>It picks the best source for where you are</b>
-
-Wetter knows about several national and international meteorological services, what each is good at and where. It prefers a regional model where one runs a fine grid, falls back to a global one elsewhere, and quietly switches when a service is unavailable. You never have to know which one answered.
-
-Where the regional model has the finer forecast but the shorter reach, Wetter uses it for the near term and continues with a longer-range source afterwards, so there is always an hour-by-hour timeline.
+No cartoon weather and no stacks of cards. Restrained typography, hairline rules, and a palette where rain owns the only saturated colour. Light and dark themes, and Celsius or Fahrenheit, millimetres or inches, as you prefer.
 
 <b>It works without a connection</b>
 
-The forecast you already have appears immediately. A failed update leaves it on screen and tells you how old it is, rather than replacing it with an error.
+The forecast you already have appears immediately. A failed update leaves it on screen and tells you how old it is.
 
-<b>Privacy is the architecture, not a promise</b>
+<b>Privacy</b>
 
-• No account
-• No analytics, no crash reporting, no advertising, no tracking of any kind
-• One permission: internet access
-• Location access is optional — the app is fully usable without it
-• No server of ours. Your device asks a weather service directly, and nothing sits in between
+• No account, no analytics, no crash reporting, no advertising, no tracking
+• No server of ours: your device asks the weather services directly
+• Location access is optional, and used once, when you ask for your current location
+• What leaves your device is the location's coordinates, sent to the services that answer, and on the maps the tiles around it
 
-The only thing that leaves your device is a pair of coordinates, sent to a weather service so it can answer. That is unavoidable for a weather app. Making it the only thing is the point.
+Permissions: internet and network state; location and notifications, both optional; and restarting after a reboot and exact alarms, which keep the background refresh in step with the radar.
 
 <b>Free software</b>
 
-Wetter is licensed under the GNU General Public License v3.0 or later. The complete source is public, and anyone can read exactly what it does and build it themselves.
+Licensed under the GNU General Public License v3.0 or later. Source code and issue tracker: https://github.com/Perszus/wetter
 
-Weather data by Open-Meteo.com and by MET Norway (met.no), both licensed CC BY 4.0.
+Weather data by Open-Meteo.com and MET Norway (met.no), both licensed CC BY 4.0. Radar by RainViewer. Aerodrome observations from the NOAA/NWS Aviation Weather Center. Place names from Photon and map tiles from OpenStreetMap, © OpenStreetMap contributors.

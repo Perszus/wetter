@@ -7,7 +7,7 @@ it stays true at the edges of the world and the calendar.
 
 ## What "reliable" means here
 
-`philos.md` claims precision as the whole point of this app, and design rule 8
+Precision is the whole point of this app, and design rule 8
 says the machinery stays hidden. Together those make an unusual promise: the
 reader is shown a number with no provenance, no confidence interval and no
 source badge, and is expected to act on it. There is no "well, it said 60%".

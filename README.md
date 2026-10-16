@@ -18,6 +18,8 @@ that one.
   when it clears.
 - **Radar for the near term.** Inside the hour the forecast comes from what radar
   is measuring now, handing over to the models after that.
+- **A rain map.** The last hour of radar and the next two projected, played as a
+  loop over the surrounding region.
 - **A timeline that stays hourly.** Where a regional model runs out, a global one
   continues it, joined where the first stops.
 - **The right source for the place.** Several meteorological services, chosen per
@@ -54,7 +56,7 @@ that one.
 | Home-screen widgets | done |
 | Published to a store | not yet |
 
-628 tests: 624 unit and 4 instrumented, across the three modules.
+672 tests: 663 unit and 9 instrumented, across the three modules.
 
 ---
 
@@ -72,9 +74,11 @@ Not published yet. When it ships it will be on **F-Droid**.
 | `ACCESS_NETWORK_STATE` | Checking whether a refresh can succeed. |
 | `ACCESS_COARSE_LOCATION` | Optional. A single fix when you ask for your current location, discarded once the pin is placed. |
 | `POST_NOTIFICATIONS` | Optional. Severe weather warnings, switchable in Settings. |
+| `RECEIVE_BOOT_COMPLETED` | Restarting the background refresh after the phone restarts. |
+| `SCHEDULE_EXACT_ALARM` | Optional. Timing the background refresh to each new radar sweep; without it the refresh runs a few minutes late. |
 
-The optional two are requested when first needed. Refusing either leaves
-everything else working.
+The optional ones are requested when first needed, or offered in Settings.
+Refusing any of them leaves everything else working.
 
 ---
 
@@ -137,12 +141,16 @@ build.
 :domain     plain Kotlin — no Android, no networking
 ├── model/          forecasts, hours, conditions
 ├── provider/       the provider port, coverage, selection, stitching
-├── forecast/       rain windows and the readings the UI asks for
-├── hazard/         severe-weather thresholds
+├── forecast/       fusion, rain windows and the readings the UI asks for
+├── hazard/         severe-weather thresholds and warnings
 ├── radar/          nowcasting from radar frames
 ├── curve/, chart/  the precipitation curve and its bands
-├── air/, sky/      air quality, cloud decks, visibility
+├── air/, sky/      air quality, stargazing, tides
 ├── climate/        local climatology
+├── observation/    station reports
+├── verification/   scoring forecasts and learning local bias
+├── glass/          what the weather leaves on the dial
+├── location/, settings/  coordinates, place names, preferences
 └── SolarTime.kt    sunrise, sunset, daylight
 
 :data       an Android library — where weather comes from
@@ -151,11 +159,13 @@ build.
 ├── repository/     offline-first forecast access
 ├── db/             Room persistence
 ├── location/       geocoding, saved locations, the device fix
+├── map/            basemap tiles
 └── WeatherData.kt  the module's entry point
 
 :app        the application
 ├── ui/screens/     today, week, month, locations, settings
 ├── ui/components/  the dial, the rain curve, the glyphs
+├── ui/map/         the rain map and the pin picker
 ├── ui/theme/       colour, type, spacing
 ├── widget/         home-screen widgets
 ├── notify/         severe-weather warnings

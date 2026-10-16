@@ -120,9 +120,8 @@ darkness at different strengths.
 from the centre is a *reflection of the light source*, which is what a glossy
 surface does; a matte one has no reflection to place and is lit only by how far
 each part of it is turned towards the light — across a flat disc, a plain
-vertical ramp, wide and low in contrast. The bright arc that used to ride the top
-of the dial's edge was a specular catch, the single clearest signal a surface is
-glass, and it is gone.
+vertical ramp, wide and low in contrast. A bright arc along the dial's edge would
+be a specular catch, the clearest signal a surface is glass, so there is none.
 
 ## Rule 7 — emphasis is a ladder, not a judgement
 
