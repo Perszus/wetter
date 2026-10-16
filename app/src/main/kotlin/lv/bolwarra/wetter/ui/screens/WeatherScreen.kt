@@ -319,8 +319,7 @@ private fun WeatherScreenBody(
                         if (forward) -width else width
                     } + fadeOut()
                     // Height is not animated: watching the page below stretch is worse than having
-                    // it
-                    // settle at once.
+                    // it settle at once.
                     enter togetherWith exit using SizeTransform(clip = false)
                 },
                 label = "domain",

@@ -99,7 +99,7 @@ internal class OpenMeteoProvider(
         const val DEFAULT_BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
         /** Required by Open-Meteo's terms, shown verbatim in About. */
-        const val ATTRIBUTION = "Weather data by Open-Meteo.com, licensed CC BY 4.0"
+        const val ATTRIBUTION = "Weather data by Open-Meteo.com, licensed CC\u00A0BY\u00A04.0"
 
         /**
          * Everything this service gives, sixteen days, matching what [capabilities]

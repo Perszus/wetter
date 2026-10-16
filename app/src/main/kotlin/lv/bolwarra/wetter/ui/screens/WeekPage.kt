@@ -26,11 +26,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.time.Instant
 import java.time.ZoneId
@@ -77,6 +80,25 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
     // would point at a different day.
     var openDay by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // One column for every day's name, as wide as the widest of them, so the marks
+    // line up at any text size.
+    val labels = days.map {
+        if (it.date ==
+            today
+        ) {
+            stringResource(R.string.week_today)
+        } else {
+            formatWeekdayShort(it.date)
+        }
+    }
+    val measurer = rememberTextMeasurer()
+    val titleStyle = WetterTheme.type.title
+    val density = LocalDensity.current
+    val dayColumn = with(density) {
+        val widest = labels.maxOf { measurer.measure(it, titleStyle).size.width }
+        maxOf(DAY_COLUMN, widest.toDp() + spacing.s)
+    }
+
     Column(modifier.fillMaxWidth()) {
         Tile(
             label = stringResource(R.string.tile_week_rain),
@@ -89,12 +111,17 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
         ) {
             days.forEachIndexed { index, day ->
                 if (index > 0) {
-                    Spacer(Modifier.height(spacing.s))
-                    HairlineRule()
+                    // Under an open day the strip's own floor is the divider.
+                    if (openDay != days[index - 1].date.toString()) {
+                        Spacer(Modifier.height(spacing.s))
+                        HairlineRule()
+                    }
                     Spacer(Modifier.height(spacing.s))
                 }
                 DayRow(
                     day = day,
+                    label = labels[index],
+                    labelWidth = dayColumn,
                     isToday = day.date == today,
                     // Today's drawer opens at the current hour: hours already past are not worth
                     // scrolling through.
@@ -115,6 +142,8 @@ fun WeekPage(forecast: WeatherForecast, now: Instant, modifier: Modifier = Modif
 @Composable
 private fun DayRow(
     day: DailyWeather,
+    label: String,
+    labelWidth: Dp,
     isToday: Boolean,
     hours: List<HourlyWeather>,
     zone: ZoneId,
@@ -125,10 +154,6 @@ private fun DayRow(
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
 
-    val dayLabel = when {
-        isToday -> stringResource(R.string.week_today)
-        else -> formatWeekdayShort(day.date)
-    }
     val turn by animateFloatAsState(
         targetValue = if (open) HALF_TURN else 0f,
         animationSpec = Reveal.chevron,
@@ -146,11 +171,13 @@ private fun DayRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = dayLabel,
+                text = label,
                 style = WetterTheme.type.title,
                 // Today is the only row at full ink.
                 color = if (isToday) colors.textPrimary else colors.textSecondary,
-                modifier = Modifier.width(DAY_COLUMN),
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.width(labelWidth),
             )
 
             ConditionGlyph(
@@ -201,7 +228,6 @@ private fun DayRow(
             Column {
                 Spacer(Modifier.height(spacing.s))
                 HourStrip(hours = hours, zone = zone)
-                Spacer(Modifier.height(spacing.xs))
             }
         }
     }

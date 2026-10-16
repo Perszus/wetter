@@ -335,8 +335,7 @@ private fun AdvancedTile(
                                 ?: NO_READING,
                         ),
                         // Named "now", because the answer above it is about tonight and the two
-                        // would
-                        // otherwise read as contradicting each other.
+                        // would otherwise read as contradicting each other.
                         Metric(
                             stringResource(R.string.metric_sky_open),
                             Stargazing

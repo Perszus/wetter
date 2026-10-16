@@ -186,9 +186,8 @@ class HeartbeatReceiver : BroadcastReceiver() {
                         Heartbeat.ACTION_WAKE -> wake(context)
                         else -> {
                             // Booted, updated, or the exact-alarm permission changed: redraw from
-                            // disk at
-                            // once, then a full pass in moments, since what is on disk may be hours
-                            // behind.
+                            // disk at once, then a full pass in moments, since what is on disk may
+                            // be hours behind.
                             withTimeoutOrNull(DRAW_MS) {
                                 runCatching { Widgets.refresh(context) }
                             }

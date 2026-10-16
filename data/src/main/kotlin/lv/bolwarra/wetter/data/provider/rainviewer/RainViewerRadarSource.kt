@@ -218,7 +218,7 @@ internal class RainViewerRadarSource(
 
     internal companion object {
         const val ID = "rainviewer"
-        const val ATTRIBUTION = "Weather data by RainViewer"
+        const val ATTRIBUTION = "Radar by RainViewer"
         const val INDEX_URL = "https://api.rainviewer.com/public/weather-maps.json"
 
         /**

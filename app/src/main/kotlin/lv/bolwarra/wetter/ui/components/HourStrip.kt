@@ -3,6 +3,7 @@
 
 package lv.bolwarra.wetter.ui.components
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +23,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -44,9 +52,8 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * width, so the same hour is the same size on every day.
  *
  * The rain is height on [RainCurveBands], the axis the chart and widgets share; a
- * dry hour draws nothing. A wet hour is also washed in the rain colour and its
- * time set in that colour, so it can be picked out while the strip is still
- * moving.
+ * dry hour draws nothing. A wet hour is also washed and its time set in full ink,
+ * so it can be picked out while the strip is still moving.
  */
 @Composable
 fun HourStrip(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Modifier) {
@@ -63,11 +70,13 @@ fun HourStrip(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
         return
     }
 
+    val scroll = rememberScrollState()
     Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+                .fadedEdges(scroll)
+                .horizontalScroll(scroll),
             horizontalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
             hours.forEach { hour -> HourColumn(hour, zone) }
@@ -77,6 +86,34 @@ fun HourStrip(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
         HairlineRule()
     }
 }
+
+/** Fades each end that has more beyond it, so the strip reads as continuing. */
+private fun Modifier.fadedEdges(scroll: ScrollState): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val fade = EDGE_FADE.toPx()
+        if (scroll.canScrollBackward) {
+            drawRect(
+                brush = Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), 0f, fade),
+                size = Size(fade, size.height),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+        if (scroll.canScrollForward) {
+            val start = size.width - fade
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    listOf(Color.Black, Color.Transparent),
+                    start,
+                    size.width,
+                ),
+                topLeft = Offset(start, 0f),
+                size = Size(fade, size.height),
+                blendMode = BlendMode.DstIn,
+            )
+        }
+    }
 
 @Composable
 private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
@@ -166,6 +203,7 @@ private val COLUMN = 48.dp
 private val HOUR_GLYPH = 18.dp
 
 private val MARK_WIDTH = 10.dp
+private val EDGE_FADE = 28.dp
 private val COLUMN_RADIUS = 8.dp
 
 /**

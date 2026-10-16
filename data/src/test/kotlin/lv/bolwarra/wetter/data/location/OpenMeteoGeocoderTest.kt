@@ -154,7 +154,7 @@ class OpenMeteoGeocoderTest {
         assertEquals(17.0, point.elevationMetres!!, 1e-6)
         // Named by the point. Borrowing the nearest settlement's name would
         // answer a question nobody asked, with a different place's forecast.
-        assertEquals("56.9496, 24.1052", point.name)
+        assertEquals("56.9496°N, 24.1052°E", point.name)
     }
 
     @Test

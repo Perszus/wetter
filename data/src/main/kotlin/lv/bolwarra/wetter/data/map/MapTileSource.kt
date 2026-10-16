@@ -41,6 +41,6 @@ class MapTileSource internal constructor(private val client: HttpClient) {
         private const val HOST = "https://tile.openstreetmap.org"
 
         /** Shown on the map itself, as the ODbL requires the credit to appear with the map. */
-        const val ATTRIBUTION = "© OpenStreetMap contributors"
+        const val ATTRIBUTION = "©\u00A0OpenStreetMap contributors"
     }
 }

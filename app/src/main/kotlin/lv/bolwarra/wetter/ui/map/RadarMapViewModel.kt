@@ -51,12 +51,12 @@ class RadarMapViewModel(
     val tiles: TileLoader = BasemapLoader(basemap)
 
     /**
-     * The credits the map carries on its face. Both are licence terms attached
-     * to the picture - the basemap's and the radar's - rather than an account
-     * of how Wetter works, which is why they are the exception to rule 8 that
-     * the pin picker's map already is.
+     * The credits the map carries on its face: licence terms attached to the
+     * picture, the basemap's and the radar's. Each holds together, so a narrow or
+     * large-text line breaks only between them.
      */
-    val attribution: String = MapTileSource.ATTRIBUTION + " · " + nowcasts.attribution
+    val attribution: String = listOf(MapTileSource.ATTRIBUTION, nowcasts.attribution)
+        .joinToString(" · ") { it.replace(' ', '\u00A0') }
 
     val state: StateFlow<RadarMapState> = selectedLocation.selected
         .flatMapLatest { location ->

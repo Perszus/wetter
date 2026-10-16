@@ -364,7 +364,7 @@ private fun ColumnScope.UnitsPage(preferences: Preferences, onChange: (Preferenc
         options = TemperatureUnit.entries,
         selected = preferences.temperature,
         onSelect = { onChange(preferences.copy(temperature = it)) },
-        describe = { it.suffix },
+        describe = { "°" + it.suffix },
     )
     Spacer(Modifier.height(spacing.l))
     ChoiceRow(

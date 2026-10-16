@@ -33,7 +33,7 @@ The services and what each is asked:
 | MET Norway | Forecasts for a location | <https://api.met.no/doc/TermsOfService> |
 | RainViewer | Radar images of the area around a location | <https://www.rainviewer.com/privacy.html> |
 | NOAA / NWS Aviation Weather Center | Airport weather reports near a location, used only to check past forecasts | <https://www.weather.gov/privacy> |
-| Photon (komoot) | The name of a point you have placed a pin on | <https://www.komoot.com/privacy> |
+| Photon (komoot) | The name of a point you placed on the map or typed as coordinates | <https://www.komoot.com/privacy> |
 | OpenStreetMap | Map tiles for the area you are looking at | <https://osmfoundation.org/wiki/Privacy_Policy> |
 
 ## What stays on your device

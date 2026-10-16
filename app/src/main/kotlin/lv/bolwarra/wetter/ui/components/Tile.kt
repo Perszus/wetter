@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
@@ -198,33 +200,35 @@ fun ExpandableTile(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
+            // The label never wraps; the summary gives way to it, and goes when it no
+            // longer fits.
             Text(
                 text = label.uppercase(),
                 style = WetterTheme.type.sectionLabel,
                 color = colors.textTertiary,
-                modifier = Modifier.weight(1f, fill = false),
+                maxLines = 1,
+                softWrap = false,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (summary != null && !expanded) {
-                    Text(
-                        text = summary,
-                        style = WetterTheme.type.meta,
-                        color = colors.textTertiary,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.width(spacing.s))
-                }
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = colors.textTertiary,
-                    modifier = Modifier
-                        .size(CHEVRON)
-                        .rotate(turn),
-                )
-            }
+            Spacer(Modifier.width(spacing.m))
+            Text(
+                text = if (expanded) "" else summary.orEmpty(),
+                style = WetterTheme.type.meta,
+                color = colors.textTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(spacing.s))
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                tint = colors.textTertiary,
+                modifier = Modifier
+                    .size(CHEVRON)
+                    .rotate(turn),
+            )
         }
         AnimatedVisibility(
             visible = expanded,

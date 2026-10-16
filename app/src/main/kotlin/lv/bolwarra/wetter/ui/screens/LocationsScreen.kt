@@ -3,6 +3,8 @@
 
 package lv.bolwarra.wetter.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -38,8 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -65,6 +70,8 @@ fun LocationsRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected by viewModel.selected.collectAsStateWithLifecycle()
     var pinning by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(enabled = pinning) { pinning = false }
 
     if (pinning) {
         PinPicker(
@@ -278,6 +285,7 @@ private fun LocationRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .semantics { selected = isSelected }
             .defaultMinSize(minHeight = spacing.touchTarget)
             .padding(vertical = spacing.m),
         verticalAlignment = Alignment.CenterVertically,
@@ -286,9 +294,7 @@ private fun LocationRow(
             Text(
                 text = location.name,
                 style = WetterTheme.type.title,
-                // Selection is shown by weight of colour rather than by a tick.
-                // One row in the list is darker than the rest; that is enough.
-                color = if (isSelected) colors.interactive else colors.textPrimary,
+                color = colors.textPrimary,
             )
             val place = listOfNotNull(location.region, location.country).joinToString(", ")
             if (place.isNotEmpty()) {
@@ -299,7 +305,22 @@ private fun LocationRow(
                 )
             }
         }
-        if (onRemove != null) {
+        if (isSelected) {
+            // The place on screen carries the dial's own mark for "here".
+            Canvas(
+                Modifier
+                    .padding(horizontal = (spacing.touchTarget - HERE_MARK) / 2)
+                    .size(HERE_MARK),
+            ) {
+                val path = Path().apply {
+                    moveTo(0f, size.height / 2)
+                    lineTo(size.width, 0f)
+                    lineTo(size.width, size.height)
+                    close()
+                }
+                drawPath(path, colors.textPrimary)
+            }
+        } else if (onRemove != null) {
             Box(
                 modifier = Modifier
                     .size(spacing.touchTarget)
@@ -321,6 +342,7 @@ private fun LocationRow(
 
 private val SEARCH_ICON = 20.dp
 private val REMOVE_ICON = 18.dp
+private val HERE_MARK = 9.dp
 
 @Preview(name = "Locations · light", showBackground = true)
 @Composable

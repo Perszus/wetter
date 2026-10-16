@@ -7,6 +7,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,6 +39,7 @@ class PhotonReverseGeocoder internal constructor(
             parameter("lat", at.latitude)
             parameter("lon", at.longitude)
             parameter("limit", 1)
+            parameter("lang", language())
         }.body()
         response.features.firstOrNull()?.properties?.toPlaceName()
     } catch (cancellation: CancellationException) {
@@ -71,11 +73,20 @@ class PhotonReverseGeocoder internal constructor(
         )
     }
 
+    /**
+     * Names in the phone's language where Photon offers it, otherwise as the place
+     * itself writes them. Photon refuses any other value outright.
+     */
+    private fun language(): String =
+        Locale.getDefault().language.takeIf { it in TRANSLATED } ?: "default"
+
     companion object {
         const val DEFAULT_BASE_URL = "https://photon.komoot.io/reverse"
 
+        private val TRANSLATED = setOf("de", "en", "fr")
+
         /** Photon's data is OpenStreetMap's, and the licence follows it. */
-        const val ATTRIBUTION = "Place names from Photon, © OpenStreetMap contributors"
+        const val ATTRIBUTION = "Place names from Photon, ©\u00A0OpenStreetMap contributors"
     }
 }
 

@@ -146,7 +146,8 @@ internal class MetNorwayProvider(
         const val DEFAULT_BASE_URL = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
 
         /** Required by MET Norway's terms, shown verbatim in About. */
-        const val ATTRIBUTION = "Weather data from MET Norway (met.no), licensed CC BY 4.0"
+        const val ATTRIBUTION =
+            "Weather data from MET Norway (met.no), licensed CC\u00A0BY\u00A04.0"
 
         private const val NORDIC_RESOLUTION_KM = 2.5
         private const val GLOBAL_RESOLUTION_KM = 9.0

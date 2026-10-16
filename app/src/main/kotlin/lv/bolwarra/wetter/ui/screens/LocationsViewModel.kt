@@ -27,6 +27,7 @@ import lv.bolwarra.wetter.data.map.MapTileSource
 import lv.bolwarra.wetter.data.provider.photon.PhotonReverseGeocoder
 import lv.bolwarra.wetter.data.repository.PreferencesStore
 import lv.bolwarra.wetter.data.repository.WeatherRepository
+import lv.bolwarra.wetter.domain.location.CoordinateQuery
 import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.location.PlaceName
 import lv.bolwarra.wetter.domain.location.PlaceSearch
@@ -110,8 +111,9 @@ class LocationsViewModel(
                 searching.value = true
                 val outcome = placeSearch.search(typed)
                 failed.value = outcome.isFailure
+                val found = outcome.getOrDefault(emptyList())
+                emit(if (CoordinateQuery.parse(typed) != null) found.map { named(it) } else found)
                 searching.value = false
-                emit(outcome.getOrDefault(emptyList()))
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -217,6 +219,14 @@ class LocationsViewModel(
             selectedLocation.select(corrected)
             onPlaceChanged()
         }
+    }
+
+    /** A typed point, named by what is there as a pin would be; else it keeps its coordinates. */
+    private suspend fun named(point: WeatherLocation): WeatherLocation {
+        val name = runCatching {
+            reverseGeocoder.nameOf(Coordinates(point.latitude, point.longitude))
+        }.getOrNull() ?: return point
+        return point.copy(name = name.label, region = name.region, country = name.country)
     }
 
     /** What is at a point, or null. Called when the map settles, never mid-drag. */

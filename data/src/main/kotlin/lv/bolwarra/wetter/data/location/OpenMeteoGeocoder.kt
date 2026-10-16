@@ -8,7 +8,6 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import java.time.ZoneId
-import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import lv.bolwarra.wetter.data.provider.toWeatherError
@@ -105,9 +104,8 @@ internal class OpenMeteoGeocoder(
                 listOf(
                     WeatherLocation(
                         // Named by the point itself: the nearest settlement is a different place
-                        // with a
-                        // different forecast.
-                        name = formatPoint(point),
+                        // with a different forecast.
+                        name = point.format(),
                         latitude = point.latitude,
                         longitude = point.longitude,
                         zone = zone,
@@ -123,14 +121,6 @@ internal class OpenMeteoGeocoder(
     } catch (failure: Throwable) {
         Result.failure(WeatherFailure(failure.toWeatherError()))
     }
-
-    /** Four decimals: about eleven metres, which is finer than any forecast grid. */
-    private fun formatPoint(point: Coordinates): String = String.format(
-        Locale.ROOT,
-        "%.4f, %.4f",
-        point.latitude,
-        point.longitude,
-    )
 
     /**
      * Null for a result the app cannot use. A place with no usable zone is dropped
@@ -157,7 +147,7 @@ internal class OpenMeteoGeocoder(
         const val DEFAULT_BASE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
         /** The same licence and credit as the forecast service it belongs to. */
-        const val ATTRIBUTION = "Place search by Open-Meteo.com, licensed CC BY 4.0"
+        const val ATTRIBUTION = "Place search by Open-Meteo.com, licensed CC\u00A0BY\u00A04.0"
 
         /** The service's own ceiling. */
         const val MAX_LIMIT = 100

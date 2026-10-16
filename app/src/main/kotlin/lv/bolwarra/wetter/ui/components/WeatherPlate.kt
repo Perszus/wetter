@@ -194,8 +194,7 @@ fun WeatherPlate(
                     drawPorcelain(
                         face = colors.surface,
                         // Pulled toward the face by the plate's relief factor, so the well is the
-                        // same
-                        // depth on every plate (see WetterColors.relief).
+                        // same depth on every plate (see WetterColors.relief).
                         lip = lerp(colors.surface, colors.surfaceShade, colors.relief),
                         floorCatch = lerp(colors.surface, colors.surfaceRaised, colors.relief),
                         occlusion = colors.hairline,

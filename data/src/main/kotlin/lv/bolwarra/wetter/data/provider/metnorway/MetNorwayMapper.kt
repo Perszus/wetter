@@ -170,8 +170,7 @@ internal object MetNorwayMapper {
                 hourlySteps.count { step ->
                     val mm = step.step.data.next1Hours?.details?.precipitationAmount ?: 0.0
                     // Hours worth calling wet. A one-hour window's amount is numerically its rate,
-                    // so
-                    // this is the bar the rest of the app names rain at.
+                    // so this is the bar the rest of the app names rain at.
                     PrecipitationIntensity.ofRate(mm).isWorthNaming
                 }.toDouble()
             },
