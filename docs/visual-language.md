@@ -123,6 +123,12 @@ each part of it is turned towards the light — across a flat disc, a plain
 vertical ramp, wide and low in contrast. A bright arc along the dial's edge would
 be a specular catch, the clearest signal a surface is glass, so there is none.
 
+**The dial is always dark.** The weather's pictures on its glass are drawn as
+light, and light vanishes on a light face, so on a light plate the dial takes the
+plate's dark counterpart in the same tone: a true-grey black under Pure White, a
+blue-grey night under the paper plate. A future theme gets the same: its own tone,
+nearly black. The marks beside the dial stay in the page's colours.
+
 ## Rule 7 — emphasis is a ladder, not a judgement
 
 `Emphasis.FULL / STRONG / MUTED / FAINT / GHOST` — 1.0, 0.70, 0.42, 0.20, 0.08.

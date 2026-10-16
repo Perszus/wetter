@@ -216,6 +216,11 @@ The palette encodes meaning: precipitation owns the only saturated hue, and
 temperature is quieter than rain. A wallpaper-derived scheme would break that
 relationship on most devices.
 
+**The dial is always dark, on every theme.**
+Its glass pictures are light and cannot show on a light face; drawing them dark
+on light read as a negative. So a light plate lends the dial its dark counterpart
+in the same tone, and any new theme does the same (docs/visual-language.md).
+
 **No bottom navigation bar.**
 Locations and settings are visited a few times a month. Spending a permanent
 strip of every screen advertising them costs more than the chevron beside the

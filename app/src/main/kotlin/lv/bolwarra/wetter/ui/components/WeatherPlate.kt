@@ -112,6 +112,8 @@ fun WeatherPlate(
 ) {
     val units = WetterTheme.units
     val colors = WetterTheme.colors
+    // The face is always dark, whatever the page, so the glass always shows.
+    val dialColors = colors.dial
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
 
@@ -192,16 +194,20 @@ fun WeatherPlate(
             ) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawPorcelain(
-                        face = colors.surface,
+                        face = dialColors.surface,
                         // Pulled toward the face by the plate's relief factor, so the well is the
                         // same depth on every plate (see WetterColors.relief).
-                        lip = lerp(colors.surface, colors.surfaceShade, colors.relief),
-                        floorCatch = lerp(colors.surface, colors.surfaceRaised, colors.relief),
-                        occlusion = colors.hairline,
+                        lip = lerp(dialColors.surface, dialColors.surfaceShade, dialColors.relief),
+                        floorCatch = lerp(
+                            dialColors.surface,
+                            dialColors.surfaceRaised,
+                            dialColors.relief,
+                        ),
+                        occlusion = dialColors.hairline,
                     )
                 }
                 // Between the porcelain and the instrument, so the edge, ticks and pointers stay
-                // crisp over it. White light on both plates.
+                // crisp over it.
                 GlassMarks(
                     name = glass,
                     ink = Color.White,
@@ -209,13 +215,13 @@ fun WeatherPlate(
                     modifier = Modifier.fillMaxSize(),
                 )
                 Canvas(Modifier.fillMaxSize()) {
-                    drawFiredEdge(colors.hairline)
-                    drawHourTicks(colors.hairline)
+                    drawFiredEdge(dialColors.hairline)
+                    drawHourTicks(dialColors.hairline)
                     // Ink rather than hairline, so the pointer stands apart from the scale.
-                    drawTimeMark(now, zone, colors.textPrimary)
+                    drawTimeMark(now, zone, dialColors.textPrimary)
                     if (windSpeed >= STILL_AIR_MS) {
                         // Ink: the one moving thing on the face must be the most legible.
-                        drawWindLight(beamAngle, colors.textPrimary)
+                        drawWindLight(beamAngle, dialColors.textPrimary)
                     }
                 }
             }
@@ -273,7 +279,7 @@ fun WeatherPlate(
                     Text(
                         text = formatTemperature(current.temperature, units.temperature),
                         style = WetterTheme.type.reading,
-                        color = colors.textPrimary,
+                        color = dialColors.textPrimary,
                         onTextLayout = { figureText = it },
                         modifier = Modifier.onGloballyPositioned {
                             figureAt = it.positionInParent()
@@ -282,7 +288,7 @@ fun WeatherPlate(
                     Text(
                         text = units.temperature.suffix,
                         style = WetterTheme.type.readingUnit,
-                        color = colors.textTertiary,
+                        color = dialColors.textTertiary,
                         onTextLayout = { unitText = it },
                         modifier = Modifier
                             .padding(start = 3.dp, top = 16.dp)
@@ -293,7 +299,7 @@ fun WeatherPlate(
                 Text(
                     text = stringResource(seen.labelRes()),
                     style = WetterTheme.type.title,
-                    color = colors.textSecondary,
+                    color = dialColors.textSecondary,
                     textAlign = TextAlign.Center,
                     onTextLayout = { wordText = it },
                     modifier = Modifier.onGloballyPositioned { wordAt = it.positionInParent() },

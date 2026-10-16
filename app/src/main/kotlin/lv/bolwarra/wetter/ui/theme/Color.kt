@@ -91,7 +91,17 @@ data class WetterColors(
     val relief: Float,
 
     val isLight: Boolean,
-)
+
+    /** A light plate's dark counterpart in the same tone; null on a dark plate. */
+    private val darkSibling: WetterColors? = null,
+) {
+    /**
+     * The dial's colours: always a dark face, so the glass pictures, which are
+     * drawn as light, always show. On a light plate this is its dark counterpart
+     * in the same tone, a true-grey black under Pure White.
+     */
+    val dial: WetterColors get() = darkSibling ?: this
+}
 
 /**
  * How firmly something is stated, as an alpha: one five-step hierarchy shared by
@@ -234,57 +244,62 @@ private const val POSITIVE_HUE = 148.0
 
 private const val STATE_CHROMA = 26.0
 
-private fun plate(spec: PlateSpec, isLight: Boolean) = WetterColors(
-    surface = Tone.of(spec.ground, spec.neutral),
-    relief = (SURFACE_STEP / spec.step).toFloat().coerceAtMost(1f),
+private fun plate(spec: PlateSpec, isLight: Boolean, darkSibling: WetterColors? = null) =
+    WetterColors(
+        surface = Tone.of(spec.ground, spec.neutral),
+        relief = (SURFACE_STEP / spec.step).toFloat().coerceAtMost(1f),
 
-    surfaceRaised = spec.surface(spec.step),
-    surfaceSunken = spec.surface(-spec.step),
-    surfaceHighlight = spec.surface(spec.step * HIGHLIGHT_REACH),
-    surfaceShade = spec.surface(-spec.step * SHADE_REACH),
-    // The one filled block: it inverts its plate, dark on light and light on dark.
-    surfaceStrong = spec.ink(BAND_CONTRAST),
-    // The page showing through, so the band's contrast holds by construction.
-    onSurfaceStrong = Tone.of(spec.ground, spec.neutral),
+        surfaceRaised = spec.surface(spec.step),
+        surfaceSunken = spec.surface(-spec.step),
+        surfaceHighlight = spec.surface(spec.step * HIGHLIGHT_REACH),
+        surfaceShade = spec.surface(-spec.step * SHADE_REACH),
+        // The one filled block: it inverts its plate, dark on light and light on dark.
+        surfaceStrong = spec.ink(BAND_CONTRAST),
+        // The page showing through, so the band's contrast holds by construction.
+        onSurfaceStrong = Tone.of(spec.ground, spec.neutral),
 
-    hairline = spec.ink(HAIRLINE_CONTRAST),
-    gridline = spec.ink(GRIDLINE_CONTRAST),
+        hairline = spec.ink(HAIRLINE_CONTRAST),
+        gridline = spec.ink(GRIDLINE_CONTRAST),
 
-    textPrimary = spec.ink(PRIMARY_CONTRAST),
-    textSecondary = spec.ink(SECONDARY_CONTRAST),
-    textTertiary = spec.ink(TERTIARY_CONTRAST),
-    textDisabled = spec.ink(DISABLED_CONTRAST),
+        textPrimary = spec.ink(PRIMARY_CONTRAST),
+        textSecondary = spec.ink(SECONDARY_CONTRAST),
+        textTertiary = spec.ink(TERTIARY_CONTRAST),
+        textDisabled = spec.ink(DISABLED_CONTRAST),
 
-    // Ink, not a hue: the one saturated hue means rain, so actions are set apart by
-    // weight.
-    interactive = spec.ink(INTERACTIVE_CONTRAST),
-    interactivePressed = spec.ink(INTERACTIVE_PRESSED_CONTRAST),
+        // Ink, not a hue: the one saturated hue means rain, so actions are set apart by
+        // weight.
+        interactive = spec.ink(INTERACTIVE_CONTRAST),
+        interactivePressed = spec.ink(INTERACTIVE_PRESSED_CONTRAST),
 
-    precipitation = spec.ink(ACCENT_CONTRAST, RAIN_CHROMA, RAIN_HUE),
-    precipitationMuted = spec.ink(FILL_CONTRAST, RAIN_CHROMA * 0.62, RAIN_HUE),
-    precipitationTrack = spec.ink(HAIRLINE_CONTRAST, RAIN_CHROMA * 0.25, RAIN_HUE),
+        precipitation = spec.ink(ACCENT_CONTRAST, RAIN_CHROMA, RAIN_HUE),
+        precipitationMuted = spec.ink(FILL_CONTRAST, RAIN_CHROMA * 0.62, RAIN_HUE),
+        precipitationTrack = spec.ink(HAIRLINE_CONTRAST, RAIN_CHROMA * 0.25, RAIN_HUE),
 
-    temperatureWarm = spec.ink(ACCENT_CONTRAST, TEMPERATURE_CHROMA, WARM_HUE),
-    temperatureCool = spec.ink(ACCENT_CONTRAST, TEMPERATURE_CHROMA, COOL_HUE),
+        temperatureWarm = spec.ink(ACCENT_CONTRAST, TEMPERATURE_CHROMA, WARM_HUE),
+        temperatureCool = spec.ink(ACCENT_CONTRAST, TEMPERATURE_CHROMA, COOL_HUE),
 
-    day = spec.ink(FILL_CONTRAST, TEMPERATURE_CHROMA * 0.5, WARM_HUE),
-    night = spec.ink(FILL_CONTRAST, TEMPERATURE_CHROMA * 0.5, COOL_HUE),
+        day = spec.ink(FILL_CONTRAST, TEMPERATURE_CHROMA * 0.5, WARM_HUE),
+        night = spec.ink(FILL_CONTRAST, TEMPERATURE_CHROMA * 0.5, COOL_HUE),
 
-    warning = spec.ink(ACCENT_CONTRAST, ALERT_CHROMA * 0.8, WARNING_HUE),
-    danger = spec.ink(ACCENT_CONTRAST, ALERT_CHROMA, DANGER_HUE),
-    positive = spec.ink(ACCENT_CONTRAST, STATE_CHROMA, POSITIVE_HUE),
-    negative = spec.ink(ACCENT_CONTRAST, STATE_CHROMA, DANGER_HUE),
-    informational = spec.ink(ACCENT_CONTRAST, STATE_CHROMA, RAIN_HUE),
+        warning = spec.ink(ACCENT_CONTRAST, ALERT_CHROMA * 0.8, WARNING_HUE),
+        danger = spec.ink(ACCENT_CONTRAST, ALERT_CHROMA, DANGER_HUE),
+        positive = spec.ink(ACCENT_CONTRAST, STATE_CHROMA, POSITIVE_HUE),
+        negative = spec.ink(ACCENT_CONTRAST, STATE_CHROMA, DANGER_HUE),
+        informational = spec.ink(ACCENT_CONTRAST, STATE_CHROMA, RAIN_HUE),
 
-    isLight = isLight,
-)
+        isLight = isLight,
+        darkSibling = darkSibling,
+    )
 
 /** Daylight: paper under an overcast sky, not white. */
 val LightWetterColors = lightPlate(Atmosphere.Neutral)
 
 /** The light plate as the sky of the moment leaves it. */
-fun lightPlate(sky: Atmosphere): WetterColors =
-    plate(PlateSpec(LIGHT_GROUND + sky.ground, inkIsDarker = true, sky = sky), isLight = true)
+fun lightPlate(sky: Atmosphere): WetterColors = plate(
+    PlateSpec(LIGHT_GROUND + sky.ground, inkIsDarker = true, sky = sky),
+    isLight = true,
+    darkSibling = darkPlate(sky),
+)
 
 /**
  * L* 95: paper. Set so the page stays a page under the darkest sky in the
@@ -326,6 +341,7 @@ fun pureWhitePlate(sky: Atmosphere): WetterColors = plate(
         raisedIsLighter = false,
     ),
     isLight = true,
+    darkSibling = pureBlackPlate(sky),
 )
 
 fun pureBlackPlate(sky: Atmosphere): WetterColors = plate(

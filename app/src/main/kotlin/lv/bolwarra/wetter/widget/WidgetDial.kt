@@ -33,7 +33,7 @@ internal object WidgetDial {
      */
     fun draw(sheet: Sheet, box: RectF, snapshot: WidgetSnapshot) {
         val ink = sheet.ink
-        val colors = sheet.colors
+        val colors = sheet.colors.dial
         val model = box.width() / sheet.scale / APP_DIAL_DP
 
         // Laid out first so the glass can be cleared beneath it.
@@ -87,14 +87,14 @@ internal object WidgetDial {
         val gap = sheet.px(WORD_GAP_DP * model)
         val top = box.centerY() - (figureHeight + gap + wordHeight) / 2f
         val left = box.centerX() - reading.width(ink, figureDp) / 2f
-        val row = reading.set(ink, figureDp, left, top)
+        val row = reading.set(ink, figureDp, left, top, sheet.colors.dial)
         if (row.isEmpty()) return emptyList()
 
         val wordTop = top + figureHeight + gap
         val wordLine = ink.set(
             text = word,
             sizeDp = wordDp,
-            colour = sheet.colors.textSecondary.toArgb(),
+            colour = sheet.colors.dial.textSecondary.toArgb(),
             box = RectF(
                 box.centerX() - column / 2f,
                 wordTop,
@@ -121,7 +121,7 @@ internal object WidgetDial {
         snapshot: WidgetSnapshot,
     ): List<Pair<(RectF) -> Unit, RectF>> {
         if (reading.isEmpty()) return emptyList()
-        val colors = sheet.colors
+        val colors = sheet.colors.dial
         val size = sheet.px((MARK_DP * model).coerceAtLeast(MARK_MIN_DP))
         val scaleTop = box.top + sheet.px(SCALE_DEPTH_DP * model)
         val scaleBottom = box.bottom - sheet.px(SCALE_DEPTH_DP * model)

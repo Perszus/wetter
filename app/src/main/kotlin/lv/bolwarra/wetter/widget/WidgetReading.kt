@@ -6,6 +6,7 @@ package lv.bolwarra.wetter.widget
 import android.graphics.RectF
 import androidx.compose.ui.graphics.toArgb
 import lv.bolwarra.wetter.ui.format.formatTemperature
+import lv.bolwarra.wetter.ui.theme.WetterColors
 
 /**
  * The temperature as the dial sets it, at any size: the figure in the light
@@ -40,8 +41,13 @@ internal class WidgetReading(snapshot: WidgetSnapshot) {
      * Places the row at [left], [top] without drawing it; empty if the figure
      * cannot be set.
      */
-    fun set(ink: WidgetInk, figureDp: Float, left: Float, top: Float): List<WidgetInk.Line> {
-        val colors = ink.colors
+    fun set(
+        ink: WidgetInk,
+        figureDp: Float,
+        left: Float,
+        top: Float,
+        colors: WetterColors = ink.colors,
+    ): List<WidgetInk.Line> {
         val figureWidth = ink.measure(figure, figureDp, WidgetInk.Weight.LIGHT, TRACKING)
         val height = height(ink, figureDp)
         val figureLine = ink.set(

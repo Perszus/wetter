@@ -177,18 +177,21 @@ internal class NowWidget : PictureWidget() {
             lines = row + listOfNotNull(wordLine)
         }
 
-        WidgetGlass.draw(
-            canvas = ink.canvas,
-            context = sheet.context,
-            name = snapshot.face.glass,
-            area = sheet.bounds,
-            scale = sheet.scale,
-            round = false,
-            opacity = PLATE_GLASS_OPACITY,
-            cornerRadius = sheet.cornerRadius(),
-            text = lines,
-            marks = listOfNotNull(glyph),
-        )
+        // The glass is light, so it shows only on a dark plate; a light one goes without.
+        if (!sheet.colors.isLight) {
+            WidgetGlass.draw(
+                canvas = ink.canvas,
+                context = sheet.context,
+                name = snapshot.face.glass,
+                area = sheet.bounds,
+                scale = sheet.scale,
+                round = false,
+                opacity = PLATE_GLASS_OPACITY,
+                cornerRadius = sheet.cornerRadius(),
+                text = lines,
+                marks = listOfNotNull(glyph),
+            )
+        }
         glyph?.let { ink.glyph(snapshot.face.seen, current.isDay, it) }
         lines.forEach { ink.draw(it) }
     }
