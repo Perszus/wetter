@@ -13,7 +13,7 @@ server of its own.
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.jpg" width="15%" alt="About">
 </p>
 
-Version 0.1.0 · GPL-3.0-or-later · Android 8.0 and later · coming to F-Droid
+Version 1.0 · GPL-3.0-or-later · Android 8.0 and later · coming to F-Droid
 
 ---
 

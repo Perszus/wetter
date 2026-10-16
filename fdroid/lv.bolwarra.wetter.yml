@@ -10,14 +10,14 @@ RepoType: git
 Repo: https://github.com/Perszus/wetter.git
 
 Builds:
-  - versionName: 0.1.0
+  - versionName: '1.0'
     versionCode: 1
-    commit: v0.1.0
+    commit: v1.0
     subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version v%v
 UpdateCheckMode: Tags ^v[0-9.]+$
-CurrentVersion: 0.1.0
+CurrentVersion: '1.0'
 CurrentVersionCode: 1

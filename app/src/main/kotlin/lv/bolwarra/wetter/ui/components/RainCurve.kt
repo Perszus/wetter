@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -54,6 +55,7 @@ import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.ui.format.formatMillimetres
+import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatWeekdayShort
 import lv.bolwarra.wetter.ui.format.labelRes
 import lv.bolwarra.wetter.ui.theme.Emphasis
@@ -115,6 +117,16 @@ fun RainCurve(
     val scroll = rememberScrollState()
 
     val axisStyle = WetterTheme.type.axis.copy(color = colors.textTertiary)
+    // Tall enough for the labels at any font size.
+    val density = LocalDensity.current
+    val axisHeight = remember(axisStyle, density) {
+        with(density) {
+            maxOf(
+                AXIS_HEIGHT,
+                LABEL_TOP + measurer.measure(WIDEST_TIME, axisStyle).size.height.toDp(),
+            )
+        }
+    }
 
     // Resolved here because the draw scope cannot reach string resources. Each entry
     // is the bottom of its band.
@@ -206,7 +218,7 @@ fun RainCurve(
             Canvas(
                 Modifier
                     .fillMaxWidth()
-                    .height(AXIS_HEIGHT)
+                    .height(axisHeight)
                     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
             ) {
                 drawTimeAxis(points, zone, measurer, axisStyle, colors.hairline)
@@ -325,7 +337,7 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
             // The time, and the word for what it will feel like.
             text = stringResource(
                 R.string.curve_reading,
-                clockOf(point.at, zone),
+                formatTime(point.at, zone),
                 stringResource(curveLevel(point.millimetresPerHour.toDouble()).labelRes()),
             ),
             style = WetterTheme.type.meta,
@@ -482,6 +494,11 @@ private fun DrawScope.drawTimeAxis(
     if (span <= 0f) return
 
     val step = Duration.ofMinutes(LABEL_EVERY_MINUTES.toLong())
+    // Hours between labels: every hour where they fit, fewer where a large font would
+    // run them together. Midnight is always among them.
+    val hourWidth = Duration.ofHours(1).toMillis() / span * size.width
+    val needed = measurer.measure(WIDEST_TIME, style).size.width + LABEL_GAP.toPx()
+    val stride = LABEL_STRIDES.firstOrNull { it * hourWidth >= needed } ?: LABEL_STRIDES.last()
     // The first boundary at or after the window opens.
     var mark = start.atZone(zone).truncatedTo(ChronoUnit.HOURS).toInstant()
     while (mark.isBefore(start)) mark = mark.plus(step)
@@ -498,12 +515,12 @@ private fun DrawScope.drawTimeAxis(
             strokeWidth = if (onTheHour) 2f else 1f,
         )
 
-        if (onTheHour) {
-            // Midnight is labelled with the day it opens rather than "0:00".
+        if (onTheHour && local.hour % stride == 0) {
+            // Midnight is labelled with the day it opens rather than "00:00".
             val label = if (local.hour == 0) {
                 formatWeekdayShort(local.toLocalDate())
             } else {
-                clockOf(mark, zone)
+                formatTime(mark, zone)
             }
             val measured = measurer.measure(label, style)
             // Nudged inside the bounds so the first and last labels are not clipped.
@@ -588,11 +605,6 @@ private fun indexAt(x: Float, width: Int, count: Int): Int {
 }
 
 /** "1:30", without a leading zero, so the labels fit across a phone. */
-private fun clockOf(instant: Instant, zone: ZoneId): String {
-    val time = instant.atZone(zone)
-    return "%d:%02d".format(time.hour, time.minute)
-}
-
 /**
  * The band geometry, shared with the widget through `:domain`. Height is
  * intensity on a fixed scale anchored to the conventional bands, each given an
@@ -624,6 +636,15 @@ private const val LABEL_EVERY_MINUTES = 30
 private val TRACK_HEIGHT = 148.dp
 private val READOUT_HEIGHT = 24.dp
 private val AXIS_HEIGHT = 26.dp
+
+/** The widest time label, which sets how many hours apart labels have to be. */
+private const val WIDEST_TIME = "00:00"
+
+/** Hours between time labels, tried in order until the labels fit. */
+private val LABEL_STRIDES = listOf(1, 2, 3, 6)
+
+/** The least space between two time labels. */
+private val LABEL_GAP = 8.dp
 
 /** How far the time axis dissolves into each scrolling edge. */
 private val AXIS_FADE = 24.dp

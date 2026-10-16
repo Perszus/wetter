@@ -9,6 +9,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.ui.format.NextRain
+import lv.bolwarra.wetter.ui.format.formatTime
 
 /**
  * The next four hours of rain, and nothing else: no heading and no figures, just
@@ -62,8 +63,7 @@ internal class RainWindow(
             val first = now.atZone(zone).truncatedTo(ChronoUnit.HOURS).plusHours(1)
             val into = Duration.between(now, first.toInstant()).toMillis().toFloat()
             val labels = (0 until HOURS_IN_WINDOW).map {
-                val at = first.plusHours(it.toLong())
-                "%d:%02d".format(at.hour, at.minute)
+                formatTime(first.plusHours(it.toLong()).toInstant(), zone)
             }
             return RainWindow(rates, into / WidgetSnapshot.WINDOW.toMillis().toFloat(), labels)
         }

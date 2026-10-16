@@ -5,6 +5,7 @@ package lv.bolwarra.wetter.domain.sky
 
 import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import lv.bolwarra.wetter.domain.SolarTime
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 
@@ -72,9 +73,11 @@ object StarWatch {
     }
 
     /**
-     * The first and last moment dark enough for stars, inside the horizon. Sampled
-     * rather than solved, so one code path is right everywhere, including where the
-     * sun never gets low enough.
+     * The night's dark window, each edge to the minute. A scan finds where darkness
+     * starts and stops and each crossing is then narrowed down, so the times do not
+     * move with the moment they are asked about. Sampled rather than solved, so one
+     * code path is right everywhere, including where the sun never gets low enough.
+     * A night already under way is reported from its dusk.
      */
     private fun darkness(
         from: Instant,
@@ -82,25 +85,62 @@ object StarWatch {
         latitude: Double,
         longitude: Double,
     ): Window? {
+        val dark = { at: Instant ->
+            SolarTime.elevationDegrees(at, latitude, longitude) < Stargazing.DARK_ENOUGH_DEGREES
+        }
         var at = from
         var first: Instant? = null
         var last: Instant? = null
+        var after: Instant? = null
 
         while (at.isBefore(to)) {
-            val dark = SolarTime.elevationDegrees(at, latitude, longitude) <
-                Stargazing.DARK_ENOUGH_DEGREES
-            if (dark) {
+            if (dark(at)) {
                 if (first == null) first = at
                 last = at
             } else if (first != null) {
                 // Two darknesses inside 24 hours: the tail of one night and the start of the
                 // next. The first is the one asked about.
+                after = at
                 break
             }
             at = at.plus(DARKNESS_STEP)
         }
+        if (first == null || last == null) return null
 
-        return first?.let { Window(it, last ?: it) }
+        val start = when (first) {
+            from -> dusk(from, dark)
+            else -> crossing(first.minus(DARKNESS_STEP), first, dark)
+        }
+        val end = after?.let { crossing(last, it, dark) } ?: last
+        return Window(start, end)
+    }
+
+    /** When the darkness [now] is inside began, or [now] itself where it has lasted a whole day. */
+    private fun dusk(now: Instant, dark: (Instant) -> Boolean): Instant {
+        var at = now
+        val limit = now.minus(HORIZON)
+        while (at.isAfter(limit)) {
+            val before = at.minus(DARKNESS_STEP)
+            if (!dark(before)) return crossing(before, at, dark)
+            at = before
+        }
+        return now
+    }
+
+    /**
+     * The dark side of the edge between [a] and [b], which disagree, to the nearest
+     * minute.
+     */
+    private fun crossing(a: Instant, b: Instant, dark: (Instant) -> Boolean): Instant {
+        var lo = a
+        var hi = b
+        val loDark = dark(lo)
+        while (Duration.between(lo, hi) > EDGE_PRECISION) {
+            val mid = lo.plus(Duration.between(lo, hi).dividedBy(2))
+            if (dark(mid) == loDark) lo = mid else hi = mid
+        }
+        val edge = if (loDark) lo else hi
+        return edge.plusSeconds(HALF_MINUTE).truncatedTo(ChronoUnit.MINUTES)
     }
 
     /** The longest unbroken run of good hours, as a window. */
@@ -131,4 +171,6 @@ object StarWatch {
     }
 
     private val HOUR: Duration = Duration.ofHours(1)
+    private val EDGE_PRECISION: Duration = Duration.ofSeconds(1)
+    private const val HALF_MINUTE = 30L
 }

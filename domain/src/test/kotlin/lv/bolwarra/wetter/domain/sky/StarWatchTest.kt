@@ -65,6 +65,30 @@ class StarWatchTest {
     }
 
     @Test
+    fun `the edges of the night do not move with the moment asked`() {
+        val hours = hours(24) { 0 }
+        val asked = tonight(hours)
+        val later = StarWatch.tonight(hours, noon.plusSeconds(7 * 60), riga.first, riga.second, 0.0)
+        assertEquals(asked.darkFrom, later.darkFrom)
+        assertEquals(asked.darkUntil, later.darkUntil)
+    }
+
+    @Test
+    fun `a night already under way is reported from its dusk`() {
+        val hours = hours(24) { 0 }
+        val evening = tonight(hours)
+        val lateAtNight = StarWatch.tonight(
+            hours,
+            evening.darkFrom!!.plus(Duration.ofHours(3)),
+            riga.first,
+            riga.second,
+            moonIllumination = 0.0,
+        )
+        assertEquals(evening.darkFrom, lateAtNight.darkFrom)
+        assertEquals(evening.darkUntil, lateAtNight.darkUntil)
+    }
+
+    @Test
     fun `an overcast night has darkness but nothing worth naming`() {
         val night = tonight(hours(24) { 100 })
         assertNotNull(night.darkFrom)

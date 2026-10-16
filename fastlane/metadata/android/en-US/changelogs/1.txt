@@ -2,5 +2,5 @@ The first release.
 
 When the rain starts and stops: from the radar for the next two hours, and from
 the best weather model for your location after that, with an hourly timeline
-that does not run out. A rain map, five home-screen widgets and severe-weather
-warnings. Works offline and collects nothing.
+that does not run out. It also has a rain map, five home-screen widgets and
+severe-weather warnings, works offline, and collects nothing.

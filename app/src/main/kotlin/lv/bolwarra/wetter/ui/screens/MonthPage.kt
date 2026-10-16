@@ -7,11 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -92,7 +95,9 @@ fun MonthPage(
 
             var week = gridStart
             while (!week.isAfter(gridEnd)) {
-                Row(Modifier.fillMaxWidth()) {
+                // As tall as its tallest square, so a large font grows the week rather than
+                // cutting its temperatures off.
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     repeat(DAYS_IN_WEEK) { index ->
                         val date = week.plusDays(index.toLong())
                         val withinSpan = !date.isBefore(today) && !date.isAfter(last)
@@ -145,7 +150,8 @@ private fun RowScope.DayCell(
     Column(
         modifier = Modifier
             .weight(1f)
-            .height(CELL_HEIGHT)
+            .fillMaxHeight()
+            .heightIn(min = CELL_HEIGHT)
             .padding(horizontal = CELL_GAP)
             .clip(RoundedCornerShape(CELL_RADIUS))
             // A wet day is washed, as a wet hour is in the week's strip, so the wet days read

@@ -51,7 +51,7 @@ class RainStripGeometryTest {
             colors = colors,
             rates = List(24) { rate },
             hourOffset = 0.25f,
-            hourLabels = listOf("1:00", "2:00", "3:00", "4:00"),
+            hourLabels = listOf("01:00", "02:00", "03:00", "04:00"),
         )
         return bitmap
     }

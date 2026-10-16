@@ -1,10 +1,9 @@
 # Changelog
 
 Notable changes to Wetter. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0] — Unreleased
+## [1.0] — 2026-10-16
 
 The first release.
 
@@ -38,4 +37,4 @@ The first release.
 - Units in Celsius or Fahrenheit, millimetres or inches, and four wind units;
   light and dark themes.
 
-[0.1.0]: https://github.com/Perszus/wetter/releases/tag/v0.1.0
+[1.0]: https://github.com/Perszus/wetter/releases/tag/v1.0

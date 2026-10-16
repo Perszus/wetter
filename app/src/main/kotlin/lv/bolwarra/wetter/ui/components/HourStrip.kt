@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,8 +32,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.time.ZoneId
 import lv.bolwarra.wetter.R
@@ -70,6 +74,19 @@ fun HourStrip(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
         return
     }
 
+    // Wide enough for the widest time and temperature at the reader's font size, so a
+    // large font widens the columns instead of breaking "23:00" over two lines.
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val type = WetterTheme.type
+    val column = remember(type, density) {
+        val widest = maxOf(
+            measurer.measure(WIDEST_TIME, type.axis).size.width,
+            measurer.measure(WIDEST_FIGURE, type.figure).size.width,
+        )
+        with(density) { maxOf(COLUMN, widest.toDp() + COLUMN_INSET * 2) }
+    }
+
     val scroll = rememberScrollState()
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -79,7 +96,7 @@ fun HourStrip(hours: List<HourlyWeather>, zone: ZoneId, modifier: Modifier = Mod
                 .horizontalScroll(scroll),
             horizontalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
-            hours.forEach { hour -> HourColumn(hour, zone) }
+            hours.forEach { hour -> HourColumn(hour, zone, column) }
         }
         // The floor the bars stand on, drawn once under the whole strip. It does not
         // scroll: a floor is the same everywhere along a fixed axis.
@@ -116,7 +133,7 @@ private fun Modifier.fadedEdges(scroll: ScrollState): Modifier = this
     }
 
 @Composable
-private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
+private fun HourColumn(hour: HourlyWeather, zone: ZoneId, width: Dp) {
     val units = WetterTheme.units
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
@@ -126,7 +143,7 @@ private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
 
     Column(
         modifier = Modifier
-            .width(COLUMN)
+            .width(width)
             .clip(RoundedCornerShape(COLUMN_RADIUS))
             // The wash, at the faintest step the palette has: it survives skimming without
             // competing with the bar.
@@ -196,8 +213,14 @@ private fun RainMark(millimetresPerHour: Double?) {
     }
 }
 
-/** Wide enough for "12:00" in the axis face, and no wider. */
+/** Wide enough for "12:00" in the axis face at the default font size, and no wider. */
 private val COLUMN = 48.dp
+
+/** Room either side of the widest label once a large font has outgrown [COLUMN]. */
+private val COLUMN_INSET = 4.dp
+
+private const val WIDEST_TIME = "00:00"
+private const val WIDEST_FIGURE = "-88°"
 
 /** Smaller than the day's mark: a footnote to it. */
 private val HOUR_GLYPH = 18.dp

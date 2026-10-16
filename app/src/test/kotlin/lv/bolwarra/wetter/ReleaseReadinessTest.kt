@@ -97,7 +97,8 @@ class ReleaseReadinessTest {
     @Test
     fun theVersionAgreesEverywhere() {
         val (code, name) = version()
-        val fdroid = read("fdroid/lv.bolwarra.wetter.yml")
+        // YAML reads a bare 1.0 as a number, so fdroid rewritemeta quotes such versions.
+        val fdroid = read("fdroid/lv.bolwarra.wetter.yml").replace("'", "")
         val expected = listOf(
             "versionName: $name",
             "versionCode: $code",
@@ -105,7 +106,9 @@ class ReleaseReadinessTest {
             "CurrentVersion: $name",
             "CurrentVersionCode: $code",
         )
-        val missing = expected.filter { it !in fdroid }
+        val missing = expected.filter { line ->
+            fdroid.lines().none { it.trim().removePrefix("- ") == line }
+        }
         assertTrue("F-Droid metadata disagrees: $missing", missing.isEmpty())
         assertTrue("CHANGELOG.md has no entry for $name", "## [$name]" in read("CHANGELOG.md"))
     }
