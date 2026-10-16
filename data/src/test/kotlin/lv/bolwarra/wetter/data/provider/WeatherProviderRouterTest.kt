@@ -3,6 +3,8 @@ package lv.bolwarra.wetter.data.provider
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.provider.FakeWeatherProvider
@@ -321,5 +323,47 @@ class WeatherProviderRouterTest {
         router(regional, global, health = health).getForecast(riga)
 
         assertTrue(health.of("global").isHealthy)
+    }
+
+    @Test
+    fun `a provider known to fall short is extended in parallel, not after`() = runTest {
+        val regional = FakeWeatherProvider.succeeding(
+            "regional",
+            nordicCoverage,
+            hourlyHours = 60,
+            beforeAnswer = { delay(400) },
+        )
+        val global = FakeWeatherProvider.succeeding("global", hourlyHours = 7 * 24, beforeAnswer = {
+            delay(300)
+        })
+
+        val started = currentTime
+        val forecast = router(regional, global).getForecast(riga).getOrThrow()
+
+        assertEquals("global", forecast.supplement!!.provider.id)
+        assertEquals(1, global.calls)
+        // The slower of the two, not the sum.
+        assertEquals(400L, currentTime - started)
+    }
+
+    @Test
+    fun `the answer already in flight is the fallback when the first choice fails`() = runTest {
+        val regional = FakeWeatherProvider.failing(
+            "regional",
+            WeatherError.Timeout,
+            coverage = nordicCoverage,
+            hourlyHours = 60,
+            beforeAnswer = { delay(400) },
+        )
+        val global = FakeWeatherProvider.succeeding("global", hourlyHours = 7 * 24, beforeAnswer = {
+            delay(300)
+        })
+
+        val started = currentTime
+        val forecast = router(regional, global).getForecast(riga).getOrThrow()
+
+        assertEquals("global", forecast.provider.id)
+        assertEquals("asked once, not again after the failure", 1, global.calls)
+        assertEquals(400L, currentTime - started)
     }
 }

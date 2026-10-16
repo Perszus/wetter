@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -298,6 +299,32 @@ class WeatherViewModel(
     }
 
     /**
+     * Coming back to the app: ask for the newest at once.
+     *
+     * Not "if stale". Somebody opening a weather app is asking what it is doing
+     * now, and the answer on disk is whatever the last wake found - so the app
+     * goes and looks rather than deciding the copy it holds is good enough. The
+     * cost is small by construction: the HTTP cache answers MET Norway from disk
+     * inside its own `Expires` and revalidates it to a "not modified" after, and
+     * the radar only troubles its source when a sweep is actually due. What is
+     * held is on screen the whole time; this only ever replaces it with newer.
+     *
+     * Once a minute at most, so flicking between apps does not become a request
+     * per flick.
+     */
+    fun refreshOnReturn() {
+        val now = Instant.now()
+        if (Duration.between(lastReturn, now) < RETURN_DEBOUNCE) {
+            refreshIfStale()
+            return
+        }
+        lastReturn = now
+        refresh()
+    }
+
+    private var lastReturn: Instant = Instant.EPOCH
+
+    /**
      * Fetches regardless of freshness. A person who asks for a refresh has a
      * reason, and telling them the data is recent enough would be arguing with
      * them about their own window.
@@ -324,5 +351,8 @@ class WeatherViewModel(
          * sweep picks it up within a minute of it existing.
          */
         const val TIMELINE_TICK_MS = 60_000L
+
+        /** See [refreshOnReturn]. */
+        val RETURN_DEBOUNCE: Duration = Duration.ofMinutes(1)
     }
 }

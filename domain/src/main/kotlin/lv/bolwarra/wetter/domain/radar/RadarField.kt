@@ -2,6 +2,7 @@ package lv.bolwarra.wetter.domain.radar
 
 import java.time.Instant
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /**
  * One radar sweep, as rainfall rate over a grid.
@@ -25,7 +26,7 @@ class RadarField(
     val at: Instant,
     val geometry: RadarGeometry,
     /** Row-major millimetres per hour, or [NO_ECHO] where nothing was observed. */
-    private val values: FloatArray,
+    values: FloatArray,
 ) {
     init {
         require(values.size == geometry.width * geometry.height) {
@@ -33,15 +34,29 @@ class RadarField(
         }
     }
 
+    /**
+     * Held as hundredths of a millimetre an hour in sixteen bits, not as floats.
+     *
+     * A projection keeps sixteen of these grids and the map another hour of
+     * sweeps, each a million pixels, and twice over while a newer projection is
+     * built beside the old one. As floats that came within a few megabytes of
+     * an ordinary phone's heap limit. A hundredth of a millimetre is far finer
+     * than rates read back out of a colour scale can claim, and the top of the
+     * range, 655 mm/h, is several times anything the scale reaches.
+     */
+    private val stored = ShortArray(values.size) { encode(values[it]) }
+
+    private fun value(index: Int): Float = decode(stored[index])
+
     val width: Int get() = geometry.width
     val height: Int get() = geometry.height
 
     /** Off-grid reads as unobserved rather than throwing: advection walks off edges. */
     operator fun get(x: Int, y: Int): Float =
-        if (x < 0 || y < 0 || x >= width || y >= height) NO_ECHO else values[y * width + x]
+        if (x < 0 || y < 0 || x >= width || y >= height) NO_ECHO else value(y * width + x)
 
     /** A copy of the backing array, for bulk work. */
-    fun snapshot(): FloatArray = values.copyOf()
+    fun snapshot(): FloatArray = FloatArray(stored.size) { value(it) }
 
     /**
      * Rate at a fractional position, bilinearly interpolated.
@@ -117,7 +132,7 @@ class RadarField(
             if (y < 0 || y >= height) continue
             for (x in (centreX - radius)..(centreX + radius)) {
                 if (x < 0 || x >= width) continue
-                val value = values[y * width + x]
+                val value = value(y * width + x)
                 if (!value.isNoEcho() && value > 0f) return true
             }
         }
@@ -126,18 +141,33 @@ class RadarField(
 
     /** The share of the grid the radar actually saw, 0..1. */
     fun coverage(): Float {
-        if (values.isEmpty()) return 0f
-        return values.count { !it.isNoEcho() }.toFloat() / values.size
+        if (stored.isEmpty()) return 0f
+        return stored.count { it != UNOBSERVED }.toFloat() / stored.size
     }
 
     /** The share of the grid with rain in it, counting only what was observed. */
     fun wetFraction(): Float {
-        val observed = values.count { !it.isNoEcho() }
+        val observed = stored.count { it != UNOBSERVED }
         if (observed == 0) return 0f
-        return values.count { !it.isNoEcho() && it >= TRACE_MM_PER_HOUR }.toFloat() / observed
+        return stored.count { it != UNOBSERVED && decode(it) >= TRACE_MM_PER_HOUR }.toFloat() /
+            observed
     }
 
     companion object {
+        /** The stored form of [NO_ECHO]: all ones, which no rate encodes to. */
+        private const val UNOBSERVED: Short = -1
+        private const val HUNDREDTHS = 100f
+        private const val LARGEST = 0xFFFE
+
+        private fun encode(rate: Float): Short = if (rate.isNoEcho()) {
+            UNOBSERVED
+        } else {
+            (rate * HUNDREDTHS).roundToInt().coerceIn(0, LARGEST).toShort()
+        }
+
+        private fun decode(stored: Short): Float =
+            if (stored == UNOBSERVED) NO_ECHO else (stored.toInt() and 0xFFFF) / HUNDREDTHS
+
         /** Not observed. Deliberately distinct from 0.0, which is an observation. */
         const val NO_ECHO = Float.NaN
 

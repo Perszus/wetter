@@ -37,7 +37,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
@@ -75,6 +79,12 @@ fun Tile(
      * spinner would hide a true reading to announce that a truer one is coming.
      */
     busy: Boolean = false,
+    /**
+     * Somewhere further to go from this reading, set after [trailing]. Given a
+     * full touch target that overhangs the header rather than heightening it,
+     * so a tile with an action lines up with one without.
+     */
+    action: TileAction? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = WetterTheme.colors
@@ -106,18 +116,64 @@ fun Tile(
                     TurningArc(colour = colors.textTertiary)
                 }
             }
-            if (trailing != null) {
-                Text(
-                    text = trailing,
-                    style = WetterTheme.type.meta,
-                    color = colors.textSecondary,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (trailing != null) {
+                    Text(
+                        text = trailing,
+                        style = WetterTheme.type.meta,
+                        color = colors.textSecondary,
+                    )
+                }
+                if (action != null) {
+                    Spacer(Modifier.width(spacing.s))
+                    ActionMark(action)
+                }
             }
         }
         Spacer(Modifier.height(spacing.m))
         content()
     }
 }
+
+/** A way out of a tile: what it is called, how it is drawn, and where it goes. */
+class TileAction(
+    val label: String,
+    val glyph: androidx.compose.ui.graphics.drawscope.DrawScope.(Color) -> Unit,
+    val onClick: () -> Unit,
+)
+
+/**
+ * The action's mark, laid out at the size of its glyph but touchable across a
+ * full target around it. The overhang falls inside the tile's own padding, so
+ * nothing outside the tile is reachable through it.
+ */
+@Composable
+private fun ActionMark(action: TileAction) {
+    val colors = WetterTheme.colors
+    val target = WetterTheme.spacing.touchTarget
+    Canvas(
+        Modifier
+            .layout { measurable, _ ->
+                val side = target.roundToPx()
+                val shown = ACTION_GLYPH.roundToPx()
+                val placeable = measurable.measure(
+                    androidx.compose.ui.unit.Constraints.fixed(side, side),
+                )
+                layout(shown, shown) {
+                    placeable.place((shown - side) / 2, (shown - side) / 2)
+                }
+            }
+            .clip(RoundedCornerShape(ACTION_RADIUS))
+            .clickable(onClickLabel = action.label, onClick = action.onClick)
+            .semantics { contentDescription = action.label },
+    ) {
+        val inset = (size.minDimension - ACTION_GLYPH.toPx()) / 2f
+        inset(inset) { action.glyph(this, colors.textSecondary) }
+    }
+}
+
+private val ACTION_GLYPH = 20.dp
+private val ACTION_RADIUS = 12.dp
 
 /**
  * A tile that stays shut until asked.
@@ -223,7 +279,7 @@ private const val HALF_TURN = 180f
  * its direction.
  */
 @Composable
-private fun TurningArc(colour: Color, modifier: Modifier = Modifier) {
+internal fun TurningArc(colour: Color, modifier: Modifier = Modifier) {
     val turning = rememberInfiniteTransition(label = "tile busy")
     val angle by turning.animateFloat(
         initialValue = 0f,

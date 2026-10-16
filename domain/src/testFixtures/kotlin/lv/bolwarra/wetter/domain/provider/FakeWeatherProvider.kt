@@ -27,6 +27,8 @@ class FakeWeatherProvider(
     private val respond: (WeatherLocation) -> Result<WeatherForecast> = {
         Result.failure(WeatherFailure(WeatherError.Unknown()))
     },
+    /** Runs before each answer - a test's way of making it take time. */
+    private val beforeAnswer: suspend () -> Unit = {},
 ) : WeatherProvider {
 
     var calls: Int = 0
@@ -34,6 +36,7 @@ class FakeWeatherProvider(
 
     override suspend fun getForecast(location: WeatherLocation): Result<WeatherForecast> {
         calls++
+        beforeAnswer()
         return respond(location)
     }
 
@@ -59,11 +62,13 @@ class FakeWeatherProvider(
             at: Instant = DEFAULT_INSTANT,
             hourlyHours: Int = FULL_HOURLY,
             capabilities: ProviderCapabilities = everyVariable(hourlyHorizonHours = hourlyHours),
+            beforeAnswer: suspend () -> Unit = {},
         ) = FakeWeatherProvider(
             id = id,
             coverage = coverage,
             capabilities = capabilities,
             respond = { location -> Result.success(forecastFrom(id, location, at, hourlyHours)) },
+            beforeAnswer = beforeAnswer,
         )
 
         /** A provider that always fails with the given error. */
@@ -71,10 +76,14 @@ class FakeWeatherProvider(
             id: String,
             error: WeatherError,
             coverage: ProviderCoverage = ProviderCoverage(isGlobal = true),
+            hourlyHours: Int = FULL_HOURLY,
+            beforeAnswer: suspend () -> Unit = {},
         ) = FakeWeatherProvider(
             id = id,
             coverage = coverage,
+            capabilities = everyVariable(hourlyHorizonHours = hourlyHours),
             respond = { Result.failure(WeatherFailure(error)) },
+            beforeAnswer = beforeAnswer,
         )
 
         /**

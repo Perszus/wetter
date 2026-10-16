@@ -43,25 +43,26 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import lv.bolwarra.wetter.R
+import lv.bolwarra.wetter.domain.FaceReading
 import lv.bolwarra.wetter.domain.MoonPhase
-import lv.bolwarra.wetter.domain.ObservedCondition
 import lv.bolwarra.wetter.domain.SolarTime
 import lv.bolwarra.wetter.domain.at
-import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.forecast.UmbrellaDay
 import lv.bolwarra.wetter.domain.hazard.Hazard
@@ -126,6 +127,8 @@ fun WeatherPlate(
      */
     explaining: PlateMark? = null,
     onExplain: (PlateMark?) -> Unit = {},
+    /** Notably poor air, from the Air tile's data: it makes a heat hazard hazy on the glass. */
+    hazyAir: Boolean = false,
 ) {
     val units = WetterTheme.units
     val colors = WetterTheme.colors
@@ -134,8 +137,10 @@ fun WeatherPlate(
 
     // Resolved against the clock, not taken from the fetch. Everything else on
     // this face moves - the mark, the light - and a temperature that did not
-    // would end up contradicting the mark beside it.
-    val current = forecast.conditionsAt(now)
+    // would end up contradicting the mark beside it. The word and the glass come
+    // with it, worked out where the widgets work them out too.
+    val face = FaceReading.of(forecast, timeline, hazards, now, hazyAir)
+    val current = face.current
     val windSpeed = current.windSpeed ?: 0.0
     // Falling back to the mean means a provider that does not publish gusts
     // simply reports one figure rather than a nonsensical one.
@@ -154,15 +159,12 @@ fun WeatherPlate(
     // on the same screen - the chart, the rate, the bar saying when it stops -
     // had already moved to the radar. The most prominent word on the page was
     // the least evidenced thing on it, and it could contradict the chart
-    // directly beneath it.
-    val seen = ObservedCondition.of(
-        // The reconciled word, not the raw symbol, so the radar correction
-        // below starts from the same answer the rest of the app would give.
-        reported = current.appearance,
-        observedRate = radarRateAt(timeline, now),
-        temperature = current.temperature,
-        cloudCover = hour?.cloudCover,
-    )
+    // directly beneath it. See FaceReading.
+    val seen = face.seen
+    // What the weather has left on the glass, chosen from exactly what the face
+    // prints, so the glass can never disagree with the word on it.
+    val glass = face.glass
+
     val sky = Stargazing.assess(
         cloudLow = hour?.cloudLow,
         cloudMedium = hour?.cloudMedium,
@@ -199,11 +201,34 @@ fun WeatherPlate(
             // what is left rather than assumed.
             val lane = MARK_SIZE + MARK_GAP
             val dial = minOf(maxWidth - lane * 2, PLATE_MAX, maxHeight)
+
+            // The reading's text and where it sits, so the glass can keep a soft
+            // margin round its glyphs. Measured against this box rather than the
+            // screen, so scrolling the page moves nothing here.
+            var dialAt by remember { mutableStateOf(Offset.Zero) }
+            var readingAt by remember { mutableStateOf(Offset.Zero) }
+            var rowAt by remember { mutableStateOf(Offset.Zero) }
+            var figureText by remember { mutableStateOf<TextLayoutResult?>(null) }
+            var figureAt by remember { mutableStateOf(Offset.Zero) }
+            var unitText by remember { mutableStateOf<TextLayoutResult?>(null) }
+            var unitAt by remember { mutableStateOf(Offset.Zero) }
+            var wordText by remember { mutableStateOf<TextLayoutResult?>(null) }
+            var wordAt by remember { mutableStateOf(Offset.Zero) }
+            val reading = listOfNotNull(
+                figureText?.let { GlassText(it, readingAt + rowAt + figureAt - dialAt) },
+                unitText?.let { GlassText(it, readingAt + rowAt + unitAt - dialAt) },
+                wordText?.let { GlassText(it, readingAt + wordAt - dialAt) },
+            )
             val radius = dial / 2
             val outwards = radius + MARK_GAP + MARK_SIZE / 2
             val downwards = radius * MARK_BASE_OF_CIRCLE
 
-            Box(Modifier.size(dial), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .size(dial)
+                    .onGloballyPositioned { dialAt = it.positionInParent() },
+                contentAlignment = Alignment.Center,
+            ) {
                 Canvas(Modifier.fillMaxSize()) {
                     drawPorcelain(
                         face = colors.surface,
@@ -217,6 +242,19 @@ fun WeatherPlate(
                         floorCatch = lerp(colors.surface, colors.surfaceRaised, colors.relief),
                         occlusion = colors.hairline,
                     )
+                }
+                // On the glass, so between the porcelain and the instrument: the
+                // edge, the ticks and the pointers are drawn over it and stay crisp.
+                // White on both plates: the marks are the render's own light, as
+                // the glass catches it, not ink that changes with the theme. Thinned
+                // round the reading's glyphs so the figure always stands clear.
+                GlassMarks(
+                    name = glass,
+                    ink = Color.White,
+                    clear = reading,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Canvas(Modifier.fillMaxSize()) {
                     drawFiredEdge(colors.hairline)
                     drawHourTicks(colors.hairline)
                     // The pointer is ink, where the scale it aims at is hairline.
@@ -279,19 +317,31 @@ fun WeatherPlate(
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = spacing.xxl),
+                modifier = Modifier
+                    .padding(horizontal = spacing.xxl)
+                    .onGloballyPositioned { readingAt = it.positionInParent() },
             ) {
-                Row(verticalAlignment = Alignment.Top) {
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.onGloballyPositioned { rowAt = it.positionInParent() },
+                ) {
                     Text(
                         text = formatTemperature(current.temperature, units.temperature),
                         style = WetterTheme.type.reading,
                         color = colors.textPrimary,
+                        onTextLayout = { figureText = it },
+                        modifier = Modifier.onGloballyPositioned {
+                            figureAt = it.positionInParent()
+                        },
                     )
                     Text(
                         text = units.temperature.suffix,
                         style = WetterTheme.type.readingUnit,
                         color = colors.textTertiary,
-                        modifier = Modifier.padding(start = 3.dp, top = 16.dp),
+                        onTextLayout = { unitText = it },
+                        modifier = Modifier
+                            .padding(start = 3.dp, top = 16.dp)
+                            .onGloballyPositioned { unitAt = it.positionInParent() },
                     )
                 }
                 Spacer(Modifier.height(spacing.xs))
@@ -300,6 +350,8 @@ fun WeatherPlate(
                     style = WetterTheme.type.title,
                     color = colors.textSecondary,
                     textAlign = TextAlign.Center,
+                    onTextLayout = { wordText = it },
+                    modifier = Modifier.onGloballyPositioned { wordAt = it.positionInParent() },
                 )
             }
         }
@@ -595,25 +647,6 @@ private fun windLevelLabel(level: Int) = when (level) {
 }
 
 /**
- * What the radar says is falling at this moment, or null where it has nothing.
- *
- * Null and zero mean different things here and the distinction is the whole
- * point: zero is an observation that nothing is falling, null is the absence of
- * an observation. Only the first may contradict the provider.
- */
-private fun radarRateAt(timeline: List<FusedPrecipitation>, now: Instant): Double? {
-    val nearest = timeline
-        .filter { it.radarShare > 0.0 }
-        .minByOrNull { Duration.between(it.at, now).abs() }
-        ?: return null
-    return nearest.takeIf { Duration.between(it.at, now).abs() <= RADAR_IS_NOW }
-        ?.millimetresPerHour
-}
-
-/** How far from this moment a projected step can sit and still describe it. */
-private val RADAR_IS_NOW: Duration = Duration.ofMinutes(4)
-
-/**
  * The light's position, turning at the speed of the wind.
  *
  * The angle is integrated frame by frame rather than handed to a repeating
@@ -700,7 +733,7 @@ private fun lapSecondsFor(windSpeedMs: Double): Float? {
  * the difference between glazed ceramic and a moulded plastic button — real
  * objects are lit from somewhere.
  */
-private fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color, occlusion: Color) {
+internal fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color, occlusion: Color) {
     val radius = ringRadius()
 
     // A well, not a button.
@@ -778,12 +811,12 @@ private fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color, 
  * a surface is glossy. Porcelain has none. What it has is a clean edge, so that
  * is all this draws.
  */
-private fun DrawScope.drawFiredEdge(edge: Color) {
+internal fun DrawScope.drawFiredEdge(edge: Color) {
     drawCircle(color = edge, radius = ringRadius(), style = Stroke(EDGE_WIDTH.toPx()))
 }
 
 /** One tick an hour, inside the edge. Twelve at the top, clockwise. */
-private fun DrawScope.drawHourTicks(colour: Color) {
+internal fun DrawScope.drawHourTicks(colour: Color) {
     val outer = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
     repeat(HOURS_ON_FACE) { hour ->
         val quarter = hour % QUARTERS == 0
@@ -1115,49 +1148,55 @@ private const val GOOD_SKY = 0.6f
 private fun HazardMark(severity: HazardSeverity, modifier: Modifier = Modifier) {
     val colors = WetterTheme.colors
     val description = stringResource(R.string.plate_hazard)
-    // A warning still to come is drawn back, one already happening is not. The
-    // difference between "later" and "now" is worth a glance's worth of weight.
-    val colour = if (severity == HazardSeverity.DANGER) {
-        colors.warning
-    } else {
-        colors.warning.copy(alpha = WARNING_AHEAD)
-    }
+    val colour = hazardInk(severity, colors.warning)
 
     Canvas(modifier.semantics { contentDescription = description }) {
-        val width = size.minDimension
-        val height = width * TRIANGLE_RATIO
-        val left = (size.width - width) / 2f
-        val top = (size.height - height) / 2f
-        val corner = width * TRIANGLE_CORNER
-
-        val path = Path().apply {
-            moveTo(left + width / 2f, top)
-            lineTo(left + width, top + height)
-            lineTo(left, top + height)
-            close()
-        }
-        drawPath(path, colour, style = Stroke(width = corner, join = StrokeJoin.Round))
-
-        // The bang: a bar and a dot, both inset from the edges so the triangle
-        // reads first and the mark inside it second.
-        val barTop = top + height * BANG_TOP
-        val barBottom = top + height * BANG_BOTTOM
-        drawLine(
-            colour,
-            Offset(left + width / 2f, barTop),
-            Offset(left + width / 2f, barBottom),
-            strokeWidth = corner,
-            cap = StrokeCap.Round,
-        )
-        drawCircle(
-            colour,
-            radius = corner * 0.6f,
-            center = Offset(
-                left + width / 2f,
-                top + height * BANG_DOT,
-            ),
-        )
+        drawHazardTriangle(colour)
     }
+}
+
+/**
+ * A warning still to come is drawn back, one already happening is not. The
+ * difference between "later" and "now" is worth a glance's worth of weight.
+ */
+internal fun hazardInk(severity: HazardSeverity, warning: Color): Color =
+    if (severity == HazardSeverity.DANGER) warning else warning.copy(alpha = WARNING_AHEAD)
+
+/** The triangle and its bang, centred in whatever box it is given. */
+internal fun DrawScope.drawHazardTriangle(colour: Color) {
+    val width = size.minDimension
+    val height = width * TRIANGLE_RATIO
+    val left = (size.width - width) / 2f
+    val top = (size.height - height) / 2f
+    val corner = width * TRIANGLE_CORNER
+
+    val path = Path().apply {
+        moveTo(left + width / 2f, top)
+        lineTo(left + width, top + height)
+        lineTo(left, top + height)
+        close()
+    }
+    drawPath(path, colour, style = Stroke(width = corner, join = StrokeJoin.Round))
+
+    // The bang: a bar and a dot, both inset from the edges so the triangle
+    // reads first and the mark inside it second.
+    val barTop = top + height * BANG_TOP
+    val barBottom = top + height * BANG_BOTTOM
+    drawLine(
+        colour,
+        Offset(left + width / 2f, barTop),
+        Offset(left + width / 2f, barBottom),
+        strokeWidth = corner,
+        cap = StrokeCap.Round,
+    )
+    drawCircle(
+        colour,
+        radius = corner * 0.6f,
+        center = Offset(
+            left + width / 2f,
+            top + height * BANG_DOT,
+        ),
+    )
 }
 
 /** A hazard that has not started yet is drawn back this far. */

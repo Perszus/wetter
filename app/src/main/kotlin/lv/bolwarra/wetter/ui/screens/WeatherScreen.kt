@@ -8,7 +8,9 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -16,6 +18,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,11 +35,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -60,6 +65,7 @@ import lv.bolwarra.wetter.ui.components.EmptyState
 import lv.bolwarra.wetter.ui.components.PlateMark
 import lv.bolwarra.wetter.ui.components.WeatherHeader
 import lv.bolwarra.wetter.ui.components.WeatherPlate
+import lv.bolwarra.wetter.ui.map.RadarMapRoute
 import lv.bolwarra.wetter.ui.preview.SampleWeather
 import lv.bolwarra.wetter.ui.theme.Atmosphere
 import lv.bolwarra.wetter.ui.theme.WetterTheme
@@ -79,24 +85,49 @@ fun WeatherRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    // Every return to the foreground asks whether the data has aged out.
+    // Hungry for the newest, for as long as somebody is looking: every return
+    // asks at once, and while the screen stays up the model is re-checked every
+    // minute against its ten-minute window. What is held stays on screen
+    // throughout; this only ever swaps it for newer (see refreshOnReturn). The
+    // radar keeps its own minute clock in the view model.
     LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { viewModel.refreshIfStale() }
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            viewModel.refreshOnReturn()
+            while (true) {
+                delay(KEEP_FRESH_TICK_MS)
+                viewModel.refreshIfStale()
+            }
+        }
     }
 
     // Which page you are on survives a rotation but not a relaunch: it is where
     // you are looking right now, not a preference.
     var domain by rememberSaveable { mutableStateOf(WeatherDomain.Today) }
 
-    WeatherScreen(
-        state = state,
-        domain = domain,
-        onSelectDomain = { domain = it },
-        onOpenLocations = onOpenLocations,
-        onOpenSettings = onOpenSettings,
-        onRetry = viewModel::refresh,
-        modifier = modifier,
-    )
+    // Over the forecast rather than a destination, for the reason Settings is:
+    // it is opened to look at one thing and shut again, and back returns to
+    // exactly the chart it was opened from.
+    var mapOpen by rememberSaveable { mutableStateOf(false) }
+
+    // The forecast behind an open map, softened so the panel reads as on top
+    // of it. Blur needs Android 12; below that the scrim alone does the job.
+    val blur by animateDpAsState(if (mapOpen) BACKDROP_BLUR else 0.dp, label = "backdrop")
+
+    Box(modifier) {
+        WeatherScreen(
+            modifier = Modifier.blur(blur),
+            state = state,
+            domain = domain,
+            onSelectDomain = { domain = it },
+            onOpenLocations = onOpenLocations,
+            onOpenSettings = onOpenSettings,
+            onRetry = viewModel::refresh,
+            onOpenMap = { mapOpen = true },
+        )
+        AnimatedVisibility(visible = mapOpen, enter = fadeIn(), exit = fadeOut()) {
+            RadarMapRoute(onClose = { mapOpen = false })
+        }
+    }
 }
 
 /**
@@ -118,6 +149,7 @@ fun WeatherScreen(
     onOpenSettings: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenMap: () -> Unit = {},
 ) {
     val spacing = WetterTheme.spacing
 
@@ -171,6 +203,7 @@ fun WeatherScreen(
             onOpenLocations = onOpenLocations,
             onOpenSettings = onOpenSettings,
             onRetry = onRetry,
+            onOpenMap = onOpenMap,
             now = now,
             explaining = explaining,
             onExplain = { explaining = it },
@@ -267,6 +300,7 @@ private fun WeatherScreenBody(
     onOpenLocations: () -> Unit,
     onOpenSettings: () -> Unit,
     onRetry: () -> Unit,
+    onOpenMap: () -> Unit,
     now: Instant,
     explaining: PlateMark?,
     onExplain: (PlateMark?) -> Unit,
@@ -320,6 +354,7 @@ private fun WeatherScreenBody(
                 modifier = Modifier.align(Alignment.CenterHorizontally),
                 explaining = explaining,
                 onExplain = onExplain,
+                hazyAir = state.airQuality?.band?.isNotable == true,
             )
             Spacer(Modifier.height(spacing.xl))
             DomainSwitcher(selected = domain, onSelect = onSelectDomain)
@@ -354,6 +389,7 @@ private fun WeatherScreenBody(
                             state.timeline,
                             state.airQuality,
                             state.isRefreshing,
+                            onOpenMap = onOpenMap,
                         )
                     WeatherDomain.Week -> WeekPage(forecast, now)
                     WeatherDomain.Month -> MonthPage(forecast, now, state.climatology)
@@ -497,3 +533,9 @@ private fun Modifier.dismissOnOutsideTap(active: Boolean, onDismiss: () -> Unit)
             }
         }
     }
+
+/** How far the forecast behind an open map is softened. */
+private val BACKDROP_BLUR = 12.dp
+
+/** How often an open screen re-checks the model's freshness. */
+private const val KEEP_FRESH_TICK_MS = 60_000L

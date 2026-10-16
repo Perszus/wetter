@@ -69,7 +69,10 @@ class WeatherData(
     private val database by lazy { WetterDatabase.create(appContext) }
 
     private val httpClient by lazy {
-        WetterHttpClient.create(WetterHttpClient.userAgent(applicationVersion))
+        WetterHttpClient.create(
+            WetterHttpClient.userAgent(applicationVersion),
+            cacheDirectory = java.io.File(appContext.cacheDir, "http"),
+        )
     }
 
     /**

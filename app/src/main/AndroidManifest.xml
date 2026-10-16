@@ -31,6 +31,22 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
+      The background clock (work/Heartbeat.kt).
+
+      Alarms are wiped by a reboot and by an app update, and an app that waits to
+      be opened before it starts its clock again shows yesterday's rain on the
+      home screen all morning. RECEIVE_BOOT_COMPLETED is what restarts it.
+
+      SCHEDULE_EXACT_ALARM lets the wake land on the minute a radar sweep is
+      published rather than somewhere in the few minutes after. From Android 12
+      it is not granted by default; somebody turns it on in Settings, and the
+      app's own settings panel offers the way there. Without it the clock still
+      runs, inexactly - minutes late, never missing.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!--
       Severe weather warnings, and nothing else.
 
       The only thing this app says without being opened. What reaches a
@@ -74,10 +90,21 @@
 
           Exported because two of the three actions below are implicit
           broadcasts, and an unexported receiver never sees those. All three are
-          protected broadcasts that only the system may send, so being reachable
-          costs nothing: the worst another app can do by naming this receiver
-          explicitly is ask it to redraw itself.
+          protected broadcasts that only the system may send. The fourth thing it
+          hears is its own redraw alarm (widget/Tick.kt), addressed to it by
+          class. Being reachable costs nothing: the worst another app can do by
+          naming this receiver explicitly is ask it to redraw itself.
         -->
+        <receiver
+            android:name=".work.HeartbeatReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".widget.RainWidget"
             android:exported="true"
@@ -91,6 +118,66 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/rain_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.NowWidget"
+            android:exported="true"
+            android:label="@string/widget_now_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.HoursWidget"
+            android:exported="true"
+            android:label="@string/widget_hours_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hours_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WeekWidget"
+            android:exported="true"
+            android:label="@string/widget_week_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/week_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.OverviewWidget"
+            android:exported="true"
+            android:label="@string/widget_overview_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/overview_widget_info" />
         </receiver>
     </application>
 </manifest>

@@ -1,6 +1,8 @@
 package lv.bolwarra.wetter.widget
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.RectF
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import lv.bolwarra.wetter.domain.curve.RainCurveBands
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
@@ -44,19 +46,27 @@ class RainStripGeometryTest {
 
     private val colors: WetterColors = pureBlackPlate(Atmosphere.Neutral)
 
-    private fun strip(rate: Double): Bitmap = RainStrip.render(
-        widthDp = 320f,
-        heightDp = 120f,
-        density = 2f,
-        cornerRadiusDp = 16f,
-        colors = colors,
-        rates = List(24) { rate },
-        windSpeed = null,
-        windFrom = null,
-        hourOffset = 0.25f,
-        hourLabels = listOf("1:00", "2:00", "3:00", "4:00"),
-        maxBytes = 4_000_000,
-    )
+    private fun strip(rate: Double): Bitmap {
+        val scale = 2f
+        val bitmap = Bitmap.createBitmap(
+            (320 * scale).toInt(),
+            (120 * scale).toInt(),
+            Bitmap.Config.ARGB_8888,
+        )
+        val canvas = Canvas(bitmap)
+        val bounds = RectF(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
+        WidgetPlate.drawPlate(canvas, bounds, 16f * scale, colors)
+        RainStrip.drawStrip(
+            canvas = canvas,
+            box = bounds,
+            scale = scale,
+            colors = colors,
+            rates = List(24) { rate },
+            hourOffset = 0.25f,
+            hourLabels = listOf("1:00", "2:00", "3:00", "4:00"),
+        )
+        return bitmap
+    }
 
     /**
      * The topmost row where a flat curve at [rate] differs from one at zero,

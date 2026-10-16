@@ -425,4 +425,30 @@ class NowcastCacheTest {
         assertTrue("no refresh was requested", radar.tileCalls > 0)
         scope.cancel()
     }
+
+    @Test
+    fun `radar stays on the chart once a projection is held in memory`() = runBlocking {
+        // The production repository always has a scope, and the path that has
+        // one used to answer "no radar" whenever a projection was already in
+        // memory - which, after the first fetch of a process, is every time.
+        val sweep = Instant.parse("2026-09-04T12:00:00Z")
+        val clock = TestClock(sweep.plus(Duration.ofSeconds(30)))
+        val radar = FakeRadar(latest = sweep)
+        val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
+        val repository = NowcastRepository(
+            source = radar,
+            ensembles = NoEnsemble,
+            clock = clock,
+            scope = scope,
+        )
+
+        repository.nowcast(riga)
+        val timeline = repository.timeline(forecastAt(riga, clock.now), clock.now)
+
+        assertTrue(
+            "a projection in memory did not reach the timeline",
+            timeline.any { it.radarShare > 0.0 },
+        )
+        scope.cancel()
+    }
 }

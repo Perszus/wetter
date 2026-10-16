@@ -7,8 +7,8 @@ The question people open a weather app to answer is usually narrow: **is it
 going to rain, when, how heavy, and when will it stop?** Wetter is built around
 that one.
 
-> **Status: not released yet.** The app is built and tested. Home-screen widgets
-> are still being added. See [Where it is now](#where-it-is-now).
+> **Status: not released yet.** The app is built and tested. See
+> [Where it is now](#where-it-is-now).
 
 ---
 
@@ -25,8 +25,9 @@ that one.
 - **"Rain" means rain.** Below half a millimetre an hour it is called drizzle.
 - **Works offline.** The last forecast stays on screen with its age, and survives
   the app being closed.
-- **Widgets.** A resizable rain strip on the home screen, with more shapes to
-  come.
+- **Widgets.** Five, each answering one question: the next four hours of rain,
+  the weather now, the coming hours, the week, and an overview of all of them.
+  Each lays itself out for the size it is given.
 - **Severe weather warnings.** Gales, torrential rain, heavy snow, ice,
   thunderstorms and dangerous temperatures — nothing else.
 - **Depth when you want it.** Cloud decks, air quality, pressure, humidity, dew
@@ -50,7 +51,7 @@ that one.
 | Background refresh | done |
 | Severe-weather notifications | done |
 | Settings | done |
-| Home-screen widgets | in progress — the first one is done |
+| Home-screen widgets | done |
 | Published to a store | not yet |
 
 628 tests: 624 unit and 4 instrumented, across the three modules.

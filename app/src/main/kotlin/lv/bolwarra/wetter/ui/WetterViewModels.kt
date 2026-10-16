@@ -4,10 +4,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import lv.bolwarra.wetter.WetterApplication
+import lv.bolwarra.wetter.ui.map.RadarMapViewModel
 import lv.bolwarra.wetter.ui.screens.LocationsViewModel
 import lv.bolwarra.wetter.ui.screens.SettingsViewModel
 import lv.bolwarra.wetter.ui.screens.WeatherViewModel
-import lv.bolwarra.wetter.widget.RainWidget
+import lv.bolwarra.wetter.widget.Widgets
 
 /**
  * The one factory, reaching into the container held by the Application.
@@ -34,6 +35,10 @@ object WetterViewModels {
             SettingsViewModel(application().container.preferences)
         }
         initializer {
+            val container = application().container
+            RadarMapViewModel(container.nowcasts, container.selectedLocation, container.basemap)
+        }
+        initializer {
             val app = application()
             val container = app.container
             LocationsViewModel(
@@ -46,7 +51,7 @@ object WetterViewModels {
                 container.deviceLocation,
                 container.applicationScope,
                 container.basemap,
-                onPlaceChanged = { RainWidget.refresh(app) },
+                onPlaceChanged = { Widgets.refresh(app) },
             )
         }
     }

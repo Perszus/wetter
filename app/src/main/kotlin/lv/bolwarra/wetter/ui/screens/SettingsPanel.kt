@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +56,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lv.bolwarra.wetter.BuildConfig
 import lv.bolwarra.wetter.R
@@ -69,6 +74,7 @@ import lv.bolwarra.wetter.ui.WetterViewModels
 import lv.bolwarra.wetter.ui.components.ChoiceRow
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 import lv.bolwarra.wetter.ui.theme.plateFor
+import lv.bolwarra.wetter.work.Heartbeat
 
 @Composable
 fun SettingsOverlay(onDismiss: () -> Unit) {
@@ -301,6 +307,8 @@ private fun ColumnScope.GeneralGroup(preferences: Preferences, onChange: (Prefer
     )
     Spacer(Modifier.height(spacing.l))
 
+    BackgroundUpdates()
+
     ChoiceRow(
         label = stringResource(R.string.setting_temperature),
         options = TemperatureUnit.entries,
@@ -326,6 +334,102 @@ private fun ColumnScope.GeneralGroup(preferences: Preferences, onChange: (Prefer
         onSelect = { onChange(preferences.copy(precipitation = it)) },
         describe = { it.label },
     )
+}
+
+/**
+ * What stands between the app and keeping itself fresh, and the way past it.
+ *
+ * Two things only the person holding the phone can change, so the app shows
+ * them rather than pretending. Precise timing is the Android 12+ "Alarms &
+ * reminders" permission, which lets the background wake land on the minute a
+ * radar sweep is published (work/Heartbeat.kt). Unrestricted battery is the
+ * system's battery optimisation - and on Xiaomi, Oppo, Vivo and others the
+ * maker's own battery manager and autostart switch, all on the app's own info
+ * page - which can stop background work altogether.
+ *
+ * Shown only while something is missing. Once both are allowed there is nothing
+ * to say, and the row disappears rather than becoming a status light.
+ * Re-checked on every return, because the answer changes on another screen.
+ */
+@Composable
+private fun ColumnScope.BackgroundUpdates() {
+    val context = LocalContext.current
+    val spacing = WetterTheme.spacing
+    val colors = WetterTheme.colors
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+
+    var exact by remember { mutableStateOf(Heartbeat.exactAllowed(context)) }
+    var unrestricted by remember { mutableStateOf(context.batteryUnrestricted()) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            exact = Heartbeat.exactAllowed(context)
+            unrestricted = context.batteryUnrestricted()
+        }
+    }
+    if (exact && unrestricted) return
+
+    Text(
+        text = stringResource(R.string.setting_background),
+        style = WetterTheme.type.body,
+        color = colors.textSecondary,
+    )
+    Spacer(Modifier.height(spacing.xs))
+    Text(
+        text = stringResource(R.string.setting_background_why),
+        style = WetterTheme.type.meta,
+        color = colors.textTertiary,
+    )
+    if (!exact) {
+        BackgroundAction(stringResource(R.string.setting_background_exact)) {
+            context.openExactAlarmSettings()
+        }
+    }
+    if (!unrestricted) {
+        BackgroundAction(stringResource(R.string.setting_background_battery)) {
+            context.openAppDetails()
+        }
+    }
+    Spacer(Modifier.height(spacing.l))
+}
+
+@Composable
+private fun BackgroundAction(label: String, onClick: () -> Unit) {
+    val spacing = WetterTheme.spacing
+    Text(
+        text = label,
+        style = WetterTheme.type.body,
+        color = WetterTheme.colors.textPrimary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(spacing.s))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = spacing.s),
+    )
+}
+
+private fun Context.batteryUnrestricted(): Boolean =
+    getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName) == true
+
+/** "Alarms & reminders" for this app, on Android 12 and later. */
+private fun Context.openExactAlarmSettings() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+        .setData(Uri.fromParts("package", packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { startActivity(intent) }
+}
+
+/**
+ * The app's own info page, which is where battery restriction lives on every
+ * phone - and, on the makers that add their own, the autostart switch beside it.
+ * Asking for the exemption directly would need a permission the Play Store only
+ * grants to a few kinds of app.
+ */
+private fun Context.openAppDetails() {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        .setData(Uri.fromParts("package", packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { startActivity(intent) }
 }
 
 /**

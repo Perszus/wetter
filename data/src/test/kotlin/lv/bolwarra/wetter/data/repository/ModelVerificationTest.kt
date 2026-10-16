@@ -1,8 +1,10 @@
 package lv.bolwarra.wetter.data.repository
 
+import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
 import lv.bolwarra.wetter.data.db.ForecastRecordDao
 import lv.bolwarra.wetter.data.db.ForecastRecordEntity
@@ -32,6 +34,13 @@ import org.junit.Test
 class ModelVerificationTest {
 
     private val issued: Instant = Instant.parse("2026-09-05T08:00:00Z")
+
+    /**
+     * The repository's clock, set beside these dates. It keeps a thirty-day
+     * window, and on the wall clock the fixed dates below aged out of it in
+     * October - the tests failed on the calendar alone, with nothing broken.
+     */
+    private val clock: Clock = Clock.fixed(Instant.parse("2026-09-05T12:00:00Z"), ZoneOffset.UTC)
 
     /** The moment a forecast is being held to - a whole hour, as the rows are. */
     private val validAt: Instant = Instant.parse("2026-09-05T09:00:00Z")
@@ -151,7 +160,7 @@ class ModelVerificationTest {
         val dao = FakeRecordDao(listOf(claim().copy(id = 1)))
         val reports = Reports(listOf(reportAt(minute = -10, temperature = 15.0)))
 
-        val settled = VerificationRepository(dao, reports).verify(riga)
+        val settled = VerificationRepository(dao, reports, clock).verify(riga)
 
         assertEquals(1, settled)
         assertEquals(15.0, dao.rows.single().observed!!, 0.5)
@@ -167,7 +176,7 @@ class ModelVerificationTest {
             ),
         )
 
-        assertEquals(1, VerificationRepository(dao, reports).verify(riga))
+        assertEquals(1, VerificationRepository(dao, reports, clock).verify(riga))
         assertNotNull(dao.rows.single().observed)
     }
 
@@ -179,7 +188,7 @@ class ModelVerificationTest {
         val dao = FakeRecordDao(listOf(claim().copy(id = 1)))
         val reports = Reports(listOf(reportAt(minute = 20, temperature = 15.0)))
 
-        assertEquals(0, VerificationRepository(dao, reports).verify(riga))
+        assertEquals(0, VerificationRepository(dao, reports, clock).verify(riga))
         assertEquals(null, dao.rows.single().observed)
     }
 }

@@ -197,7 +197,53 @@ object RadarNowcaster {
      * @param recent sweeps in ascending time order. The last is the starting
      *   point; earlier ones are what the motion and trend are measured from.
      */
-    fun nowcast(recent: List<RadarField>, leads: List<Duration>): RadarNowcast? {
+    fun nowcast(recent: List<RadarField>, leads: List<Duration>): RadarNowcast? =
+        project(recent, leads, around = null)
+
+    /**
+     * The same projection, worked out only where it will be read: a window
+     * around one place, wide enough for [RadarNowcast.seriesAt] and its
+     * coverage check.
+     *
+     * The chart and the widget read a single point from the projection, and
+     * projecting the whole grid to read it spent most of the effort moving
+     * pixels nobody looks at - a 768-pixel square, sixteen times over, which on
+     * a phone was the larger part of every new sweep's wait. Every pixel in the
+     * window is still traced back through the full motion field and sampled
+     * from the whole of the latest sweep, so rain approaching from far outside
+     * the window arrives exactly as it would have. Only pixels whose answer is
+     * never read are skipped.
+     *
+     * Null where the place is off the grid: there is no point to read.
+     */
+    fun nowcastAround(
+        recent: List<RadarField>,
+        leads: List<Duration>,
+        latitude: Double,
+        longitude: Double,
+    ): RadarNowcast? {
+        val latest = recent.maxByOrNull { it.at } ?: return null
+        val point = latest.geometry.pointOf(latitude, longitude) ?: return null
+        // The coverage radius, and one more for the bilinear sample's neighbour.
+        val reach = AROUND_RADIUS + 1
+        val x0 = (point.x.toInt() - reach).coerceAtLeast(0)
+        val y0 = (point.y.toInt() - reach).coerceAtLeast(0)
+        val x1 = (point.x.toInt() + reach + 1).coerceAtMost(latest.width - 1)
+        val y1 = (point.y.toInt() + reach + 1).coerceAtMost(latest.height - 1)
+        return project(recent, leads, around = Window(x0, y0, x1 - x0 + 1, y1 - y0 + 1))
+    }
+
+    /** A rectangle of the grid, in grid pixels. */
+    private data class Window(val x: Int, val y: Int, val width: Int, val height: Int)
+
+    /** How far around the point [nowcastAround] works: the coverage check's reach. */
+    private const val AROUND_RADIUS = 64
+
+    private fun project(
+        recent: List<RadarField>,
+        leads: List<Duration>,
+        around: Window?,
+    ): RadarNowcast? {
         if (recent.size < 2 || leads.isEmpty()) return null
         val frames = recent.sortedBy { it.at }
         val latest = frames.last()
@@ -216,7 +262,7 @@ object RadarNowcaster {
             RadarNowcastStep(
                 at = latest.at.plus(lead),
                 lead = lead,
-                field = advance(latest, motion, trend, minutes),
+                field = advance(latest, motion, trend, minutes, around),
                 confidence = confidenceAt(minutes, motion.confidence),
             )
         }
@@ -269,22 +315,55 @@ object RadarNowcaster {
         motion: MotionField,
         trend: FloatArray,
         minutes: Double,
+        around: Window? = null,
     ): RadarField {
-        val geometry = latest.geometry
+        val full = latest.geometry
+        val window = around ?: Window(0, 0, full.width, full.height)
+        // The output covers the window; the arithmetic is done in the full
+        // grid's coordinates, so a window pixel gets exactly the value the same
+        // pixel of a whole-grid projection would.
+        val geometry = if (around == null) {
+            full
+        } else {
+            RadarGeometry(
+                zoom = full.zoom,
+                originX = full.originX + window.x,
+                originY = full.originY + window.y,
+                width = window.width,
+                height = window.height,
+            )
+        }
         val out = FloatArray(geometry.width * geometry.height)
         val boost = TREND_SATURATION_MINUTES * (1.0 - exp(-minutes / TREND_SATURATION_MINUTES))
 
-        for (y in 0 until geometry.height) {
-            for (x in 0 until geometry.width) {
+        for (wy in 0 until geometry.height) {
+            for (wx in 0 until geometry.width) {
+                val x = wx + window.x
+                val y = wy + window.y
                 val source = traceBack(motion, x.toFloat(), y.toFloat(), minutes)
                 val advected = latest.sampleAt(source)
                 if (advected.isNoEcho()) {
-                    out[y * geometry.width + x] = RadarField.NO_ECHO
+                    out[wy * geometry.width + wx] = RadarField.NO_ECHO
                     continue
                 }
-                val block = blockIndexAt(motion, x, y)
+                // Growth is something rain does, so it applies only where rain
+                // is - and it is the trend of the block the rain came *from*,
+                // since that is where it was measured growing.
+                //
+                // Both were wrong once. The trend was added to every pixel of
+                // the destination block, dry ones included, so a block with one
+                // strengthening cell in a corner rained evenly across all of it:
+                // squares of light rain forty kilometres wide that nothing had
+                // observed, and one of them over the reader's pin. It was the
+                // radar map that showed it; the chart had been sampling those
+                // squares all along.
+                if (advected < RadarField.TRACE_MM_PER_HOUR) {
+                    out[wy * geometry.width + wx] = advected.coerceAtLeast(MIN_RATE)
+                    continue
+                }
+                val block = blockIndexAt(motion, source.x.toInt(), source.y.toInt())
                 val grown = advected + (trend[block] * boost).toFloat()
-                out[y * geometry.width + x] = grown.coerceAtLeast(MIN_RATE)
+                out[wy * geometry.width + wx] = grown.coerceAtLeast(MIN_RATE)
             }
         }
         return RadarField(

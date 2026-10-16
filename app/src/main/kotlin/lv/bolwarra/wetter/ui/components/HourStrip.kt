@@ -153,6 +153,7 @@ private fun HourColumn(hour: HourlyWeather, zone: ZoneId) {
             condition = hour.appearance,
             contentDescription = stringResource(hour.appearance.labelRes()),
             size = HOUR_GLYPH,
+            isDay = hour.isDay,
         )
         Spacer(Modifier.height(spacing.xs))
         Text(

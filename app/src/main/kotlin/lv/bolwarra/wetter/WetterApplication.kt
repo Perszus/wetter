@@ -1,7 +1,12 @@
 package lv.bolwarra.wetter
 
 import android.app.Application
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.work.ForecastRefreshWorker
+import lv.bolwarra.wetter.work.Heartbeat
 
 /**
  * Owns the object graph for as long as the process lives.
@@ -19,5 +24,12 @@ class WetterApplication : Application() {
         // duplicates. It is cheap and it is the only place the schedule is
         // guaranteed to be re-asserted after the app is updated.
         ForecastRefreshWorker.schedule(this)
+        // And the clock that actually keeps the app fresh. A no-op when a wake is
+        // already pending, so a process started for any reason cannot postpone it
+        // - and in its own scope rather than the container's, so that check does
+        // not build the object graph the comment above keeps lazy.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            runCatching { Heartbeat.ensure(this@WetterApplication) }
+        }
     }
 }

@@ -3,6 +3,9 @@ package lv.bolwarra.wetter.data.provider
 import android.util.Log
 import java.time.Clock
 import java.time.Instant
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import lv.bolwarra.wetter.data.BuildConfig
 import lv.bolwarra.wetter.domain.model.WeatherError
 import lv.bolwarra.wetter.domain.model.WeatherForecast
@@ -79,16 +82,51 @@ internal class WeatherProviderRouter(
             return Result.failure(WeatherFailure(WeatherError.NoProviderAvailable))
         }
 
+        return coroutineScope {
+            // Asked alongside the first choice rather than after it, when the
+            // first choice is known in advance to stop being hourly short of the
+            // horizon. Its capabilities say so before a byte is fetched - MET
+            // Norway is hourly for 60 hours of the 144 needed - so waiting for
+            // its answer to find out only put a second round trip in series with
+            // the first on every refresh in the Nordics. The same answer is also
+            // very often the fallback, so a failed first choice costs no wait.
+            val first = candidates.first().provider
+            val reach = first.capabilities.hourlyHorizonHours
+            val companion = extensionCandidate(first, reach.toLong(), ranked)
+                ?.takeIf { reach < requirements.hourlyHorizon.toHours() }
+            val early = companion?.let { EarlyAnswer(it.id, async { it.getForecast(location) }) }
+            try {
+                attempt(candidates, location, ranked, early)
+            } finally {
+                // Unused if the first choice turned out to reach far enough.
+                early?.answer?.cancel()
+            }
+        }
+    }
+
+    /** A second provider's answer, requested before it was known to be needed. */
+    private class EarlyAnswer(val providerId: String, val answer: Deferred<Result<WeatherForecast>>)
+
+    private suspend fun attempt(
+        candidates: List<ProviderScore>,
+        location: WeatherLocation,
+        ranked: List<ProviderScore>,
+        early: EarlyAnswer?,
+    ): Result<WeatherForecast> {
         var firstError: WeatherError? = null
 
         for (candidate in candidates) {
             val provider = candidate.provider
-            val result = provider.getForecast(location)
+            val result = if (early != null && early.providerId == provider.id) {
+                early.answer.await()
+            } else {
+                provider.getForecast(location)
+            }
 
             result.onSuccess { forecast ->
                 health.recordSuccess(provider.id, Instant.now(clock))
                 rememberHealth()
-                return Result.success(extendIfShort(forecast, location, ranked))
+                return Result.success(extendIfShort(forecast, location, ranked, early))
             }
 
             val error = result.exceptionOrNull()?.asWeatherError() ?: WeatherError.Unknown()
@@ -126,6 +164,7 @@ internal class WeatherProviderRouter(
         forecast: WeatherForecast,
         location: WeatherLocation,
         ranked: List<ProviderScore>,
+        early: EarlyAnswer? = null,
     ): WeatherForecast {
         val now = Instant.now(clock)
         if (!ForecastStitcher.needsExtending(forecast, requirements.hourlyHorizon, now)) {
@@ -143,7 +182,11 @@ internal class WeatherProviderRouter(
             "${forecast.provider.id} is hourly for ${coveredHours}h; extending with ${candidate.id}",
         )
 
-        val result = candidate.getForecast(location)
+        val result = if (early != null && early.providerId == candidate.id) {
+            early.answer.await()
+        } else {
+            candidate.getForecast(location)
+        }
         val extension = result.getOrNull()
         if (extension == null) {
             val error = result.exceptionOrNull()?.asWeatherError() ?: WeatherError.Unknown()
@@ -161,6 +204,17 @@ internal class WeatherProviderRouter(
         health.recordSuccess(candidate.id, Instant.now(clock))
         return ForecastStitcher.stitch(forecast, extension)
     }
+
+    /** The best-ranked other provider that is hourly further than [coveredHours]. */
+    private fun extensionCandidate(
+        primary: WeatherProvider,
+        coveredHours: Long,
+        ranked: List<ProviderScore>,
+    ): WeatherProvider? = ranked.firstOrNull { score ->
+        score.eligible &&
+            score.provider.id != primary.id &&
+            score.provider.capabilities.hourlyHorizonHours > coveredHours
+    }?.provider
 
     /**
      * Whether the next provider is worth trying.

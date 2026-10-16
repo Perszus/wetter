@@ -58,4 +58,17 @@ interface RadarSource {
         longitude: Double,
         frames: Int,
     ): Result<List<RadarField>>
+
+    /**
+     * The same sweeps over a much wider area at coarser resolution - the
+     * surrounding countries rather than the surrounding district - for a
+     * picture of what is coming rather than a reading at a point.
+     *
+     * Nothing by default: a source that cannot offer it simply has no map.
+     */
+    suspend fun wideFrames(
+        latitude: Double,
+        longitude: Double,
+        frames: Int,
+    ): Result<List<RadarField>> = Result.success(emptyList())
 }

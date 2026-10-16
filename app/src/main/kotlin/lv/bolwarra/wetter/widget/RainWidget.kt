@@ -1,418 +1,83 @@
 package lv.bolwarra.wetter.widget
 
-import android.app.PendingIntent
-import android.appwidget.AppWidgetManager
-import android.appwidget.AppWidgetProvider
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.content.res.Configuration
-import android.os.Build
-import android.os.Bundle
-import android.util.Log
-import android.widget.RemoteViews
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import lv.bolwarra.wetter.MainActivity
-import lv.bolwarra.wetter.R
-import lv.bolwarra.wetter.WetterApplication
-import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.model.WeatherForecast
-import lv.bolwarra.wetter.ui.theme.Atmosphere
-import lv.bolwarra.wetter.ui.theme.WetterColors
-import lv.bolwarra.wetter.ui.theme.darkPlate
-import lv.bolwarra.wetter.ui.theme.lightPlate
+import lv.bolwarra.wetter.ui.format.NextRain
 
 /**
- * The home-screen widget: the next four hours of rain, and nothing else.
- *
- * What is deliberately absent is most of it. There is no heading saying "Rain" -
- * a blue curve climbing out of a flat line is not something anybody needs told
- * the name of - and no millimetre figure, because the number was never the
- * question. What survives is the shape and the level, which is what a glance is
- * for (docs/design-principles.md, rule 8).
- *
- * That leaves the whole plate for the chart, which is the point. The curve gets
- * roughly two thirds of the height instead of competing with a label row, and
- * the two band lines behind it carry the vertical axis without a single word or
- * number on it.
- *
- * ### Why it draws itself in our process
- *
- * [RemoteViews] is a description of views, inflated in the launcher. No code of
- * ours runs there, so the curve arrives as a finished bitmap from [RainStrip].
- * Only the hour labels are real views, so they keep the reader's font scale.
+ * The next four hours of rain, and nothing else: no heading and no figures, just
+ * the curve against its two band lines, which is what a glance needs.
  */
-class RainWidget : AppWidgetProvider() {
+internal class RainWidget : PictureWidget() {
 
-    /**
-     * The clock moved under us, so the picture is wrong rather than merely old.
-     *
-     * A four-hour window labelled in local time stops being true the moment the
-     * zone changes or somebody corrects the clock, and neither event produces new
-     * weather for the periodic refresh to notice. Both are protected broadcasts,
-     * so the only sender is the system.
-     */
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        if (intent.action !in CLOCK_CHANGED) return
+    override val defaultWidthDp = 240f
+    override val defaultHeightDp = 70f
 
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try {
-                refresh(context)
-            } finally {
-                pending.finish()
-            }
-        }
-    }
-
-    override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) =
-        render(context, manager, appWidgetIds)
-
-    /**
-     * Resizing changes the picture, because the picture is sized in pixels.
-     *
-     * Without this the bitmap keeps whatever dimensions it had when it was first
-     * placed, and the launcher stretches it - which shows up as a curve that
-     * gets steadily softer every time somebody drags a corner.
-     */
-    override fun onAppWidgetOptionsChanged(
-        context: Context,
-        manager: AppWidgetManager,
-        appWidgetId: Int,
-        newOptions: Bundle,
-    ) = render(context, manager, intArrayOf(appWidgetId))
-
-    private fun render(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        if (ids.isEmpty()) return
-
-        // A BroadcastReceiver is considered non-responsive after ten seconds, so
-        // the work goes to a coroutine and the receiver is kept alive explicitly
-        // until it finishes.
-        val pending = goAsync()
-        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            try {
-                paint(context, manager, ids)
-            } finally {
-                pending.finish()
-            }
-        }
-    }
-
-    /** Read once, drawn for every widget on the screen. */
-    internal suspend fun paint(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        val frame = frameFor(context)
-        ids.forEach { id -> draw(context, manager, id, frame) }
-    }
-
-    /**
-     * Everything the picture needs, read once for all the widgets on screen.
-     *
-     * Null when there is no forecast yet - a fresh install before the first
-     * refresh. The widget then keeps whatever it last drew rather than blanking,
-     * because a widget that empties itself looks broken in a way that a slightly
-     * old curve does not.
-     */
-    private suspend fun frameFor(context: Context): Frame? {
-        val container = (context.applicationContext as? WetterApplication)?.container ?: return null
-        val location = container.selectedLocation.current()
-
-        // Fetch for ourselves when the cache has aged out.
-        //
-        // The background job is the usual way new weather arrives, and on a
-        // phone whose battery manager has quietly stopped that job it is no way
-        // at all - the widget then redraws a forecast from this morning forever,
-        // which is worse than the blank one nobody would have trusted.
-        //
-        // This alarm belongs to the system rather than to us, so it arrives
-        // regardless, and a request made from inside it is a request the OEM has
-        // already allowed. Bounded well under the ten seconds a broadcast
-        // receiver gets, and simply skipped if it overruns: the old cache still
-        // draws, and there is another wake-up along shortly.
-        val cached = container.repository.cached(location)
-        val forecast = if (container.repository.needsRefresh(cached)) {
-            withTimeoutOrNull(FETCH_BUDGET_MS) {
-                container.repository.refresh(location).getOrNull()
-            } ?: cached
-        } else {
-            cached
-        } ?: return null
-
-        val now = Instant.now()
-
-        // The fused timeline is radar-led in the first hour, which is exactly
-        // the part of a four-hour window worth being right about. It can reach
-        // the network, so it is given a budget well inside the receiver's, and
-        // the model's own hours stand in if it overruns.
-        val fused = withTimeoutOrNull(FUSION_BUDGET_MS) {
-            runCatching {
-                container.nowcasts.timeline(forecast, now, STEP, STEPS)
-            }.getOrNull()
-        }
-
-        val rates = fused
-            ?.takeIf { it.isNotEmpty() }
-            ?.map { it.millimetresPerHour }
-            ?: modelRates(forecast, now)
-
-        val conditions = forecast.conditionsAt(now)
-        return Frame(
-            rates = rates,
-            windSpeed = conditions.windSpeed,
-            windFrom = conditions.windDirection,
-            zone = forecast.location.zone,
-            now = now,
+    override fun draw(sheet: Sheet, snapshot: WidgetSnapshot) {
+        val window = RainWindow.of(snapshot)
+        RainStrip.drawStrip(
+            canvas = sheet.ink.canvas,
+            box = sheet.bounds,
+            scale = sheet.scale,
+            colors = sheet.colors,
+            rates = window.rates,
+            hourOffset = window.hourOffset,
+            hourLabels = window.hourLabels,
         )
     }
 
+    /** The Today page's next-rain sentence, which is what this chart shows. */
+    override fun describe(context: Context, snapshot: WidgetSnapshot): String =
+        NextRain.of(context.resources, snapshot.forecast, snapshot.timeline, snapshot.now).text
+}
+
+/** The next four hours of rain, ready to draw: the rain widget and the overview's strip. */
+internal class RainWindow(
+    /** Millimetres per hour, evenly spaced across the window, the first being now. */
+    val rates: List<Double>,
     /**
-     * The model's own hours, when radar could not be reached in time.
-     *
-     * Five points across four hours rather than twenty-five, so the curve is
-     * blockier - which is honest, because that is genuinely all the model has.
+     * Where the first whole hour falls, as a fraction of the window. The window
+     * opens at now, so the hour marks are a quarter apart but offset.
      */
-    private fun modelRates(forecast: WeatherForecast, now: Instant): List<Double> {
-        val end = now.plus(WINDOW)
-        return forecast.hourly
-            .filter {
-                !it.timestamp.isBefore(now.minus(Duration.ofHours(1))) &&
-                    it.timestamp.isBefore(end)
-            }
-            .sortedBy { it.timestamp }
-            .map { it.precipitation ?: 0.0 }
-            .ifEmpty { listOf(0.0, 0.0) }
-    }
-
-    /**
-     * Hand the launcher a picture, and settle for a smaller one if it will not
-     * take it.
-     *
-     * The bitmap is drawn at the screen's own density, which on a large widget
-     * and a dense screen can still put the update past the megabyte a Binder
-     * transaction gets - a tablet-sized widget at 3x is several of them. There is no way to ask in advance - the sizes involved
-     * depend on the launcher's own overhead - so this tries, and on refusal
-     * comes back with a quarter of the pixels. Softer than intended is still a
-     * widget; refused is a blank rectangle.
-     */
-    private fun draw(context: Context, manager: AppWidgetManager, id: Int, frame: Frame?) {
-        if (push(context, manager, id, frame, RainStrip.MAX_BYTES)) return
-        push(context, manager, id, frame, RainStrip.FALLBACK_BYTES)
-    }
-
-    private fun push(
-        context: Context,
-        manager: AppWidgetManager,
-        id: Int,
-        frame: Frame?,
-        maxBytes: Int,
-    ): Boolean {
-        // Nothing to draw means draw nothing - not draw a blank.
-        //
-        // This used to build the views anyway and push them without a bitmap,
-        // which wiped whatever the widget was showing. The comment on frameFor
-        // has always said it keeps its last picture instead; now it does. A
-        // slightly old curve is a widget, an empty rectangle is a fault report.
-        if (frame == null) return true
-
-        val views = RemoteViews(context.packageName, R.layout.widget_rain)
-        views.setOnClickPendingIntent(R.id.widget_root, openApp(context))
-
-        run {
-            val size = sizeOf(manager, id)
-            views.setImageViewBitmap(
-                R.id.widget_canvas,
-                RainStrip.render(
-                    widthDp = size.first,
-                    heightDp = size.second,
-                    density = context.resources.displayMetrics.density,
-                    cornerRadiusDp = cornerRadiusDp(context),
-                    colors = paletteFor(context),
-                    rates = frame.rates,
-                    windSpeed = frame.windSpeed,
-                    windFrom = frame.windFrom,
-                    hourOffset = hourOffset(frame),
-                    hourLabels = hourLabels(frame),
-                    maxBytes = maxBytes,
-                ),
-            )
-        }
-
-        return try {
-            manager.updateAppWidget(id, views)
-            true
-        } catch (refused: RuntimeException) {
-            // Both ways this fails arrive as a RuntimeException on this side:
-            // the widget service rejecting an oversized bitmap outright, and a
-            // Binder transaction that will not fit.
-            Log.w(TAG, "widget $id refused a $maxBytes byte update", refused)
-            false
-        }
-    }
-
-    /**
-     * How far along the window the first whole hour falls, as a fraction of it.
-     *
-     * The window opens at *now*, so the hour boundaries inside it are not at
-     * quarters of the width - they are a quarter apart but offset by however far
-     * away the next one is. The labels used to be drawn at fixed quarters, which
-     * put midnight wherever 23:47 plus an hour happened to land, and read as
-     * text that had slipped sideways.
-     */
-    private fun hourOffset(frame: Frame): Float {
-        val next = frame.now.atZone(frame.zone)
-            .truncatedTo(ChronoUnit.HOURS)
-            .plusHours(1)
-            .toInstant()
-        val into = Duration.between(frame.now, next).toMillis().toFloat()
-        return into / WINDOW.toMillis().toFloat()
-    }
-
-    /**
-     * The clock times of those boundaries.
-     *
-     * Twenty-four hour, and not the device's 12/24 preference, because the app's
-     * own time axis is `"%d:%02d"` unconditionally (clockOf in RainCurve.kt).
-     * Following the setting here made the widget say "12 AM" beside a chart
-     * saying "0:00" for the same moment.
-     *
-     * Whether each label has room to be drawn is decided where it is drawn,
-     * against the measured width of the text.
-     */
-    private fun hourLabels(frame: Frame): List<String> {
-        val first = frame.now.atZone(frame.zone)
-            .truncatedTo(ChronoUnit.HOURS)
-            .plusHours(1)
-        return (0 until HOURS_IN_WINDOW).map {
-            val at = first.plusHours(it.toLong())
-            "%d:%02d".format(at.hour, at.minute)
-        }
-    }
-
-    /**
-     * The widget's own size in dp, which is not knowable from the layout.
-     *
-     * The launcher reports a range because the same widget occupies different
-     * space in portrait and landscape. The narrow width and the tall height are
-     * the portrait pair, which is the one it is nearly always seen in.
-     */
-    private fun sizeOf(manager: AppWidgetManager, id: Int): Pair<Float, Float> {
-        val options = manager.getAppWidgetOptions(id)
-        val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
-        val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
-        return Pair(
-            if (width > 0) width.toFloat() else DEFAULT_WIDTH_DP,
-            if (height > 0) height.toFloat() else DEFAULT_HEIGHT_DP,
-        )
-    }
-
-    /**
-     * The launcher clips the widget to its own radius on Android 12 and later,
-     * so the plate is drawn to match rather than guessed at. Below that nobody
-     * clips anything and the corner is ours to choose.
-     */
-    private fun cornerRadiusDp(context: Context): Float =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.resources.getDimension(android.R.dimen.system_app_widget_background_radius) /
-                context.resources.displayMetrics.density
-        } else {
-            FALLBACK_RADIUS_DP
-        }
-
-    /**
-     * The same palette as the app, under the same sky.
-     *
-     * [Atmosphere.Neutral] rather than the sky of the moment: on the home screen
-     * the plate sits against a wallpaper the app knows nothing about, and a
-     * ground that shifts with the weather would read as the widget failing to
-     * settle rather than as the weather changing.
-     */
-    private fun paletteFor(context: Context): WetterColors {
-        val night = context.resources.configuration.uiMode and
-            Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-        return if (night) darkPlate(Atmosphere.Neutral) else lightPlate(Atmosphere.Neutral)
-    }
-
-    private fun openApp(context: Context): PendingIntent = PendingIntent.getActivity(
-        context,
-        0,
-        Intent(context, MainActivity::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
-    private data class Frame(
-        val rates: List<Double>,
-        val windSpeed: Double?,
-        val windFrom: Int?,
-        val zone: ZoneId,
-        val now: Instant,
-    )
-
+    val hourOffset: Float,
+    /** The hour marks' labels, in 24-hour time like the app's own chart axis. */
+    val hourLabels: List<String>,
+) {
     companion object {
 
-        /**
-         * Redraws every placed widget.
-         *
-         * Called after a refresh writes a new forecast, which is the only thing
-         * that changes what the widget should say. There is no periodic update
-         * of its own - `updatePeriodMillis` is zero - because a schedule that
-         * woke the device to redraw the same curve would be spending battery to
-         * change nothing.
-         *
-         * It draws directly rather than asking the system to. The first version
-         * broadcast ACTION_APPWIDGET_UPDATE at itself, which looks like the
-         * obvious way to do this and silently does nothing: that action is
-         * protected, so the broadcast is refused with a permission denial the
-         * sender never sees. Nothing in the app can send it - only the system
-         * can - and an app that wants its widget redrawn simply hands
-         * AppWidgetManager the new views.
-         */
-        suspend fun refresh(context: Context) {
-            val manager = AppWidgetManager.getInstance(context) ?: return
-            val ids = manager.getAppWidgetIds(ComponentName(context, RainWidget::class.java))
-            if (ids.isEmpty()) return
+        fun of(snapshot: WidgetSnapshot): RainWindow {
+            val now = snapshot.now
+            val zone = snapshot.forecast.location.zone
+            val rates = snapshot.timeline
+                .takeIf { it.isNotEmpty() }
+                ?.map { it.millimetresPerHour }
+                ?: modelRates(snapshot.forecast, now)
 
-            // An instance purely to reach the drawing, which is a member because
-            // onUpdate needs it too. A provider is an ordinary BroadcastReceiver
-            // and nothing here touches its receiver half.
-            RainWidget().paint(context, manager, ids)
+            val first = now.atZone(zone).truncatedTo(ChronoUnit.HOURS).plusHours(1)
+            val into = Duration.between(now, first.toInstant()).toMillis().toFloat()
+            val labels = (0 until HOURS_IN_WINDOW).map {
+                val at = first.plusHours(it.toLong())
+                "%d:%02d".format(at.hour, at.minute)
+            }
+            return RainWindow(rates, into / WidgetSnapshot.WINDOW.toMillis().toFloat(), labels)
         }
 
-        /** Four hours, as asked for, at the timeline's own ten-minute spacing. */
-        private val WINDOW: Duration = Duration.ofHours(4)
-        private val STEP: Duration = Duration.ofMinutes(10)
-        private const val STEPS = 24
-
-        /**
-         * The two network budgets, which have to share a receiver's ten seconds.
-         *
-         * Four and three leaves three spare for the drawing and for the fetch
-         * that only sometimes happens at all - most redraws find the cache fresh
-         * and skip the first of these entirely.
-         */
-        private const val FETCH_BUDGET_MS = 4_000L
-        private const val FUSION_BUDGET_MS = 3_000L
-
-        private const val TAG = "RainWidget"
+        /** The model's hourly rates, for when no radar projection is held. */
+        private fun modelRates(forecast: WeatherForecast, now: Instant): List<Double> {
+            val end = now.plus(WidgetSnapshot.WINDOW)
+            return forecast.hourly
+                .filter {
+                    !it.timestamp.isBefore(now.minus(Duration.ofHours(1))) &&
+                        it.timestamp.isBefore(end)
+                }
+                .sortedBy { it.timestamp }
+                .map { it.precipitation ?: 0.0 }
+                .ifEmpty { listOf(0.0, 0.0) }
+        }
 
         private const val HOURS_IN_WINDOW = 4
-
-        private val CLOCK_CHANGED = setOf(
-            Intent.ACTION_TIME_CHANGED,
-            Intent.ACTION_TIMEZONE_CHANGED,
-        )
-
-        /** Three cells by one, before anybody resizes it. */
-        private const val DEFAULT_WIDTH_DP = 240f
-        private const val DEFAULT_HEIGHT_DP = 70f
-
-        private const val FALLBACK_RADIUS_DP = 16f
     }
 }

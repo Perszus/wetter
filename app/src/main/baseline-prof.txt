@@ -1,0 +1,19 @@
+# Compiled ahead of time at install, rather than left to warm up interpreted.
+#
+# The radar projection is tight arithmetic over half a million pixels, run for
+# every new sweep - in a background wake that is usually a fresh process. Left
+# to the JIT it measured eleven seconds a sweep on a phone; compiled ahead, about
+# three. The rest of the near-term path - fusion, the widget, the background
+# pass - is listed for the same reason: it runs cold, and it is what people wait on.
+HSPLlv/bolwarra/wetter/domain/radar/**;->**(**)**
+Llv/bolwarra/wetter/domain/radar/**;
+HSPLlv/bolwarra/wetter/domain/forecast/**;->**(**)**
+Llv/bolwarra/wetter/domain/forecast/**;
+HSPLlv/bolwarra/wetter/data/repository/NowcastRepository**;->**(**)**
+Llv/bolwarra/wetter/data/repository/NowcastRepository**;
+HSPLlv/bolwarra/wetter/data/provider/rainviewer/**;->**(**)**
+Llv/bolwarra/wetter/data/provider/rainviewer/**;
+HSPLlv/bolwarra/wetter/widget/**;->**(**)**
+Llv/bolwarra/wetter/widget/**;
+HSPLlv/bolwarra/wetter/work/**;->**(**)**
+Llv/bolwarra/wetter/work/**;

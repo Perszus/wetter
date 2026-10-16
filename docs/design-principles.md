@@ -20,18 +20,27 @@ dashboard. It should read as measured, quiet, and precise.
 1. **Precipitation is the primary signal.** It gets the emphasis, the only
    saturated colour in the palette, and the most screen area. Temperature is
    deliberately quieter than rain.
-2. **Nothing waits on the network.** A cached forecast renders immediately. A
-   refresh happens behind it, and its failure never removes what is on screen.
-   The cache is on disk and a background worker keeps it fresh, so this holds
-   across a restart rather than only within one session.
+2. **Show what is known at once; go and get newer; show it the moment it
+   lands.** Every surface - the app, the dial, the widget - draws from disk
+   immediately and never waits on the network. Behind it the app is hungry
+   rather than patient: opening it asks for the newest at once, an open screen
+   keeps asking, and in the background a clock timed to the radar wakes just
+   after each new sweep is published, every ten minutes, and redraws the widget
+   whether or not the network answered (work/Heartbeat.kt). A failed fetch never
+   removes what is on screen. The next half hour is what people open a weather
+   app for, so radar - which carries it - is always fetched first.
 3. **Staleness is the app's problem, not the reader's.** There is deliberately
    no "updated 42 minutes ago" line. Somebody opening a weather app wants the
    weather, not a report on the app's own housekeeping; keeping the forecast
    current is work the app should simply do. The cost of this is real and worth
    knowing: a device offline for a day shows day-old numbers without saying so.
 4. **No account, no telemetry, no advertising, no backend of ours.**
-5. **One permission.** `INTERNET`. Location is optional and only requested when
-   somebody chooses to use it.
+5. **Few permissions, each for one stated reason.** `INTERNET` to ask a weather
+   service about a place. Location is optional and only requested when somebody
+   chooses to use it; notifications only carry severe-weather warnings. Boot and
+   exact alarms exist for the background clock alone - the first restarts it
+   after a reboot, the second lets it land on the minute, and the app works,
+   minutes less precisely, without it.
 6. **Free software, buildable from source**, with no proprietary dependency and
    nothing that F-Droid cannot reproduce.
 7. **Most evidence, least speculation.** Where two sources disagree, the one
@@ -111,8 +120,9 @@ dashboard. It should read as measured, quiet, and precise.
 
    **The guard, and it is the important half.** Precision is not the appearance
    of precision. Finer *stamping* is not finer *information*: Open-Meteo will
-   serve these models at quarter-hour stamps and the values repeat unchanged
-   within each hour - measured, not assumed. Fetching that would quadruple the
+   serve quarter-hour stamps everywhere, and outside a few regional models the
+   values are the hour divided evenly, or do not even add up to it - measured,
+   not assumed (docs/providers.md). Fetching that would quadruple the
    payload to learn nothing, and drawing it as though it were quarter-hourly
    truth would be a lie told in high resolution. So: take the finest signal that
    is real, interpolate honestly between the points a source actually gave, and
@@ -272,7 +282,7 @@ pass. Roughly:
 3. Persistence — Room, a cache that survives the process
 4. The visual phase — precipitation timeline, temperature curve, daily forecast
 5. Locations — search, saved places, optional device position
-6. Widget — a precipitation-focused home-screen widget *(first one done)*
+6. Widgets — rain, now, hours, week and an overview *(done)*
 7. Background refresh *(done)*
 8. Settings
 9. Polish, accessibility, tablets

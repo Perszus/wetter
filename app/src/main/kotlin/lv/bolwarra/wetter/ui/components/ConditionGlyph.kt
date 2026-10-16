@@ -6,9 +6,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
@@ -54,6 +56,12 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * of seven days, the blue marks are the wet ones and nothing else competes for
  * the eye. A yellow sun would have made a clear week the loudest thing on the
  * page.
+ *
+ * ### The sky after dark
+ *
+ * [isDay] swaps the sun for a crescent wherever the sky is drawn. A day in the
+ * week is a day and keeps the sun; an hour at eleven at night with a sun on it
+ * is simply wrong, and the hour strip and the widgets both show hours.
  */
 @Composable
 fun ConditionGlyph(
@@ -63,12 +71,13 @@ fun ConditionGlyph(
     size: Dp = GLYPH,
     tint: Color = WetterTheme.colors.textSecondary,
     falling: Color = WetterTheme.colors.precipitation,
+    isDay: Boolean = true,
 ) {
     val described = contentDescription
         ?.let { Modifier.semantics { this.contentDescription = it } }
         ?: Modifier
     Canvas(modifier.size(size).then(described)) {
-        drawCondition(condition, tint, falling)
+        drawCondition(condition, tint, falling, isDay)
     }
 }
 
@@ -81,8 +90,19 @@ fun ConditionGlyph(
  * whether anything falls, whether it is frozen, whether it is violent — and the
  * freezing pair keep a mark of their own because ice underfoot is the one thing
  * on this list that a coat does not solve.
+ *
+ * Internal so the widgets draw the very same marks into their pictures.
  */
-private fun DrawScope.drawCondition(condition: WeatherCondition, ink: Color, wet: Color) {
+internal fun DrawScope.drawCondition(
+    condition: WeatherCondition,
+    ink: Color,
+    wet: Color,
+    isDay: Boolean = true,
+) {
+    // The sun's place in the sky, or the moon's after dark.
+    fun light(centre: Offset, radius: Float) =
+        if (isDay) sun(centre, radius, ink) else moon(centre, radius, ink)
+
     val s = size.minDimension
     // Everything below is written against a square, then centred in whatever box
     // it was given. Two glyphs in a column must sit on the same baseline however
@@ -90,15 +110,15 @@ private fun DrawScope.drawCondition(condition: WeatherCondition, ink: Color, wet
     translate(left = (size.width - s) / 2f, top = (size.height - s) / 2f) {
         when (condition) {
             WeatherCondition.CLEAR ->
-                sun(Offset(s * 0.5f, s * 0.5f), s * 0.18f, ink)
+                light(Offset(s * 0.5f, s * 0.5f), s * 0.18f)
 
             WeatherCondition.MAINLY_CLEAR -> {
-                sun(Offset(s * 0.36f, s * 0.34f), s * 0.15f, ink)
+                light(Offset(s * 0.36f, s * 0.34f), s * 0.15f)
                 cloud(s * 0.58f, s * 0.72f, s * 0.52f, ink)
             }
 
             WeatherCondition.PARTLY_CLOUDY -> {
-                sun(Offset(s * 0.32f, s * 0.30f), s * 0.14f, ink)
+                light(Offset(s * 0.32f, s * 0.30f), s * 0.14f)
                 cloud(s * 0.56f, s * 0.76f, s * 0.68f, ink)
             }
 
@@ -153,7 +173,7 @@ private fun DrawScope.drawCondition(condition: WeatherCondition, ink: Color, wet
             }
 
             WeatherCondition.RAIN_SHOWERS -> {
-                sun(Offset(s * 0.28f, s * 0.24f), s * 0.12f, ink)
+                light(Offset(s * 0.28f, s * 0.24f), s * 0.12f)
                 cloud(s * 0.56f, s * 0.60f, s * 0.62f, ink)
                 drops(
                     s,
@@ -231,6 +251,27 @@ private fun DrawScope.sun(centre: Offset, radius: Float, colour: Color) {
             cap = StrokeCap.Round,
         )
     }
+}
+
+/**
+ * The night's stand-in for [sun]: a crescent, the disc with a bite out of it.
+ *
+ * Larger than the sun's disc because it has no rays - the rays are what give
+ * the sun its size, and a bare disc at the same radius reads as a smaller,
+ * lesser thing. At this scale the crescent sits in the same footprint.
+ */
+private fun DrawScope.moon(centre: Offset, radius: Float, colour: Color) {
+    val outer = radius * MOON_SCALE
+    val disc = Path().apply { addOval(Rect(centre, outer)) }
+    val bite = Path().apply {
+        addOval(
+            Rect(
+                Offset(centre.x + outer * MOON_BITE_X, centre.y - outer * MOON_BITE_Y),
+                outer * MOON_BITE_SIZE,
+            ),
+        )
+    }
+    drawPath(Path.combine(PathOperation.Difference, disc, bite), colour)
 }
 
 /**
@@ -370,5 +411,41 @@ private const val STROKE = 0.075f
 
 private const val RAYS = 8
 
+private const val MOON_SCALE = 1.7f
+private const val MOON_BITE_X = 0.5f
+private const val MOON_BITE_Y = 0.32f
+private const val MOON_BITE_SIZE = 0.82f
+
 /** Sized to the cap height of the row it sits in, not to a picture. */
 val GLYPH = 22.dp
+
+/**
+ * A folded map: three panels, alternately tilted, in one stroke.
+ *
+ * Drawn rather than taken from an icon set, for the reason every other mark in
+ * the app is - it is drawn at the weight and in the ink of the text beside it.
+ */
+fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFoldedMap(ink: Color) {
+    val w = size.width
+    val h = size.height
+    val lift = h * 0.12f
+    val top = h * 0.14f
+    val bottom = h * 0.86f
+    val xs = listOf(0f, w / 3f, 2f * w / 3f, w)
+    // Folds alternate: a crease that rises at the top falls at the bottom.
+    val tops = xs.mapIndexed { i, x -> Offset(x, if (i % 2 == 0) top + lift else top) }
+    val bottoms = xs.mapIndexed { i, x -> Offset(x, if (i % 2 == 0) bottom else bottom - lift) }
+    val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
+        width = h * 0.085f,
+        join = androidx.compose.ui.graphics.StrokeJoin.Round,
+        cap = androidx.compose.ui.graphics.StrokeCap.Round,
+    )
+    val outline = androidx.compose.ui.graphics.Path().apply {
+        moveTo(tops.first().x, tops.first().y)
+        tops.drop(1).forEach { lineTo(it.x, it.y) }
+        bottoms.reversed().forEach { lineTo(it.x, it.y) }
+        close()
+    }
+    drawPath(outline, ink, style = stroke)
+    for (i in 1..2) drawLine(ink, tops[i], bottoms[i], stroke.width, cap = stroke.cap)
+}

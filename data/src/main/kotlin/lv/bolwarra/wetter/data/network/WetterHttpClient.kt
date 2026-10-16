@@ -7,7 +7,9 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
+import java.io.File
 import kotlinx.serialization.json.Json
+import okhttp3.Cache
 
 /**
  * The one HTTP client, shared by every provider.
@@ -48,7 +50,15 @@ internal object WetterHttpClient {
         isLenient = true
     }
 
-    fun create(userAgent: String, engine: HttpClientEngine? = null): HttpClient {
+    /**
+     * @param cacheDirectory where responses may be kept on disk, honouring what
+     *   each service says about them. See [CACHE_BYTES].
+     */
+    fun create(
+        userAgent: String,
+        engine: HttpClientEngine? = null,
+        cacheDirectory: File? = null,
+    ): HttpClient {
         val configure: io.ktor.client.HttpClientConfig<*>.() -> Unit = {
             expectSuccess = true
 
@@ -64,6 +74,40 @@ internal object WetterHttpClient {
                 requestTimeoutMillis = REQUEST_TIMEOUT_MS
             }
         }
-        return if (engine != null) HttpClient(engine, configure) else HttpClient(OkHttp, configure)
+        return when {
+            engine != null -> HttpClient(engine, configure)
+            else -> HttpClient(OkHttp) {
+                engine {
+                    config {
+                        if (cacheDirectory != null) cache(Cache(cacheDirectory, CACHE_BYTES))
+                    }
+                }
+                configure()
+            }
+        }
     }
+
+    /**
+     * An ordinary HTTP disk cache, governed entirely by what each service says.
+     *
+     * There was none, so a cold start fetched again what a warm one already
+     * had. Every service here states its own terms, and the cache obeys them
+     * rather than any policy of ours:
+     *
+     * - radar tiles live at a path unique to their sweep and are marked good
+     *   for two days, so the sweeps behind a fresh process come off disk
+     *   instead of being downloaded again;
+     * - basemap tiles are marked good for days, which OpenStreetMap's tile
+     *   policy asks clients to honour - the map reopens without asking again;
+     * - MET Norway sends `Expires` and `Last-Modified`, and its terms ask for
+     *   exactly the conditional requests this makes automatic;
+     * - the radar index says `no-cache`, so it is revalidated every time and
+     *   can never be served stale;
+     * - Open-Meteo sends no caching headers at all, so a forecast from it is
+     *   never answered from disk.
+     *
+     * Thirty-two megabytes: a day of radar sweeps and a few map openings, in
+     * the app's cache directory where the system may clear it under pressure.
+     */
+    private const val CACHE_BYTES = 32L * 1024 * 1024
 }

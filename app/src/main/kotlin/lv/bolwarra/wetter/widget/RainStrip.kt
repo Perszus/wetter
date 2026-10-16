@@ -1,216 +1,54 @@
 package lv.bolwarra.wetter.widget
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
-import android.graphics.SweepGradient
 import androidx.compose.ui.graphics.toArgb
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
 import lv.bolwarra.wetter.domain.curve.RainCurveBands
 import lv.bolwarra.wetter.ui.theme.WetterColors
 
 /**
- * The widget, drawn as one picture.
- *
- * A home-screen widget is a [android.widget.RemoteViews] tree - a description of
- * views, serialized over Binder and inflated inside the launcher's process. We
- * have no code running there, so there is no canvas of ours to draw on and no
- * frame loop to animate. The only way to put an arbitrary shape on a widget is
- * to render it here, in our process, and hand the launcher a finished bitmap.
- *
- * So this draws everything except the text: the plate, the wind, the bands and
- * the curve. Drawing the plate here rather than as an XML background is what
- * keeps the widget the same colour as the app - the palette is solved in CIE
- * LCh at runtime (ui/theme/Color.kt), and a hex value copied into a drawable
- * would be a second source of truth that silently stops matching.
- *
- * ### The size of it
- *
- * Binder gives a process about one megabyte of transaction buffer, and the
- * bitmap has to fit inside that along with everything else in the update. A
- * 240x130 dp widget at a modern phone's 2.75x density is 660x357 px, which as
- * ARGB_8888 is 942 KB - the entire budget, for one frame.
- *
- * Hence [MAX_PIXELS]. The bitmap is rendered at whatever scale keeps it under
- * that and the launcher scales it up, which costs a little sharpness on the
- * thinnest strokes and nothing anywhere else. It is also why the text is not in
- * here: upscaled type looks broken in a way an upscaled curve does not.
+ * The rain chart the rain widget is made of, and the overview's strip: the band
+ * lines, the curve coloured by the band it is in, and the hour marks with their
+ * labels, drawn into a box on a widget's picture.
  */
 internal object RainStrip {
 
     /**
-     * @param rates millimetres per hour, evenly spaced across the window, the
-     *   first sample being now.
-     * @param windSpeed metres per second, or null when nothing is known - in
-     *   which case no ring is drawn at all rather than a calm one.
-     * @param windFrom degrees clockwise from north, the direction the wind
-     *   blows from.
+     * The chart and its clock, in a box on a canvas that is not necessarily
+     * this widget's - the overview carries the same strip, drawn by the same
+     * code, so the two can never show the same rain two ways.
+     *
+     * [box] is in pixels; its height in dp decides the insets, as it always has.
      */
-    fun render(
-        widthDp: Float,
-        heightDp: Float,
-        density: Float,
-        cornerRadiusDp: Float,
+    fun drawStrip(
+        canvas: Canvas,
+        box: RectF,
+        scale: Float,
         colors: WetterColors,
         rates: List<Double>,
-        windSpeed: Double?,
-        windFrom: Int?,
         hourOffset: Float,
         hourLabels: List<String>,
-        maxBytes: Int,
-    ): Bitmap {
-        val scale = renderScale(widthDp, heightDp, density, maxBytes)
-        val width = max(1, (widthDp * scale).toInt())
-        val height = max(1, (heightDp * scale).toInt())
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-
-        val plate = RectF(0f, 0f, width.toFloat(), height.toFloat())
-        val radius = cornerRadiusDp * scale
-
-        drawPlate(canvas, plate, radius, colors)
-        drawRim(canvas, plate, radius, scale, colors, windSpeed, windFrom)
-
+    ) {
+        val heightDp = box.height() / scale
         // Proportional, not fixed. At one cell tall the whole widget is about
         // 56 dp, and a 10 dp head plus a 24 dp foot would leave the chart less
         // room than its own margins.
         val chart = RectF(
-            CHART_INSET_DP * scale,
-            topInset(heightDp) * scale,
-            width - CHART_INSET_DP * scale,
-            height - labelInset(heightDp) * scale,
+            box.left + CHART_INSET_DP * scale,
+            box.top + topInset(heightDp) * scale,
+            box.right - CHART_INSET_DP * scale,
+            box.bottom - labelInset(heightDp) * scale,
         )
         if (chart.width() > 0f && chart.height() > 0f) {
             drawBands(canvas, chart, scale, colors)
             drawCurve(canvas, chart, scale, colors, rates)
             drawHours(canvas, chart, scale, colors, hourOffset, hourLabels)
         }
-        return bitmap
-    }
-
-    /**
-     * The ground the widget sits on.
-     *
-     * Opaque on purpose. A translucent widget takes its legibility from whatever
-     * wallpaper happens to be behind it, and the whole palette is built by
-     * solving contrast against a known ground - against an unknown one none of
-     * those ratios mean anything.
-     */
-    private fun drawPlate(canvas: Canvas, plate: RectF, radius: Float, colors: WetterColors) {
-        // The raised tone rather than the page tone. On a screen the plate sits
-        // on a known ground; on a home screen it sits on a wallpaper, and the
-        // first build used `surface` - which on the dark palette is very nearly
-        // black, against a wallpaper that was also very nearly black. It read as
-        // a hole rather than as a card.
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = colors.surfaceRaised.toArgb()
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(plate, radius, radius, paint)
-
-        // A sheen down the top third. Glass is not a flat fill: it catches the
-        // light it is under, brightest where it faces the source and falling
-        // away below. Two percent of a highlight tone is enough - any more and
-        // it stops being light on a surface and becomes a painted stripe.
-        val sheen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            shader = LinearGradient(
-                0f,
-                plate.top,
-                0f,
-                plate.top + plate.height() * SHEEN_DEPTH,
-                withAlpha(colors.surfaceHighlight.toArgb(), SHEEN_ALPHA),
-                withAlpha(colors.surfaceHighlight.toArgb(), 0f),
-                Shader.TileMode.CLAMP,
-            )
-        }
-        canvas.drawRoundRect(plate, radius, radius, sheen)
-    }
-
-    /**
-     * The edge, as a rim of light - and the wind, as where it is brightest.
-     *
-     * The first version was a soft blurred band, which read as a smudge round
-     * the outside rather than as an edge: it made the widget look grubby, like a
-     * drop shadow drawn on the wrong side. Glass does not have a halo. It has a
-     * thin, bright, hard rim where the light catches the bevel, and that rim
-     * goes all the way round whether or not anything is happening.
-     *
-     * So the rim is the material and the wind is a modulation of it. It is
-     * always drawn, at a low base brightness, which is what makes the widget
-     * read as an object sitting on the wallpaper rather than a hole cut in it.
-     * Where the wind blows from, the rim brightens.
-     *
-     * ### Why it does not move
-     *
-     * The idea this serves was a gradient travelling around the border, which a
-     * widget cannot do: [android.widget.RemoteViews] is inflated in the
-     * launcher's process, so there is no frame loop of ours and no animation
-     * primitive for arbitrary graphics. The nearest thing - a ViewFlipper
-     * cycling pre-rendered frames - costs a full bitmap per frame out of a
-     * one-megabyte budget, advances on a coarse timer, and is paused by
-     * launchers at will. It would read as a stutter, not as a breeze.
-     *
-     * Standing still says more anyway. Motion could only have carried speed; a
-     * fixed bright side carries direction too, which is the half somebody acts
-     * on when deciding which way to walk home.
-     */
-    private fun drawRim(
-        canvas: Canvas,
-        plate: RectF,
-        radius: Float,
-        scale: Float,
-        colors: WetterColors,
-        windSpeed: Double?,
-        windFrom: Int?,
-    ) {
-        val width = RIM_DP * scale
-        val band = RectF(plate).apply { inset(width / 2f, width / 2f) }
-        if (band.width() <= 0f || band.height() <= 0f) return
-
-        val rim = colors.surfaceHighlight.toArgb() and 0x00FFFFFF
-        val base = withAlpha(rim, RIM_BASE_ALPHA)
-
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = width
-            color = base
-        }
-
-        // No reading is not a calm reading, so with nothing measured the rim
-        // stays even and says nothing about the wind either way.
-        if (windSpeed != null && windFrom != null) {
-            // Square-rooted, so a real breeze is visible rather than sitting at
-            // a fifteenth of the range. Gale force is the top of the scale and
-            // almost nothing reaches it, so a linear ramp spends nearly all its
-            // range on wind nobody will ever stand in.
-            val strength = sqrt((windSpeed / GALE_MS).coerceIn(0.0, 1.0)).toFloat()
-            val lit = withAlpha(rim, RIM_BASE_ALPHA + (RIM_PEAK_ALPHA - RIM_BASE_ALPHA) * strength)
-
-            // Sweep angles start at three o'clock and run clockwise; compass
-            // bearings start at twelve and also run clockwise, so the two differ
-            // by a quarter turn. Rotating by that puts the bright part of the
-            // rim exactly on the bearing.
-            paint.shader = SweepGradient(
-                band.centerX(),
-                band.centerY(),
-                intArrayOf(lit, base, base, lit),
-                floatArrayOf(0f, TAIL_START, TAIL_END, 1f),
-            ).apply {
-                setLocalMatrix(
-                    Matrix().apply {
-                        postRotate(windFrom - QUARTER_TURN, band.centerX(), band.centerY())
-                    },
-                )
-            }
-        }
-        canvas.drawRoundRect(band, radius - width / 2f, radius - width / 2f, paint)
     }
 
     /**
@@ -382,8 +220,8 @@ internal object RainStrip {
                     chart.top,
                     0f,
                     chart.bottom,
-                    withAlpha(full, FILL_TOP_ALPHA),
-                    withAlpha(full, FILL_BOTTOM_ALPHA),
+                    WidgetPlate.withAlpha(full, FILL_TOP_ALPHA),
+                    WidgetPlate.withAlpha(full, FILL_BOTTOM_ALPHA),
                     Shader.TileMode.CLAMP,
                 )
             },
@@ -406,12 +244,12 @@ internal object RainStrip {
                     0f,
                     chart.bottom,
                     intArrayOf(
-                        mix(muted, full, HEAVY_MIX),
-                        mix(muted, full, HEAVY_MIX),
-                        mix(muted, full, MODERATE_MIX),
-                        mix(muted, full, MODERATE_MIX),
-                        mix(muted, full, LIGHT_MIX),
-                        mix(muted, full, LIGHT_MIX),
+                        WidgetPlate.mix(muted, full, HEAVY_MIX),
+                        WidgetPlate.mix(muted, full, HEAVY_MIX),
+                        WidgetPlate.mix(muted, full, MODERATE_MIX),
+                        WidgetPlate.mix(muted, full, MODERATE_MIX),
+                        WidgetPlate.mix(muted, full, LIGHT_MIX),
+                        WidgetPlate.mix(muted, full, LIGHT_MIX),
                     ),
                     // A hair apart, because stops have to keep increasing and
                     // two at the same offset are not guaranteed to draw as an
@@ -500,70 +338,6 @@ internal object RainStrip {
         return path
     }
 
-    /**
-     * How many device pixels to draw one dp at, within a byte budget.
-     *
-     * **The screen's own density, wherever it fits.** That is the whole rule,
-     * and it is what makes this adapt rather than being tuned to one handset: a
-     * widget's true pixel size is its dp size times whatever the device's
-     * density happens to be, so asking for native asks for exactly the right
-     * number on a 2x phone, a 3x phone and a tablet alike.
-     *
-     * The ceiling is the part that does not scale with the device. A Binder
-     * transaction is about a megabyte on every Android device ever shipped -
-     * it is a property of the transport, not of the screen - so it is expressed
-     * in bytes here and the pixels are derived, rather than a pixel count
-     * measured off one phone and left to mean something different on the next.
-     *
-     * An earlier version had exactly that bug: a constant of 110,000 pixels,
-     * chosen when the widget was a different shape, which happened to sit just
-     * under what a 480 dpi phone needed and so upscaled every frame by nine
-     * percent.
-     */
-    private fun renderScale(
-        widthDp: Float,
-        heightDp: Float,
-        density: Float,
-        maxBytes: Int,
-    ): Float {
-        val area = max(1f, widthDp * heightDp)
-        return min(density, sqrt(maxBytes / BYTES_PER_PIXEL / area))
-    }
-
-    private fun mix(from: Int, to: Int, amount: Float): Int {
-        fun channel(shift: Int): Int {
-            val a = (from shr shift) and 0xFF
-            val b = (to shr shift) and 0xFF
-            return (a + (b - a) * amount).toInt().coerceIn(0, 255) shl shift
-        }
-        return (0xFF shl 24) or channel(16) or channel(8) or channel(0)
-    }
-
-    private fun withAlpha(color: Int, alpha: Float): Int =
-        (color and 0x00FFFFFF) or ((alpha * 255).toInt().coerceIn(0, 255) shl 24)
-
-    /**
-     * Three quarters of a Binder transaction, which is what the picture may
-     * weigh.
-     *
-     * The rest of the megabyte carries the views, the pending intent and the
-     * launcher's own overhead. The widget service would allow far more - AOSP
-     * caps it at six times the display in bytes, some 20 MB on a modern phone -
-     * but that is not the wall a payload hits first.
-     */
-    internal const val MAX_BYTES = 768 * 1024
-
-    /**
-     * What to draw at when the launcher refuses the full-size payload.
-     *
-     * A quarter of the budget, so the retry cannot itself be marginal. Softer
-     * than intended is a widget; refused is a blank rectangle.
-     */
-    internal const val FALLBACK_BYTES = MAX_BYTES / 4
-
-    /** ARGB_8888, the only config with the alpha the rounded corners need. */
-    private const val BYTES_PER_PIXEL = 4f
-
     private const val CHART_INSET_DP = 10f
 
     /**
@@ -603,23 +377,6 @@ internal object RainStrip {
     private const val LABEL_GAP_DP = 3f
     private const val LABEL_BASELINE_DP = 15f
     private const val HAIRLINE_DP = 1f
-
-    /** Thin and hard, the way a bevel catches light. */
-    private const val RIM_DP = 1.5f
-    private const val RIM_BASE_ALPHA = 0.22f
-    private const val RIM_PEAK_ALPHA = 0.85f
-
-    private const val SHEEN_ALPHA = 0.055f
-    private const val SHEEN_DEPTH = 0.38f
-
-    /** Where the glow has fallen away entirely, and where it starts returning. */
-    private const val TAIL_START = 0.3f
-    private const val TAIL_END = 0.7f
-
-    private const val QUARTER_TURN = 90f
-
-    /** Gale force, the same number the hazard rules use. Full glow sits here. */
-    private const val GALE_MS = 17.2
 
     /**
      * The fill does not fade to nothing.

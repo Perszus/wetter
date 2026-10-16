@@ -245,7 +245,7 @@ private fun ZoomButton(description: String, glyph: String, enabled: Boolean, onC
  * which reads on pale fields, on grey streets and on the black of a label.
  */
 @Composable
-private fun BoxScope.Pin(at: Offset, density: Float) {
+internal fun BoxScope.Pin(at: Offset, density: Float) {
     androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
         val centre = at
         val stroke = PIN_STROKE_DP * density

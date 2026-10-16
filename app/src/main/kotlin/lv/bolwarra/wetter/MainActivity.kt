@@ -6,9 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import lv.bolwarra.wetter.domain.settings.Preferences
 import lv.bolwarra.wetter.ui.WetterApp
 import lv.bolwarra.wetter.ui.theme.WetterTheme
+import lv.bolwarra.wetter.widget.Widgets
 
 /**
  * The only activity.
@@ -38,5 +40,20 @@ class MainActivity : ComponentActivity() {
                 WetterApp()
             }
         }
+    }
+
+    /**
+     * Leaving the app is the moment the home screen comes back, so the widget
+     * is redrawn from what the app has just been showing.
+     *
+     * Nothing is fetched for this: the app has spent the visit collecting the
+     * newest sweep and forecast, and the widget reads the same store. Without
+     * it the widget kept whatever the last background run drew - up to a
+     * quarter of an hour behind a screen the reader had just looked at.
+     */
+    override fun onStop() {
+        super.onStop()
+        val app = application as WetterApplication
+        app.container.applicationScope.launch { runCatching { Widgets.refresh(app) } }
     }
 }

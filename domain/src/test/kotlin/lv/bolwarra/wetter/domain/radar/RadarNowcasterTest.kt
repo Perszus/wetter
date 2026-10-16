@@ -336,4 +336,38 @@ class RadarNowcasterTest {
             assertEquals(latest.plus(step.lead), step.at)
         }
     }
+
+    @Test
+    fun `growth intensifies rain and never paints it onto dry ground`() {
+        // A shower strengthening as it moves. The trend is measured per block,
+        // and was once added to every pixel of the block - so a block with a
+        // growing cell in one corner rained evenly across all of it, forty
+        // kilometres of square that nothing had observed.
+        val growing = movingEast(scale = 2f)
+        val nowcast = RadarNowcaster.nowcast(growing, leads)!!
+
+        fun wet(field: RadarField): Int {
+            var count = 0
+            for (y in 0 until field.height) {
+                for (x in 0 until field.width) {
+                    val v = field[x, y]
+                    if (!v.isNoEcho() && v >= RadarField.TRACE_MM_PER_HOUR) count++
+                }
+            }
+            return count
+        }
+
+        // Bounded against what was observed rather than matched exactly: the
+        // estimated motion is not perfectly uniform, so advection alone
+        // stretches a field by a few tens of percent over an hour. The defect
+        // this guards against filled whole blocks and quadrupled the area
+        // within ten minutes.
+        val observed = wet(growing.last())
+        nowcast.steps.forEach { step ->
+            assertTrue(
+                "${step.lead}: ${wet(step.field)} wet pixels from $observed observed",
+                wet(step.field) <= observed * 3 / 2,
+            )
+        }
+    }
 }

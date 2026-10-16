@@ -93,4 +93,38 @@ class RadarGeometryTest {
         assertNull(geometry.pointOf(89.0, 0.0))
         assertNull(geometry.pointOf(-89.0, 0.0))
     }
+
+    @Test
+    fun `an even block is centred on the place, not on its tile`() {
+        // Four tiles have no middle tile, only a middle corner. Whichever half
+        // of its tile the place falls in, it must end within half a tile of the
+        // block's centre - which keeps it well inside the middle three tiles
+        // the map shows.
+        val places = listOf(
+            56.95 to 24.11,
+            56.95 to 24.9,
+            57.4 to 23.5,
+            51.5 to -0.12,
+            -33.9 to 151.2,
+        )
+        for ((latitude, longitude) in places) {
+            val block = RadarGeometry.blockAround(latitude, longitude, 7, 4)
+            val point = requireNotNull(block.pointOf(latitude, longitude))
+            val half = RadarGeometry.TILE_SIZE / 2f
+            assertTrue(
+                "$latitude,$longitude x ${point.x}",
+                kotlin.math.abs(point.x - 512f) <= half,
+            )
+            assertTrue(
+                "$latitude,$longitude y ${point.y}",
+                kotlin.math.abs(point.y - 512f) <= half,
+            )
+        }
+    }
+
+    @Test
+    fun `a block near the pole stays on the map`() {
+        val block = RadarGeometry.blockAround(84.9, 10.0, 7, 4)
+        assertEquals(0, block.originY)
+    }
 }

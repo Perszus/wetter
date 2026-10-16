@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Four cells across, one down. Wider shows more hours; taller shows another
+  row of them (widget/HoursWidget.kt), up to three.
+
+  minWidth and minHeight are cells in the old 70n - 30 dp formula, for launchers
+  that still place by dp; targetCellWidth and targetCellHeight say the same in
+  cells for Android 12 and later. The half-hour update is the system's backstop,
+  not the plan: the heartbeat redraws every widget at each radar sweep (see
+  rain_widget_info.xml for why the backstop is kept).
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_hours_description"
+    android:initialLayout="@layout/widget_picture"
+    android:maxResizeHeight="300dp"
+    android:minHeight="40dp"
+    android:minResizeHeight="40dp"
+    android:minResizeWidth="180dp"
+    android:minWidth="250dp"
+    android:previewImage="@drawable/widget_preview_hours"
+    android:previewLayout="@layout/widget_preview_hours"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="1"
+    android:targetCellWidth="4"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

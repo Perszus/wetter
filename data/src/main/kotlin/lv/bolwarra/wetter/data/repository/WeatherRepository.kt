@@ -52,11 +52,18 @@ class WeatherRepository internal constructor(
     }
 
     /**
-     * Whether a forecast is old enough to be worth replacing.
+     * Whether a forecast is old enough to be worth asking again.
      *
-     * Half an hour, because that is roughly how often the models Wetter draws on
-     * publish a new run. Refreshing more often would spend battery and somebody
-     * else's bandwidth to redraw the same numbers (docs/design-principles.md).
+     * Ten minutes, the same clock the radar keeps. It was half an hour, on the
+     * reasoning that the models publish hourly - but "hourly" lands at a different
+     * minute for every service and every run, so a half-hour window meant a new
+     * run could sit published for up to forty-five minutes before anything here
+     * asked for it. Asking sooner costs nothing when nothing has changed: MET
+     * Norway's answers are revalidated against its own `Last-Modified` and come
+     * back "not modified", and the disk cache answers outright inside `Expires`
+     * (WetterHttpClient). The only full re-download is Open-Meteo, which says
+     * nothing about caching, and one small request every ten minutes is well
+     * inside what it asks of a free client (docs/providers.md).
      */
     fun needsRefresh(forecast: WeatherForecast?): Boolean {
         if (forecast == null) return true
@@ -67,6 +74,6 @@ class WeatherRepository internal constructor(
         Duration.between(forecast.fetchedAt, Instant.now(clock))
 
     companion object {
-        val DEFAULT_FRESH_FOR: Duration = Duration.ofMinutes(30)
+        val DEFAULT_FRESH_FOR: Duration = Duration.ofMinutes(10)
     }
 }

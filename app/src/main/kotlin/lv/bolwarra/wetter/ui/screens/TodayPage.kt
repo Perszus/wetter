@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.time.Duration
@@ -33,11 +34,7 @@ import lv.bolwarra.wetter.domain.at
 import lv.bolwarra.wetter.domain.conditionsAt
 import lv.bolwarra.wetter.domain.dominantKind
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
-import lv.bolwarra.wetter.domain.forecast.ObservedSpell
-import lv.bolwarra.wetter.domain.model.HourlyWeather
-import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
-import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.sky.StarWatch
 import lv.bolwarra.wetter.domain.sky.Stargazing
@@ -49,11 +46,11 @@ import lv.bolwarra.wetter.ui.components.MetricGrid
 import lv.bolwarra.wetter.ui.components.MetricGroup
 import lv.bolwarra.wetter.ui.components.RainCurve
 import lv.bolwarra.wetter.ui.components.Tile
-import lv.bolwarra.wetter.ui.format.DayDistance
+import lv.bolwarra.wetter.ui.components.TileAction
+import lv.bolwarra.wetter.ui.components.drawFoldedMap
 import lv.bolwarra.wetter.ui.format.NO_READING
-import lv.bolwarra.wetter.ui.format.dayDistance
+import lv.bolwarra.wetter.ui.format.NextRain
 import lv.bolwarra.wetter.ui.format.formatConcentration
-import lv.bolwarra.wetter.ui.format.formatDayAndMonth
 import lv.bolwarra.wetter.ui.format.formatDuration
 import lv.bolwarra.wetter.ui.format.formatMillimetres
 import lv.bolwarra.wetter.ui.format.formatPercent
@@ -61,9 +58,9 @@ import lv.bolwarra.wetter.ui.format.formatPressure
 import lv.bolwarra.wetter.ui.format.formatTemperature
 import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatUvIndex
-import lv.bolwarra.wetter.ui.format.formatWeekday
 import lv.bolwarra.wetter.ui.format.formatWindSpeed
 import lv.bolwarra.wetter.ui.format.labelRes
+import lv.bolwarra.wetter.ui.format.rateNow
 import lv.bolwarra.wetter.ui.format.uvBandLabel
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
@@ -81,6 +78,12 @@ fun TodayPage(
     air: AirQuality? = null,
     /** Whether a fetch is outstanding, shown as a turning arc beside the label. */
     isRefreshing: Boolean = false,
+    /**
+     * Opens the rain map. Offered whenever there is a forecast, not only once
+     * radar has landed: nobody waits half a minute for a button to appear, and
+     * the map says for itself that it is still fetching.
+     */
+    onOpenMap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val units = WetterTheme.units
@@ -125,6 +128,11 @@ fun TodayPage(
                 // and the one the radar refresh actually changes; putting the
                 // same mark on the moon phase would be the app fidgeting.
                 busy = isRefreshing,
+                action = onOpenMap?.let {
+                    TileAction(stringResource(R.string.radar_open), { ink ->
+                        drawFoldedMap(ink)
+                    }, it)
+                },
             ) {
                 RainCurve(
                     hours = ahead,
@@ -420,48 +428,6 @@ private fun AdvancedTile(
     }
 }
 
-/**
- * What is falling at this moment, in millimetres an hour.
- *
- * Prefers the fused timeline, because in the first hour that is radar and the
- * model's hourly row is a smooth average of sixty minutes that may contain one
- * five-minute burst. Falls back to the row covering now when there is no
- * projection - offline, or somewhere no radar reaches.
- */
-private fun rateNow(
-    timeline: List<FusedPrecipitation>,
-    ahead: List<HourlyWeather>,
-    now: Instant,
-): Double {
-    val nearest = timeline.minByOrNull { Duration.between(it.at, now).abs() }
-    // Only if it is actually about now. A projection kept from a sweep half an
-    // hour ago describes half an hour ago.
-    if (nearest != null && Duration.between(nearest.at, now).abs() <= NOW_TOLERANCE) {
-        return nearest.millimetresPerHour
-    }
-    return ahead.at(now)?.precipitation ?: 0.0
-}
-
-/** How far from "now" a projected sample can sit and still count as now. */
-private val NOW_TOLERANCE: Duration = Duration.ofMinutes(4)
-
-/**
- * What the radar is seeing, named.
- *
- * Radar returns echoes from hydrometeors and cannot say whether they are frozen,
- * so the word comes from elsewhere: the model's own next spell where it has one,
- * and the air temperature otherwise. Near freezing that is genuinely uncertain,
- * which is why the answer there is "wintry mix" rather than a confident "rain".
- */
-private fun radarKind(
-    spell: PrecipitationSpell?,
-    forecast: WeatherForecast,
-    now: Instant,
-): PrecipitationKind {
-    spell?.kind?.takeIf { it != PrecipitationKind.NONE }?.let { return it }
-    return PrecipitationKind.likelyAt(forecast.conditionsAt(now).temperature)
-}
-
 private const val PERCENT = 100
 
 /**
@@ -484,25 +450,10 @@ private fun NextRainBar(
 ) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
-    // Read from the same series the curve above is drawn from, so the sentence
-    // and the picture cannot disagree. See ObservedSpell for what went wrong
-    // when this was the provider's hourly rows and the chart was radar.
-    val spell = ObservedSpell.next(timeline, forecast.hourly, now)
-
-    // The model's hourly row is an average over sixty minutes, so a shower that
-    // the radar can see arriving can sit under the trace threshold in it. When
-    // that happens this bar used to announce rain starting in an hour while the
-    // curve above it, and the rate beside the label, both showed rain falling.
-    // Whatever is actually overhead wins.
-    val rate = rateNow(timeline, forecast.hourly, now)
-    // Rain, not merely something measurable. This bar is the app's plainest
-    // sentence and it was built on the lower bar, so a fortnight of Rīga cloud
-    // with a tenth of a millimetre in it read as continuous rain. An hour in
-    // that band is actually raining about half the time; see
-    // PrecipitationIntensity.isWorthNaming.
-    val fallingNow = PrecipitationIntensity.ofRate(rate).isWorthNaming
-    val modelAgrees = spell != null && !spell.start.isAfter(now)
-    val wet = fallingNow || modelAgrees
+    // Worked out in NextRain, which the widgets read too, so the home screen
+    // and this line cannot say two different things about the same rain.
+    val line = NextRain.of(LocalResources.current, forecast, timeline, now)
+    val ink = if (line.matters) colors.textPrimary else colors.textTertiary
 
     Row(
         modifier = Modifier
@@ -516,63 +467,14 @@ private fun NextRainBar(
             Modifier
                 .size(DOT)
                 .clip(CircleShape)
-                .background(
-                    if (wet ||
-                        spell != null
-                    ) {
-                        colors.textPrimary
-                    } else {
-                        colors.textTertiary
-                    },
-                ),
+                .background(ink),
         )
         Spacer(Modifier.width(spacing.m))
         Text(
-            text = if (fallingNow && !modelAgrees) {
-                stringResource(
-                    R.string.next_rain_falling,
-                    stringResource(radarKind(spell, forecast, now).labelRes()),
-                )
-            } else {
-                spell.describe(now, forecast)
-            },
+            text = line.text,
             style = WetterTheme.type.body,
-            color = if (wet || spell != null) colors.textPrimary else colors.textTertiary,
+            color = ink,
         )
-    }
-}
-
-/** One line, in the fewest words that are still true. */
-@Composable
-private fun PrecipitationSpell?.describe(now: Instant, forecast: WeatherForecast): String {
-    val zone = forecast.location.zone
-    if (this == null) return stringResource(R.string.next_rain_none)
-
-    val kind = stringResource(kind.labelRes())
-    if (!start.isAfter(now)) {
-        // Already falling. When it stops is the only thing left to say, and if
-        // the forecast runs out first, nobody can honestly say.
-        return if (isOpenEnded) {
-            stringResource(R.string.next_rain_falling, kind)
-        } else {
-            stringResource(R.string.next_rain_until, kind, formatTime(end, zone))
-        }
-    }
-
-    val date = start.atZone(zone).toLocalDate()
-    val day = when (dayDistance(start, now, zone)) {
-        DayDistance.TODAY -> null
-        DayDistance.TOMORROW -> stringResource(R.string.relative_tomorrow)
-        DayDistance.THIS_WEEK -> formatWeekday(date)
-        // Seven days out a weekday name is today's name again, so it stops being
-        // an answer and becomes a riddle.
-        DayDistance.LATER -> formatDayAndMonth(date)
-    }
-
-    return if (day == null) {
-        stringResource(R.string.next_rain_starts, kind, formatTime(start, zone))
-    } else {
-        stringResource(R.string.next_rain_starts_on, kind, day, formatTime(start, zone))
     }
 }
 

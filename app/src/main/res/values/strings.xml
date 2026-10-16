@@ -187,6 +187,10 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="setting_warnings">Severe weather warnings</string>
     <string name="setting_warnings_on">On</string>
     <string name="setting_warnings_off">Off</string>
+    <string name="setting_background">Background updates</string>
+    <string name="setting_background_why">Wetter refreshes itself every ten minutes, timed to the radar. The phone is holding it back.</string>
+    <string name="setting_background_exact">Allow precise timing</string>
+    <string name="setting_background_battery">Allow unrestricted battery</string>
     <string name="hazard_heat">Extreme heat</string>
     <string name="hazard_cold">Extreme cold</string>
     <string name="hazard_wind">Damaging wind</string>
@@ -290,6 +294,14 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <!-- Widget -->
     <string name="widget_rain_label">Rain</string>
     <string name="widget_rain_description">Rain for the next four hours</string>
+    <string name="widget_now_label">Now</string>
+    <string name="widget_now_description">The temperature and the sky, right now</string>
+    <string name="widget_hours_label">Hours</string>
+    <string name="widget_hours_description">The coming hours: sky, temperature and rain</string>
+    <string name="widget_week_label">Week</string>
+    <string name="widget_week_description">The week ahead: sky and temperatures</string>
+    <string name="widget_overview_label">Overview</string>
+    <string name="widget_overview_description">The dial, the next rain, the coming hours and the week</string>
 
     <!-- Putting a point on the map -->
     <string name="locations_pin_on_map">Put a point on the map</string>
@@ -305,6 +317,15 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="locations_pin_not_located">Could not find you. Tap the map instead.</string>
     <string name="map_zoom_in">Zoom in</string>
     <string name="map_zoom_out">Zoom out</string>
+    <string name="radar_open">Rain map</string>
+    <string name="radar_fetching">Fetching the latest radar…</string>
+    <string name="radar_nothing">No radar picture here right now.</string>
+    <string name="radar_projecting">Working out the next two hours…</string>
+    <string name="radar_play">Play</string>
+    <string name="radar_pause">Pause</string>
+    <string name="radar_now">Now</string>
+    <string name="radar_ago">%1$s ago</string>
+    <string name="radar_ahead">In %1$s</string>
     <string name="locations_pin_confirm">Use this point</string>
     <string name="locations_pin_cancel">Cancel</string>
 

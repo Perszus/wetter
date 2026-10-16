@@ -72,7 +72,7 @@ internal interface TileDecoder {
  * tile around the user would let a shower move in from outside the frame with no
  * warning at all, since there is no data upwind to have seen it coming. A block
  * buys the surrounding country in every direction, which at these zooms is the
- * couple of hours of approach the nowcast needs. It costs about 45 KB.
+ * couple of hours of approach the nowcast needs. See [BLOCK_SIZE] for its size.
  */
 internal class RainViewerRadarSource(
     private val client: HttpClient,
@@ -100,68 +100,80 @@ internal class RainViewerRadarSource(
         latitude: Double,
         longitude: Double,
         frames: Int,
-    ): Result<List<RadarField>> = try {
-        val index = index()
-        val wanted = index.radar.past.takeLast(frames.coerceAtLeast(2))
-        if (wanted.isEmpty() || index.host.isBlank()) {
-            Result.failure(WeatherFailure(WeatherError.NoProviderAvailable))
-        } else {
-            val (tileX, tileY) = RadarGeometry.tileOf(latitude, longitude, ZOOM)
-            val geometry = RadarGeometry.ofTileBlock(
-                zoom = ZOOM,
-                tileX = tileX - BLOCK_RADIUS,
-                tileY = tileY - BLOCK_RADIUS,
-                tilesAcross = BLOCK_SIZE,
-                tilesDown = BLOCK_SIZE,
-            )
-            // Frames together, not one after another.
-            //
-            // Each frame is nine tiles that were already fetched in parallel,
-            // and then the frames themselves were awaited in turn - so three
-            // sweeps cost three round trips and the catch-up case, which asks
-            // for thirteen, cost thirteen. They do not depend on each other in
-            // any way; the only reason they were sequential is that `map` is.
-            //
-            // The whole set shares one permit pool rather than each frame
-            // holding its own, so the burst is bounded by how many requests are
-            // in the air at once instead of by how many sweeps were asked for.
-            val fields = coroutineScope {
-                wanted.map { frame ->
-                    async { fetchFrame(index.host, frame, tileX, tileY, geometry) }
-                }.awaitAll()
+    ): Result<List<RadarField>> = frames(
+        RadarGeometry.blockAround(latitude, longitude, ZOOM, BLOCK_SIZE),
+        frames,
+    )
+
+    override suspend fun wideFrames(
+        latitude: Double,
+        longitude: Double,
+        frames: Int,
+    ): Result<List<RadarField>> = frames(
+        RadarGeometry.blockAround(latitude, longitude, WIDE_ZOOM, WIDE_BLOCK_SIZE),
+        frames,
+    )
+
+    private suspend fun frames(geometry: RadarGeometry, frames: Int): Result<List<RadarField>> =
+        try {
+            val index = index()
+            val wanted = index.radar.past.takeLast(frames.coerceAtLeast(2))
+            if (wanted.isEmpty() || index.host.isBlank()) {
+                Result.failure(WeatherFailure(WeatherError.NoProviderAvailable))
+            } else {
+                // Frames together, not one after another.
+                //
+                // Each frame is a block of tiles already fetched in parallel,
+                // and then the frames themselves were awaited in turn - so three
+                // sweeps cost three round trips and the catch-up case, which asks
+                // for thirteen, cost thirteen. They do not depend on each other in
+                // any way; the only reason they were sequential is that `map` is.
+                //
+                // The whole set shares one permit pool rather than each frame
+                // holding its own, so the burst is bounded by how many requests are
+                // in the air at once instead of by how many sweeps were asked for.
+                val fields = coroutineScope {
+                    wanted.map { frame ->
+                        async { fetchFrame(index.host, frame, geometry) }
+                    }.awaitAll()
+                }
+                Result.success(fields.filterNotNull())
             }
-            Result.success(fields.filterNotNull())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (failure: Throwable) {
+            Result.failure(WeatherFailure(failure.toWeatherError()))
         }
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (failure: Throwable) {
-        Result.failure(WeatherFailure(failure.toWeatherError()))
-    }
 
     /**
      * One sweep, stitched from its tiles.
      *
-     * The tiles are fetched together rather than in turn: nine sequential round
+     * The tiles are fetched together rather than in turn: sixteen sequential round
      * trips is most of a second of latency for no reason, and they are
      * independent.
      */
     private suspend fun fetchFrame(
         host: String,
         frame: RainViewerFrame,
-        tileX: Int,
-        tileY: Int,
         geometry: RadarGeometry,
     ): RadarField? = coroutineScope {
+        val firstX = geometry.originX / RadarGeometry.TILE_SIZE
+        val firstY = geometry.originY / RadarGeometry.TILE_SIZE
+        val across = geometry.width / RadarGeometry.TILE_SIZE
+        val down = geometry.height / RadarGeometry.TILE_SIZE
+        val span = 1 shl geometry.zoom
         val tiles = buildList {
-            for (row in 0 until BLOCK_SIZE) {
-                for (column in 0 until BLOCK_SIZE) {
-                    val x = tileX - BLOCK_RADIUS + column
-                    val y = tileY - BLOCK_RADIUS + row
+            for (row in 0 until down) {
+                for (column in 0 until across) {
+                    // Columns wrap at the antimeridian; the block never leaves
+                    // the map vertically (RadarGeometry.blockAround).
+                    val x = Math.floorMod(firstX + column, span)
+                    val y = firstY + row
                     add(
                         Triple(
                             column,
                             row,
-                            async { tile(host, frame.path, x, y) },
+                            async { tile(host, frame.path, geometry.zoom, x, y) },
                         ),
                     )
                 }
@@ -227,23 +239,25 @@ internal class RainViewerRadarSource(
     /**
      * How many tile requests may be in the air at once.
      *
-     * Nine is one frame's worth. Without a bound, asking for the thirteen
+     * Nine at a time. Without a bound, asking for the thirteen
      * frames of a catch-up would put a hundred and seventeen requests on a
      * volunteer service in one go, which is rude and, on a phone radio, slower
      * than doing fewer at a time.
      */
     private val inFlight = Semaphore(MAX_TILES_IN_FLIGHT)
 
-    private suspend fun tile(host: String, path: String, x: Int, y: Int): IntArray? = try {
-        val url = "$host$path/${RadarGeometry.TILE_SIZE}/$ZOOM/$x/$y/$COLOUR_SCHEME/$OPTIONS.png"
-        val response: HttpResponse = inFlight.withPermit { client.get(url) }
-        val bytes = response.readRawBytes()
-        withContext(Dispatchers.Default) { decoder.decode(bytes) }
-    } catch (cancellation: CancellationException) {
-        throw cancellation
-    } catch (_: Throwable) {
-        null
-    }
+    private suspend fun tile(host: String, path: String, zoom: Int, x: Int, y: Int): IntArray? =
+        try {
+            val size = RadarGeometry.TILE_SIZE
+            val url = "$host$path/$size/$zoom/$x/$y/$COLOUR_SCHEME/$OPTIONS.png"
+            val response: HttpResponse = inFlight.withPermit { client.get(url) }
+            val bytes = response.readRawBytes()
+            withContext(Dispatchers.Default) { decoder.decode(bytes) }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            null
+        }
 
     internal companion object {
         const val ID = "rainviewer"
@@ -257,13 +271,31 @@ internal class RainViewerRadarSource(
          */
         const val ZOOM = 7
 
-        /** Three by three, centred on the user's tile. */
+        /** A row and a bit of the block at once - polite, and quick on a phone radio. */
         const val MAX_TILES_IN_FLIGHT = 9
 
         val INDEX_FRESH_FOR: Duration = Duration.ofMinutes(1)
 
+        /** Three by three, centred on the place: about 510 km across over the Baltic. */
         const val BLOCK_SIZE = 3
-        const val BLOCK_RADIUS = BLOCK_SIZE / 2
+
+        /**
+         * The map's picture: a zoom out, and four tiles by four - about 1,360 km
+         * across over the Baltic, the country and every neighbour.
+         *
+         * A zoom out because the map is about what is coming from the next
+         * country, and at the chart's resolution that area is four times the
+         * pixels to fetch, hold and project. Two thirds of a kilometre a pixel
+         * matters for whether it rains on your street; at a country's width,
+         * a kilometre and a third shows the same weather.
+         *
+         * One tile wider than the map shows. It draws the middle three tiles'
+         * worth, so every projected frame has half a tile - some 170 km - of
+         * observed sky upwind of its edge to carry rain in from, rather than a
+         * blank that eats in from the side as the loop plays.
+         */
+        const val WIDE_ZOOM = 6
+        const val WIDE_BLOCK_SIZE = 4
 
         /**
          * The colour scheme and rendering options. Every scheme currently returns

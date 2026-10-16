@@ -334,6 +334,41 @@ rather than just their summary. A median rather than a mean because it ignores
 any more than one forecasting nothing can empty it, and on this evidence both
 happen.
 
+### Who votes
+
+A median is only as good as the independence of what goes into it, and two
+things quietly undermined that. Both were found by measuring the members
+rather than trusting their names.
+
+- **Three votes were one model everywhere outside Europe.** KNMI's and DMI's
+  "seamless" products are their regional model inside their own domain and
+  ECMWF outside it. In Tokyo, New York, Sydney, São Paulo, Delhi and Lagos their
+  series were ECMWF's byte for byte, so ECMWF's answer was being counted three
+  times and called a consensus. Members with identical series are now counted
+  once, which keeps KNMI and DMI as the genuinely separate votes they are over
+  Europe.
+- **One vote was a staircase.** ECMWF's 0.25° product is three-hourly, spread
+  evenly across its hours - two thirds of its wet hour-to-hour steps over Rīga
+  were exact repeats. The native 9 km `ecmwf_ifs` is hourly and replaced it.
+
+Canada's GEM joined to restore the count outside Europe: global, hourly and its
+own analysis. Measured and left out: JMA and CMA, three-hourly staircases away
+from home (48 of 55 wet steps repeated over Rīga), and BOM's and KMA's globals,
+which the service returns empty. So the vote is ECMWF, ICON, GFS, UKMO,
+Météo-France, GEM and the chosen provider everywhere, plus KNMI's and DMI's own
+models over Europe.
+
+### Why not quarter-hourly model data
+
+Open-Meteo serves a `minutely_15` series everywhere, and it is genuine only in
+a few places. Measured on one wet afternoon: over Berlin, inside ICON-D2's
+domain, the quarters vary and add up to the hour. Over Rīga they are the hour
+divided evenly. Over New York and Tokyo they are neither - quarters of 1.6 mm
+beside an hourly total of 2.7 mm, so they cannot both be the same rain. Taking
+them would put a series that contradicts its own hourly total into the one
+place this app is most careful, and the sub-hourly near term is radar's job
+wherever radar exists. The finest *real* resolution is the rule; this is not it.
+
 The hand-over is eased with a smoothstep rather than dropped at the boundary. A
 step in the weighting is a step in the answer, and nothing in the sky steps at
 the moment a projection turns an hour old — it showed as a kink in the curve at
@@ -401,7 +436,8 @@ Two properties of that split are worth keeping:
 - <https://www.rainviewer.com/api.html>
 - No key, no registration.
 - **Attribution is mandatory** under their free terms: *"Weather data by
-  RainViewer"* with a link back. Shown in About.
+  RainViewer"* with a link back. Shown in About, and on the rain map itself,
+  beside the OpenStreetMap credit, because there the picture is theirs.
 - **Their free tier is described as personal and educational use.** Commercial or
   high-volume integration is arranged case by case, and they explicitly disclaim
   rights in the underlying national radar data. This is the least settled licence
@@ -412,7 +448,13 @@ Two properties of that split are worth keeping:
   frames of history. Coverage over the Baltic is real and continuous; MET
   Norway's nowcast reports *no coverage* for Rīga because that is its own Nordic
   composite, not this one.
-- Responses are cached hard and a block of nine tiles is about 45 KB per cycle.
+- Tiles are marked good for two days at a path unique to their sweep, and
+  are kept in the HTTP disk cache, so a fresh process does not download the
+  sweeps behind it again.
+- The chart reads a three-by-three block at zoom 7,
+  about 510 km across over the Baltic. The rain map reads its own four-by-four
+  block a zoom out, about 1,360 km, and shows only the middle three by three,
+  so its projection always has observed sky upwind of what is on screen.
 
 ### What the tiles cannot tell us
 

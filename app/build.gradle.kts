@@ -52,6 +52,18 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
+        // For carrying around: the debug build's identity and key, so it installs
+        // over one and keeps its data, but not debuggable. A debuggable app runs
+        // with most of the runtime's compilation switched off, and the radar
+        // projection - tight loops over half a million pixels - measured over
+        // thirty seconds a sweep on a phone that way, against well under one on a
+        // desktop. Nobody should judge how fresh the app is from that build.
+        create("daily") {
+            initWith(getByName("debug"))
+            isDebuggable = false
+            versionNameSuffix = "-daily"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -110,6 +122,11 @@ android {
             "/META-INF/versions/9/previous-compilation-data.bin",
         )
     }
+
+    testOptions {
+        // The widget tests draw with the app's own resources and assets.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 kotlin {
@@ -152,6 +169,18 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Real android.graphics on the JVM, for drawing the widgets in tests.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+}
+
+// Robolectric fails to load its native graphics runtime from a Maven repository
+// whose path contains a space. A machine whose home directory has one can point
+// it elsewhere with robolectricRepository=<path> in ~/.gradle/gradle.properties.
+tasks.withType<Test>().configureEach {
+    providers.gradleProperty("robolectricRepository").orNull?.let {
+        systemProperty("maven.repo.local", it)
+    }
 }
 
 // An AAB is only ever built to be uploaded to Play, and Play will reject an

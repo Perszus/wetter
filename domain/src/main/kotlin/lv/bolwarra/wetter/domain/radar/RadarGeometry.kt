@@ -93,6 +93,29 @@ data class RadarGeometry(
             return x to y
         }
 
+        /**
+         * A square block of [tiles] tiles whose middle is as close to a place as
+         * whole tiles allow - within half a tile of it, whether [tiles] is odd
+         * or even.
+         *
+         * Centring by tile rather than by "the tile the place is in, plus a
+         * ring" is what lets an even block be used at all: a four-by-four block
+         * has no middle tile, only a middle corner, and which corner is nearest
+         * depends on which half of its tile the place falls in.
+         */
+        fun blockAround(latitude: Double, longitude: Double, zoom: Int, tiles: Int): RadarGeometry {
+            val n = 1 shl zoom
+            val clamped = latitude.coerceIn(-MERCATOR_LIMIT, MERCATOR_LIMIT)
+            val tileX = (longitude + 180.0) / 360.0 * n
+            val tileY = (1.0 - asinh(tan(Math.toRadians(clamped))) / PI) / 2.0 * n
+            val firstX = kotlin.math.round(tileX - tiles / 2.0).toInt()
+            // Rows do not wrap: past the top or bottom of the map there is no
+            // earth, so the block is kept on it.
+            val firstY = kotlin.math.round(tileY - tiles / 2.0).toInt()
+                .coerceIn(0, (n - tiles).coerceAtLeast(0))
+            return ofTileBlock(zoom, firstX, firstY, tiles, tiles)
+        }
+
         /** The geometry of a block of tiles, once stitched into one grid. */
         fun ofTileBlock(zoom: Int, tileX: Int, tileY: Int, tilesAcross: Int, tilesDown: Int) =
             RadarGeometry(

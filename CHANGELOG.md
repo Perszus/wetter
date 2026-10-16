@@ -8,6 +8,110 @@ Notable changes to Wetter. The format follows
 
 ### Added
 
+- **Four more widgets.** Now: the dial with the weather on its glass, or on a
+  single cell the reading alone. Hours: the coming hours with their sky,
+  temperature and rain. Week: the days ahead with their highs and lows, and each
+  day's range as a bar when there is height for it. Overview: the dial, the next
+  rain, the hours and the week together. Each lays itself out for the size it is
+  given - more hours or days when wider, more detail when taller - and can only
+  be resized within the range where that holds. The widget picker shows each one
+  as it really looks.
+- The hour strip shows a moon instead of a sun after dark.
+- **The dial's glass shows the weather.** Behind the reading, faint as light on
+  glass, is what the weather outside leaves on it - streaks of rain, flakes of
+  snow, a breath of mist, frost - one picture for each of 182 states, chosen from
+  the same reading as the word on the dial so the two never disagree. It is wiped
+  clear under the temperature and the word, so no picture can ever run through
+  the figure.
+- **A rain map, one tap from the chart.** The map mark on the rain tile opens a
+  panel over the blurred forecast: about a thousand kilometres around you - from
+  Rīga, Stockholm to Vilnius - with the last hour of radar and the next two hours
+  projected, play and a scrubber laid out in minutes. Rain is purple, running to
+  red where it concentrates, on the same band axis as the chart; the basemap is
+  greyed so the rain is the only colour. The mark is there from the first frame;
+  the observed sweeps appear within seconds and the projection when it has been
+  worked out, on a time axis laid out in full from the start. The map reads a
+  block a tile wider than it shows, so rain carried into view was seen before it
+  arrived. A tap outside the panel closes it.
+- **Fresh every ten minutes, timed to the radar, for the app and the widget.**
+  The background clock now wakes just after each new radar sweep is published,
+  so the next half hour - the part people read - is never more than a few
+  minutes behind the sky, and keeps the same ten-minute pace where there is no
+  radar. Radar is fetched first on every wake, then the forecast. It replaces a
+  fifteen-minute background job that Doze could stretch to hours; that job now
+  only stands behind the clock and restarts it if anything stops it, and the
+  clock restarts itself after a reboot or an update.
+- **Everything shows what it knows at once, then swaps in newer the moment it
+  lands.** The widget no longer waits on the network to draw - it used to sit
+  on its old picture for as long as a fetch took, and keep it when the fetch
+  failed - and is redrawn at every wake, network or not, so its hours always
+  start at the present minute. Opening the app asks for the newest straight
+  away rather than only once the copy on disk is half an hour old, and an open
+  screen keeps asking; forecasts are now re-checked every ten minutes instead
+  of every thirty, which costs next to nothing when nothing has changed.
+- **The next half hour arrives in seconds, not half a minute.** Every new radar
+  sweep was projected forward across the whole radar grid - over half a million
+  pixels, sixteen times - to read the one place being shown, and the download of
+  the sweep also waited on up to two hours of older sweeps fetched for scoring.
+  The projection is now worked out only around the place it is read for, with
+  identical results, the scoring catch-up runs separately where nothing waits on
+  it, and the radar code is compiled ahead of time on install rather than left to
+  warm up. The chart and the widget no longer wait behind a radar refresh in
+  progress to draw what is already held.
+- **Settings say when the phone is holding the app back.** If precise alarm
+  timing is off, or battery optimisation (and, on Xiaomi and others, the
+  maker's own battery manager) can stop background work, a "Background updates"
+  entry offers the way to the right system screen, and disappears once there
+  is nothing left to fix.
+
+### Fixed
+
+- **Outside Europe, ECMWF was three of the seven votes.** The KNMI and DMI
+  products fall back to ECMWF beyond their own domains, and their series were
+  ECMWF's byte for byte in Tokyo, New York, Sydney, São Paulo, Delhi and Lagos -
+  so the "median of the models" was one model's answer for most of the world.
+  Identical members are now counted once, and Canada's GEM joins as a further
+  independent, hourly, global vote.
+- **A refresh in the Nordics was two round trips in series.** MET Norway is
+  hourly for 60 of the 144 hours needed, which is known before anything is
+  fetched, so the extension is now requested alongside it rather than after. The
+  same in-flight answer is the fallback if MET Norway fails.
+- **Nothing was cached on disk.** Radar tiles (two-day lifetime, unique per
+  sweep) were downloaded again by every fresh process, basemap tiles by every
+  map opening, and MET Norway's `Expires` was ignored. An ordinary HTTP disk
+  cache now obeys what each service says; Open-Meteo sends no caching headers,
+  so its forecasts are never answered from disk.
+- **The widget's radar and model fetches ran one after the other** inside its
+  few-second budget. They are independent and now run together.
+- **Radar fields take half the memory.** Rates are held as hundredths of a
+  millimetre an hour in sixteen bits - far finer than a colour-decoded radar can
+  claim - which keeps a projection and the map well inside an ordinary phone's
+  heap.
+- **The map drew dark blocks eating in from its edge as it played.** The ground
+  a projection cannot see was veiled, along the motion estimate's block edges.
+  It is now left clear with the rain feathered out towards it, and the map reads
+  a wider block than it shows so the edge rarely comes into view at all.
+- **Radar fell off the chart after the first fetch of every session.** Once a
+  projection was held in memory, the timeline treated it as nothing and answered
+  with no radar, so the chart ran on the models alone for as long as the app
+  stayed open. The held projection is now the first answer, with a newer sweep
+  fetched behind it when one is due.
+- **The nowcast painted squares of rain onto dry ground.** Growth was added to
+  every pixel of a 40 km motion block, dry ones included, so one strengthening
+  cell rained evenly across the whole block. Measured: four times the observed
+  wet area ten minutes out. It now applies only where rain is, and uses the
+  trend of the block the rain came from. The chart had been sampling those
+  squares; in Rīga one of them was a shower that did not exist.
+- **The background job and the widget never waited for the radar they
+  fetched.** Both handed the fetch to the application scope and returned at
+  once, so the job could be frozen mid-download and the widget drew the previous
+  run's projection. Both now collect the sweep (and a stale ensemble) before
+  finishing; the widget falls back to what is held if that overruns its budget.
+- **ECMWF's vote in the ensemble was a three-hour staircase.** The 0.25° product
+  is three-hourly and spread evenly over its hours; the native 9 km `ecmwf_ifs`
+  is genuinely hourly. Measured over Rīga: two thirds of the coarse product's
+  wet hour-to-hour steps were exact repeats, against one in eight.
+
 - **A turning arc beside the tile label while new numbers are on their way.** On
   the label rather than over the content, because the content is not wrong while
   this is happening - it is the last forecast, which is the best answer there is

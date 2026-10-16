@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two cells square, where it is the dial; down to one cell, where it is the
+  reading on its own (widget/NowWidget.kt). Capped near three cells: past that
+  a single reading only grows, it gains nothing.
+
+  minWidth and minHeight are cells in the old 70n - 30 dp formula, for launchers
+  that still place by dp; targetCellWidth and targetCellHeight say the same in
+  cells for Android 12 and later. The half-hour update is the system's backstop,
+  not the plan: the heartbeat redraws every widget at each radar sweep (see
+  rain_widget_info.xml for why the backstop is kept).
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_now_description"
+    android:initialLayout="@layout/widget_picture"
+    android:maxResizeHeight="300dp"
+    android:maxResizeWidth="300dp"
+    android:minHeight="110dp"
+    android:minResizeHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minWidth="110dp"
+    android:previewImage="@drawable/widget_preview_now"
+    android:previewLayout="@layout/widget_preview_now"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="2"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />

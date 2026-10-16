@@ -12,29 +12,23 @@
   insets are proportions rather than fixed dp and the hour labels shrink a step.
 
   updatePeriodMillis is the system floor of thirty minutes, and it is a backstop
-  rather than the plan. The forecast refresh calls RainWidget.refresh whenever it
-  runs, which is the update that matters because it has new data in hand.
-
-  But that refresh is a WorkManager job, and WorkManager is the first thing an
-  aggressive OEM battery manager stops - on some phones the app has to be granted
-  autostart by hand before background work runs at all. This alarm belongs to the
-  system, not to us: it starts the process to deliver it even after the app has
-  been force-stopped, so the widget keeps up with the clock even where our own
-  job never runs.
-
-  It costs a wake-up every half hour, deferred while the device dozes. That is
-  the price of a widget that is right when somebody looks at it, and the redraw
-  itself is a cache read.
+  rather than the plan. The plan is the heartbeat (work/Heartbeat.kt): an alarm
+  timed to the radar that redraws the widget at every wake and again the moment a
+  pass lands new data. This update belongs to the system instead, and it starts
+  the process even where an aggressive OEM battery manager has stopped everything
+  of ours - so the widget is redrawn from disk, and the heartbeat re-armed, even
+  then. The redraw itself is a cache read; it never waits on the network.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_rain_description"
-    android:initialLayout="@layout/widget_rain"
+    android:initialLayout="@layout/widget_picture"
     android:minHeight="40dp"
+    android:maxResizeHeight="200dp"
     android:minResizeHeight="40dp"
     android:minResizeWidth="180dp"
     android:minWidth="180dp"
-    android:previewImage="@mipmap/ic_launcher"
-    android:previewLayout="@layout/widget_rain"
+    android:previewImage="@drawable/widget_preview_rain"
+    android:previewLayout="@layout/widget_preview_rain"
     android:resizeMode="horizontal|vertical"
     android:targetCellHeight="1"
     android:targetCellWidth="3"

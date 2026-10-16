@@ -35,7 +35,7 @@ import lv.bolwarra.wetter.domain.provider.WeatherFailure
  *
  * ### Why the response is parsed by hand
  *
- * The series come back under per-model keys - `temperature_2m_ecmwf_ifs025`,
+ * The series come back under per-model keys - `temperature_2m_ecmwf_ifs`,
  * `precipitation_icon_seamless` - so the shape of the object depends on which
  * models were asked for. A generated data class would have to name all of them
  * and would break the day a model is renamed or retired, which happens. Walking
@@ -77,8 +77,9 @@ internal class OpenMeteoEnsemble(
             ?.mapNotNull { it.jsonPrimitive.longOrNull }
             ?: return ModelEnsemble(emptyList())
 
-        val temperatures = seriesFor(hourly, TEMPERATURE_PREFIX)
-        val precipitations = seriesFor(hourly, PRECIPITATION_PREFIX)
+        val members = distinctMembers(hourly)
+        val temperatures = members.map { it.first }
+        val precipitations = members.map { it.second }
 
         val readings = times.mapIndexed { index, epochSeconds ->
             val at = Instant.ofEpochSecond(epochSeconds)
@@ -99,17 +100,35 @@ internal class OpenMeteoEnsemble(
     }
 
     /**
-     * Every model's series for one variable.
+     * Each model's temperature and precipitation, paired by model, with any
+     * model that is another one under a different name removed.
+     *
+     * Several of the "seamless" products are a regional model inside their own
+     * domain and somebody else's global model outside it. KNMI's and DMI's
+     * both fall back to ECMWF, so everywhere beyond Europe - measured in Tokyo,
+     * New York, Sydney, São Paulo, Delhi and Lagos - three of the votes were
+     * one ECMWF run, byte for byte. A median over that is ECMWF's answer
+     * wearing a consensus, which is exactly what the ensemble exists to avoid.
+     * Identical series are the same model; they are counted once.
      *
      * Nulls inside a series are kept as nulls rather than dropped, so position
      * still means the same hour in every model. Compacting them would silently
      * shift one model's afternoon onto another's morning.
      */
-    private fun seriesFor(hourly: JsonObject, prefix: String): List<List<Double?>> = hourly.entries
-        .filter { it.key.startsWith(prefix) && it.key != prefix }
-        .map { (_, value) ->
-            value.jsonArray.map { it.jsonPrimitive.doubleOrNull }
-        }
+    private fun distinctMembers(hourly: JsonObject): List<Pair<List<Double?>, List<Double?>>> {
+        val temperatures = seriesByModel(hourly, TEMPERATURE_PREFIX)
+        val precipitations = seriesByModel(hourly, PRECIPITATION_PREFIX)
+        return precipitations.keys
+            .map { model -> temperatures[model].orEmpty() to precipitations.getValue(model) }
+            .distinct()
+    }
+
+    private fun seriesByModel(hourly: JsonObject, prefix: String): Map<String, List<Double?>> =
+        hourly.entries
+            .filter { it.key.startsWith(prefix) && it.key != prefix }
+            .associate { (key, value) ->
+                key.removePrefix(prefix) to value.jsonArray.map { it.jsonPrimitive.doubleOrNull }
+            }
 
     internal companion object {
         const val DEFAULT_BASE_URL = "https://api.open-meteo.com/v1/forecast"
@@ -123,13 +142,30 @@ internal class OpenMeteoEnsemble(
          * Models that do not cover a location simply return nothing for it,
          * which the parser handles - so this list does not have to vary by
          * where the user is.
+         *
+         * ECMWF is its native 9 km grid rather than the 0.25 degree one. The
+         * coarse product is not merely coarser in space: it is three-hourly, and
+         * Open-Meteo spreads each three-hour total evenly across its hours -
+         * measured over a wet Riga, two thirds of its hour-to-hour steps were
+         * exact repeats, against one in eight for the native grid. One of seven
+         * votes was a staircase, which is exactly the "hour" that must not be
+         * the app's unit (docs/design-principles.md, rule 9).
+         *
+         * Canada's GEM is here for the rest of the world. Once the regional
+         * products that fall back to ECMWF are counted once (see
+         * [distinctMembers]), everywhere outside Europe was down to five
+         * independent votes; GEM is global, hourly and its own analysis.
+         * Measured and left out: JMA and CMA, which are three-hourly
+         * staircases away from home (48 of 55 wet steps repeated over Rīga),
+         * and BOM's and KMA's globals, which the service returns empty.
          */
         val MODELS = listOf(
-            "ecmwf_ifs025",
+            "ecmwf_ifs",
             "icon_seamless",
             "gfs_seamless",
             "ukmo_seamless",
             "meteofrance_seamless",
+            "gem_seamless",
             "knmi_seamless",
             "dmi_seamless",
         )

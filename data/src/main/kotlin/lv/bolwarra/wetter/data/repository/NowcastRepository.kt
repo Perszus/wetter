@@ -5,8 +5,11 @@ import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -17,6 +20,8 @@ import lv.bolwarra.wetter.domain.forecast.ModelEnsemble
 import lv.bolwarra.wetter.domain.forecast.PrecipitationFusion
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
+import lv.bolwarra.wetter.domain.radar.RadarMapFrame
+import lv.bolwarra.wetter.domain.radar.RadarMapPicture
 import lv.bolwarra.wetter.domain.radar.RadarNowcast
 import lv.bolwarra.wetter.domain.radar.RadarNowcaster
 import lv.bolwarra.wetter.domain.radar.RadarSample
@@ -86,6 +91,19 @@ class NowcastRepository internal constructor(
     val attribution: String get() = source.attribution
 
     private val mutex = Mutex()
+
+    /**
+     * The newest projection, replaced whole under [mutex] and read without it.
+     *
+     * Volatile and immutable so a reader can take it at any moment. The lock is
+     * held for the whole of a refresh - the download and the arithmetic, which
+     * can run to tens of seconds on a slow connection - and the quick reads used
+     * to queue behind it: the chart and the widget, both meant to draw what is
+     * held at once, sat waiting for a fetch they had not asked for. On a phone
+     * that was long enough for the system to call the app unresponsive and kill
+     * it (a background broadcast gets a minute).
+     */
+    @Volatile
     private var cached: Cached? = null
 
     private val ensembleMutex = Mutex()
@@ -113,37 +131,58 @@ class NowcastRepository internal constructor(
      * little echo to track, there is genuinely no radar-based forecast to give,
      * and the caller falls back to the model.
      */
-    suspend fun nowcast(location: WeatherLocation): RadarNowcast? = mutex.withLock {
+    suspend fun nowcast(location: WeatherLocation): RadarNowcast? = refreshed(location)?.nowcast
+
+    /**
+     * When the newest sweep held for a place was taken, without asking anybody.
+     *
+     * What the background schedule is timed from: the next sweep is due one
+     * [sweepInterval] after this, and waking any earlier only re-reads the same
+     * picture. Memory first, then the projection kept on disk, so a process
+     * started only to wake up still knows where the radar's clock stands.
+     */
+    suspend fun latestSweep(location: WeatherLocation): Instant? {
+        cached?.takeIf { it.location.sameGrid(location) }?.sweepAt?.let { return it }
+        return runCatching { seriesStore?.read(cacheKeyOf(location))?.sweepAt }.getOrNull()
+    }
+
+    /** How often the radar source publishes a new sweep. */
+    val sweepInterval: Duration get() = source.sweepInterval
+
+    /** The held projection, re-read from the source when a newer sweep is due. */
+    private suspend fun refreshed(location: WeatherLocation): Cached? = mutex.withLock {
         val now = Instant.now(clock)
         val held = cached?.takeIf { it.location.sameGrid(location) }
 
-        if (held != null && !worthAsking(held, now)) return@withLock held.nowcast
+        if (held != null && !worthAsking(held, now)) return@withLock held
+
+        val t0 = System.nanoTime()
+        fun ms() = (System.nanoTime() - t0) / 1_000_000
 
         // The cheap half: has anything new been published? A failure here is not
         // an error worth surfacing - it just means falling back to the elapsed
         // clock, so a source with a sick index degrades to the old behaviour
         // rather than to no radar at all.
         val latest = source.latestSweep().getOrNull()
+        trace { "index ${ms()}ms, latest $latest" }
         if (held != null && latest != null && latest == held.sweepAt) {
-            cached = held.copy(checkedAt = now)
-            return@withLock held.nowcast
+            return@withLock held.copy(checkedAt = now).also { cached = it }
         }
 
-        // Reach back far enough to mark what the last sleep left outstanding.
+        // Exactly what the projection needs: two sweeps for the motion and a
+        // third so the trend has something to be measured across.
         //
-        // FRAMES is what the projection needs: two sweeps for the motion and a
-        // third so the trend has something to be measured across, half an hour
-        // in all. That is also all a run could ever settle, and claims run two
-        // hours ahead - so anything coming due while the device dozed was
-        // unmarkable by the time anything woke up, and the record thinned out
-        // exactly at the long leads where the error is largest.
-        //
-        // Extra sweeps are fetched only when something is actually waiting for
-        // them, which after a normal fifteen-minute run is nothing at all.
+        // This used to reach back up to two hours whenever scoring had claims
+        // outstanding - after any quiet spell, thirteen sweeps of tiles - and
+        // the projection of the next half hour, the one thing people open the
+        // app for, waited behind that bookkeeping: measured at over fifty
+        // seconds on a phone. The reach-back is [settleOutstanding] now, run
+        // where nothing is waiting on it.
         val frames = source
-            .recentFrames(location.latitude, location.longitude, framesNeeded(now))
+            .recentFrames(location.latitude, location.longitude, FRAMES)
             .getOrNull()
             .orEmpty()
+        trace { "frames ${frames.size} at ${ms()}ms" }
         // Off the main thread, because this is the heaviest arithmetic in the
         // app by a wide margin: two block-match passes over the whole grid, then
         // a bilinear advection of every pixel for each of sixteen steps.
@@ -156,15 +195,22 @@ class NowcastRepository internal constructor(
         val nowcast = if (frames.size < 2) {
             null
         } else {
-            withContext(Dispatchers.Default) { RadarNowcaster.nowcast(frames, LEADS) }
+            // Around this place only: the series and its coverage check are all
+            // that is read from it (RadarNowcaster.nowcastAround). The map makes
+            // its own whole-grid projection from its own wider sweeps.
+            withContext(Dispatchers.Default) {
+                RadarNowcaster.nowcastAround(frames, LEADS, location.latitude, location.longitude)
+            }
         }
+        trace { "projection at ${ms()}ms" }
         val sweepAt = frames.lastOrNull()?.at ?: latest
-        cached = Cached(
+        val fresh = Cached(
             location = location,
             sweepAt = sweepAt,
             checkedAt = now,
             nowcast = nowcast,
         )
+        cached = fresh
         // Kept so the next launch starts from something rather than nothing.
         // Only the samples under this place are stored; the grid they came from
         // is megabytes and nothing reads it.
@@ -212,8 +258,82 @@ class NowcastRepository internal constructor(
                 scorer.recordNowcast(location, sweepAt, series)
             }
         }
-        nowcast
+        fresh
     }
+
+    /**
+     * What the rain map plays: the last hour as observed over the surrounding
+     * countries, then two hours projected forward from the newest sweep.
+     *
+     * Its own picture, not the chart's. The chart reads a district finely and
+     * the map reads the neighbouring countries coarsely ([RadarSource.wideFrames]);
+     * the same engine projects both, from the same sweeps.
+     *
+     * Emitted in two parts, because they take very different times: the
+     * observed sweeps as soon as they have downloaded, and the projection once
+     * it has been worked out - the heaviest arithmetic in the app, over the
+     * widest grid. Somebody who opened the map sees the sky at once and the
+     * forecast a moment later, rather than a spinner for the sum of both.
+     *
+     * Held until [releaseMap], keyed on the sweep, so reopening the map or a
+     * rebuild with nothing new published costs nothing. Empty when no sweep
+     * reached, or none has any echo in it - which on this source is
+     * indistinguishable from no coverage.
+     */
+    fun radarMap(location: WeatherLocation): Flow<RadarMapPicture> = flow {
+        mapMutex.withLock {
+            val held = mapHeld?.takeIf { it.location.sameGrid(location) }
+            val latest = source.latestSweep().getOrNull()
+            if (held != null) {
+                emit(RadarMapPicture(held.frames, projecting = false))
+                if (latest == null || latest == held.sweepAt) return@withLock
+            }
+
+            val observed = source
+                .wideFrames(location.latitude, location.longitude, MAP_HISTORY)
+                .getOrNull()
+                .orEmpty()
+                .sortedBy { it.at }
+            if (observed.none { it.wetFraction() > 0f }) {
+                if (held == null) emit(RadarMapPicture(emptyList(), projecting = false))
+                return@withLock
+            }
+            val seen = observed.map { RadarMapFrame(it.at, it, observed = true) }
+            emit(RadarMapPicture(seen, projecting = observed.size >= 2))
+
+            val projection = if (observed.size < 2) {
+                null
+            } else {
+                withContext(Dispatchers.Default) { RadarNowcaster.nowcast(observed, LEADS) }
+            }
+            // Zero lead is the newest sweep itself, which is already in [seen].
+            val ahead = projection?.steps.orEmpty()
+                .filter { !it.lead.isZero }
+                .map { RadarMapFrame(it.at, it.field, observed = false) }
+            val all = seen + ahead
+            mapHeld = MapHeld(location, observed.last().at, all)
+            emit(RadarMapPicture(all, projecting = false))
+        }
+    }
+
+    /**
+     * Let go of the map's picture. Tens of megabytes of grids that nothing
+     * needs once the map is shut; the next opening fetches afresh.
+     */
+    fun releaseMap() {
+        mapHeld = null
+    }
+
+    private val mapMutex = Mutex()
+
+    @Volatile
+    private var mapHeld: MapHeld? = null
+
+    private data class MapHeld(
+        val location: WeatherLocation,
+        val sweepAt: Instant,
+        val frames: List<RadarMapFrame>,
+    )
 
     /** Drop projections too old to contain anything still ahead. */
     suspend fun prune() {
@@ -232,6 +352,48 @@ class NowcastRepository internal constructor(
      * hours is the horizon claims are made over, so nothing older is worth
      * reaching for - beyond it the claim is unmarkable whatever we fetch.
      */
+    /**
+     * Mark the claims the newest sweeps cannot reach: fetch further back, for
+     * scoring only.
+     *
+     * Claims run two hours ahead, so anything that came due while the device
+     * dozed is only markable against the sweeps of that time - and without this
+     * the record thins out exactly at the long leads where the error is largest.
+     * It can mean a dozen sweeps of tiles, so it is never on a drawing path: the
+     * background job calls it after its pass, when nothing is waiting.
+     */
+    suspend fun settleOutstanding(location: WeatherLocation) {
+        val scorer = verification ?: return
+        val now = Instant.now(clock)
+        val needed = framesNeeded(now)
+        if (needed <= FRAMES) return
+        val frames = source
+            .recentFrames(location.latitude, location.longitude, needed)
+            .getOrNull()
+            .orEmpty()
+        runCatching {
+            frames.forEach { frame ->
+                frame.rateAt(location.latitude, location.longitude)?.let { observed ->
+                    scorer.settleFromRadar(
+                        location = location,
+                        observedAt = frame.at,
+                        observed = observed.toDouble(),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Where the time in a radar refresh goes, for profiling on a device:
+     * `adb shell setprop log.tag.Nowcast DEBUG`. Off otherwise, and free.
+     */
+    private inline fun trace(message: () -> String) {
+        if (android.util.Log.isLoggable(TRACE_TAG, android.util.Log.DEBUG)) {
+            android.util.Log.d(TRACE_TAG, message())
+        }
+    }
+
     private suspend fun framesNeeded(now: Instant): Int {
         val oldest = verification?.oldestUnsettledNowcast(now) ?: return FRAMES
         val behind = Duration.between(oldest, now)
@@ -301,7 +463,11 @@ class NowcastRepository internal constructor(
      * forecast. Cached for an hour, which is how often the runs it summarises
      * are published.
      */
-    suspend fun ensemble(location: WeatherLocation): ModelEnsemble? = ensembleMutex.withLock {
+    suspend fun ensemble(
+        location: WeatherLocation,
+        /** Fetch in line when stale, as [radarSeries] does for radar. */
+        fresh: Boolean = false,
+    ): ModelEnsemble? = ensembleMutex.withLock {
         val now = Instant.now(clock)
         val held = cachedEnsemble?.takeIf { it.location.sameGrid(location) }
         if (held != null && Duration.between(held.at, now) < ENSEMBLE_FRESH_FOR) {
@@ -330,7 +496,7 @@ class NowcastRepository internal constructor(
         // critical path that a slightly older spread would spoil.
         if (!ensembleRefreshing) {
             ensembleRefreshing = true
-            val background = scope
+            val background = scope.takeUnless { fresh }
             if (background != null) {
                 background.launch {
                     try {
@@ -340,9 +506,9 @@ class NowcastRepository internal constructor(
                     }
                 }
             } else {
-                // No scope means no background - a worker calling in has nowhere
-                // to hand this off to and nothing waiting on a frame, so it is
-                // fetched here and kept for everything that comes after.
+                // A worker or the widget: nothing waiting on a frame, and a job
+                // launched behind it could be frozen with the process the moment
+                // it returns. Fetched here and kept for everything after.
                 try {
                     return@withLock fetchEnsemble(location)
                 } finally {
@@ -370,67 +536,64 @@ class NowcastRepository internal constructor(
     /**
      * What the radar says about a place, from whatever is quickest to hand.
      *
-     * The first read in a fresh process comes off disk and costs nothing, which
-     * is the point: opening the app used to start from the model's smooth hourly
-     * guess and only sharpen once twenty-odd tiles had been fetched, decoded and
-     * matched. A kept projection is on screen immediately and the fetched one
-     * replaces it on the next tick.
+     * Three places to answer from, fastest first: the projection already in
+     * memory, the series kept on disk by an earlier process, and the network.
+     * Whenever the answer comes from one of the first two and a newer sweep is
+     * due, the fetch goes out behind it and lands on the next rebuild - so
+     * nothing waits on the network, and the answer still sharpens.
+     *
+     * ### The one held in memory is an answer
+     *
+     * It used to be treated as if it were nothing. The in-memory projection
+     * skipped the disk read, fell through to the cold branch and came back as
+     * no radar at all - which, after the first fetch of a process, was every
+     * rebuild. The chart drew the models alone for the rest of the session,
+     * the one input that had actually looked at the sky thrown away because it
+     * was already in hand.
      *
      * A kept projection is used only for the part of it still in the future.
      * One made twenty minutes ago is not wrong, only shorter.
+     *
+     * @param fresh wait for the newest sweep rather than answering from what is
+     *   held. For callers with nobody watching a frame - the background worker,
+     *   the widget - which exist to collect it. Still fetches nothing when the
+     *   sweep in hand is the newest there is.
      */
-    private suspend fun radarSeries(location: WeatherLocation): List<RadarSample> {
-        val now = Instant.now(clock)
+    private suspend fun radarSeries(location: WeatherLocation, fresh: Boolean): List<RadarSample> {
+        if (fresh) return fetched(location)
 
-        val warm = mutex.withLock { cached?.takeIf { it.location.sameGrid(location) } }
-        val store = seriesStore
-        if (warm == null && store != null) {
-            val kept = store.read(cacheKeyOf(location))
-            val stillAhead = kept?.samples?.filter { it.at.isAfter(now) }.orEmpty()
-            if (stillAhead.isNotEmpty()) {
-                // Answer from what was kept, then go and get a better one.
-                //
-                // Returning here and stopping was the whole of it before, which
-                // meant the screen showed whatever the last background run left
-                // behind and never improved while anybody watched - a projection
-                // half an hour old, on a layer whose entire argument is that it
-                // re-observes every ten minutes. Worse, if no run had happened
-                // for two hours there was nothing still ahead at all and the
-                // open blocked on a full fetch.
-                //
-                // The kept series goes back immediately and the refresh happens
-                // behind it, landing on the next tick of the timeline. Nothing
-                // waits on the network, and the answer still sharpens.
-                scope?.launch { runCatching { nowcast(location) } }
-                return stillAhead
-            }
-        }
-
-        // Nothing kept and worth drawing. Answer with no radar at all rather
-        // than holding the screen while twenty tiles are fetched and decoded.
-        //
-        // This was the last thing in the app that made anybody wait. The chart
-        // cannot draw a fused timeline until this returns, and until it has one
-        // it falls back to the provider's raw hourly rows - so a cold start
-        // showed a single model's evening, flat and dry, for as long as the
-        // radar took. Every input for the models is already on disk; there is no
-        // reason for the one input that is not to hold the other two hostage.
-        //
-        // The models answer now and radar sharpens the near term on the next
-        // tick, which is the same bargain radarSeries already strikes when it
-        // has something kept.
         val background = scope
-        if (background != null) {
-            background.launch { runCatching { nowcast(location) } }
-            return emptyList()
+        val now = Instant.now(clock)
+        // Without the lock: see [cached]. What is held is drawn now, whatever a
+        // refresh in progress is doing.
+        val warm = cached?.takeIf { it.location.sameGrid(location) }
+            ?.let { it to worthAsking(it, now) }
+        if (warm != null) {
+            val (held, due) = warm
+            if (due) background?.launch { runCatching { nowcast(location) } }
+            return held.nowcast
+                ?.seriesAt(location.latitude, location.longitude)
+                .orEmpty()
         }
 
-        // No scope means a worker, which has nothing waiting on a frame and is
-        // the reason the fetch happens at all.
-        return nowcast(location)
-            ?.seriesAt(location.latitude, location.longitude)
-            .orEmpty()
+        val kept = seriesStore?.read(cacheKeyOf(location))
+        val stillAhead = kept?.samples?.filter { it.at.isAfter(now) }.orEmpty()
+
+        // No scope means nothing to fetch behind: answer from disk if it can,
+        // and otherwise go and get it.
+        if (background == null) return stillAhead.ifEmpty { fetched(location) }
+
+        // Whatever was or was not on disk, the newest sweep is fetched behind
+        // the answer. With nothing kept that means answering with no radar at
+        // all for a moment rather than holding the screen while twenty tiles
+        // are fetched and decoded: every input for the models is already on
+        // disk, and the one that is not must not hold the other two hostage.
+        background.launch { runCatching { nowcast(location) } }
+        return stillAhead
     }
+
+    private suspend fun fetched(location: WeatherLocation): List<RadarSample> =
+        nowcast(location)?.seriesAt(location.latitude, location.longitude).orEmpty()
 
     /**
      * The fused timeline for a place: radar where it is worth having, model
@@ -442,9 +605,18 @@ class NowcastRepository internal constructor(
         from: Instant,
         step: Duration = STEP,
         steps: Int = DEFAULT_STEPS,
+        /** See [radarSeries]: wait for the newest sweep rather than answer from what is held. */
+        fresh: Boolean = false,
     ): List<FusedPrecipitation> {
-        val radar = radarSeries(forecast.location)
-        val ensemble = ensemble(forecast.location)
+        // Together, not in turn. When fresh they each go to the network, and
+        // the widget has a few seconds of a broadcast receiver to spend - the
+        // radar and the models do not depend on each other, so neither should
+        // wait for the other's round trip.
+        val (radar, ensemble) = coroutineScope {
+            val radar = async { radarSeries(forecast.location, fresh) }
+            val ensemble = async { ensemble(forecast.location, fresh) }
+            radar.await() to ensemble.await()
+        }
         // Lighter than the nowcast but still a few hundred interpolations and
         // agreement calculations per step, and it runs on every clock tick.
         return withContext(Dispatchers.Default) {
@@ -573,8 +745,19 @@ class NowcastRepository internal constructor(
          */
         val ENSEMBLE_KEEP_FOR: Duration = Duration.ofDays(1)
 
+        /** How far ahead the map's loop reaches: the last projected step. */
+        val MAP_HORIZON: Duration get() = LEADS.last()
+
+        /**
+         * An hour of sweeps behind the map's present, so it opens on the rain
+         * already moving - and a longer baseline for its motion estimate.
+         */
+        private const val MAP_HISTORY = 7
+
         /** What FRAMES alone already covers, so no catching up is needed. */
         private val ROUTINE_REACH: Duration = Duration.ofMinutes(30)
+
+        private const val TRACE_TAG = "Nowcast"
 
         /** RainViewer publishes on a ten-minute cadence. */
         private const val SWEEP_MINUTES = 10L
