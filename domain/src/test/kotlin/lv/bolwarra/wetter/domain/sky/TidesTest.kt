@@ -34,7 +34,7 @@ class TidesTest {
 
     @Test
     fun `there are two spring tides in a month, not one`() {
-        // The whole point of doubling the angle. A model that used the moon's
+        // Why the angle is doubled. A model that used the moon's
         // elongation directly would put one spring tide a month at the new moon
         // and call the full moon a neap, which is backwards.
         assertEquals(1.0, Tides.strengthAt(newMoon), 1e-6)

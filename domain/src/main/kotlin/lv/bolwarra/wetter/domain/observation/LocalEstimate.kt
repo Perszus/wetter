@@ -32,7 +32,7 @@ data class LocalObservation(
 /**
  * Turns a scatter of station reports into an estimate for one place.
  *
- * Not simply the nearest station (docs/providers.md): height is worth more than
+ * Not the nearest station (docs/providers.md): height is worth more than
  * distance for temperature, and a single station has no way to be caught wrong.
  * Every usable station contributes, weighted by closeness, similar height,
  * freshness and quality control.

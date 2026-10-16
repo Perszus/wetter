@@ -3,11 +3,17 @@
 
 package lv.bolwarra.wetter.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -26,7 +32,9 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * month.
  *
  * Insets are applied once here rather than per screen, so no screen can forget
- * them and none has to repeat the modifier.
+ * them and none has to repeat the modifier. So is the column's width: on a tablet
+ * or a wide window the app is the same composed column, centred, rather than
+ * tiles stretched edge to edge.
  */
 @Composable
 fun WetterApp(modifier: Modifier = Modifier) {
@@ -36,23 +44,32 @@ fun WetterApp(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize(),
         color = WetterTheme.colors.surface,
     ) {
-        NavHost(
-            navController = navController,
-            startDestination = Destination.Weather.route,
-            modifier = Modifier.safeDrawingPadding(),
-        ) {
-            composable(Destination.Weather.route) {
-                WeatherRoute(
-                    onOpenLocations = { navController.navigate(Destination.Locations.route) },
-                    onOpenSettings = { navController.navigate(Destination.Settings.route) },
-                )
-            }
-            composable(Destination.Locations.route) {
-                LocationsRoute(onBack = { navController.popBackStack() })
-            }
-            composable(Destination.Settings.route) {
-                SettingsRoute(onBack = { navController.popBackStack() })
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            NavHost(
+                navController = navController,
+                startDestination = Destination.Weather.route,
+                modifier = Modifier
+                    .safeDrawingPadding()
+                    .fillMaxHeight()
+                    .widthIn(max = MAX_COLUMN)
+                    .fillMaxWidth(),
+            ) {
+                composable(Destination.Weather.route) {
+                    WeatherRoute(
+                        onOpenLocations = { navController.navigate(Destination.Locations.route) },
+                        onOpenSettings = { navController.navigate(Destination.Settings.route) },
+                    )
+                }
+                composable(Destination.Locations.route) {
+                    LocationsRoute(onBack = { navController.popBackStack() })
+                }
+                composable(Destination.Settings.route) {
+                    SettingsRoute(onBack = { navController.popBackStack() })
+                }
             }
         }
     }
 }
+
+/** A large phone's width: wider windows keep the column and centre it. */
+private val MAX_COLUMN = 600.dp

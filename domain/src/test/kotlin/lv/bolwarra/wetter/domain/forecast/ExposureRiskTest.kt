@@ -53,7 +53,7 @@ class ExposureRiskTest {
     fun `a steady drizzle does not compound into certainty`() {
         // The reason the chance is the worst moment rather than the product of
         // the moments. Treated as independent trials, eighteen steps of light
-        // drizzle would come out at over 99% - the honest answer is roughly the
+        // drizzle would come out at over 99%, where the answer is roughly the
         // chance that the drizzle is there at all.
         val drizzle = ExposureRisk.assess(
             List(18) { 0.3 }.toDoubleArray().let { timeline(*it) },

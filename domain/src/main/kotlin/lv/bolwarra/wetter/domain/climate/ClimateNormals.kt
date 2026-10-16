@@ -27,7 +27,7 @@ data class ArchivedDay(
 /**
  * What a date at this place usually does.
  *
- * Deliberately not shaped like [lv.bolwarra.wetter.domain.model.DailyWeather], so
+ * Not shaped like [lv.bolwarra.wetter.domain.model.DailyWeather], so
  * it cannot stand in for a forecast: no condition, and a share of wet years rather
  * than a probability of rain.
  */

@@ -46,7 +46,7 @@ class MercatorTest {
         val at = Coordinates(56.9496, 24.1052)
         val back = Mercator.coordinatesOf(Mercator.worldOf(at, 13), 13)
         // Radar is sampled at roughly 670 m; a pin that could not be placed
-        // more precisely than that would not be worth the map.
+        // more than that would not be worth the map.
         assertEquals(at.latitude, back.latitude, 0.001)
         assertEquals(at.longitude, back.longitude, 0.001)
     }

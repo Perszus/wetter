@@ -96,7 +96,7 @@ fun TodayPage(
     val ahead = forecast.hourly.window(now, TIMELINE_HOURS + 1)
 
     // What the window is made of or, when nothing is coming, what would fall if it
-    // did, so the tile has an honest word on it either way.
+    // did, so the tile's word is true either way.
     val falling = ahead.dominantKind().takeIf { it != PrecipitationKind.NONE }
         ?: PrecipitationKind.likelyAt(forecast.conditionsAt(now).temperature)
 

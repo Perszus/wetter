@@ -49,7 +49,7 @@ class SelectedLocationStore internal constructor(
      *
      * The background worker uses this rather than [selected]: in a freshly
      * started process the flow has not necessarily emitted yet, and a worker
-     * that fetched the fallback because it asked too early would quietly refresh
+     * that fetched the fallback because it asked too early would refresh
      * the wrong place.
      */
     suspend fun current(): WeatherLocation = dao.read()?.toDomain() ?: fallback

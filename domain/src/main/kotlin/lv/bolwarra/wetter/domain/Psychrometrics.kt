@@ -6,7 +6,7 @@ package lv.bolwarra.wetter.domain
 import kotlin.math.ln
 
 /**
- * Readings derived from the ones a provider sends. Dew point follows exactly from
+ * Readings derived from the ones a provider sends. Dew point follows from
  * temperature and humidity, so it is available from every provider.
  */
 object Psychrometrics {

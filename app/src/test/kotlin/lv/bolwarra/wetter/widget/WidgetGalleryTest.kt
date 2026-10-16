@@ -6,6 +6,7 @@ package lv.bolwarra.wetter.widget
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.RectF
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
@@ -13,6 +14,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.sin
 import lv.bolwarra.wetter.domain.forecast.FusedPrecipitation
 import lv.bolwarra.wetter.domain.hazard.Hazard
@@ -83,6 +85,70 @@ class WidgetGalleryTest {
             110f..480f,
         ),
     )
+
+    /**
+     * The widget picker's previews are this code's own pictures: rain, at each
+     * widget's preview size, in both themes. A preview left over from before a
+     * change to the widgets fails here; WIDGET_PREVIEWS=write redraws them all.
+     */
+    @Test
+    fun pickerPreviewsAreCurrent() {
+        val write = System.getenv("WIDGET_PREVIEWS") == "write"
+        val snapshot = Scenario.RAIN.snapshot()
+        val stale = mutableListOf<String>()
+        PREVIEWS.forEach { (name, widget, size) ->
+            PREVIEW_FOLDERS.forEach { (theme, folder) ->
+                val full = widget.picture(
+                    context,
+                    size.first,
+                    size.second,
+                    snapshot,
+                    colors = themes.getValue(theme),
+                )
+                val picture = Bitmap.createScaledBitmap(
+                    full,
+                    full.width * PREVIEW_SHARE_NUM / PREVIEW_SHARE_DEN,
+                    full.height * PREVIEW_SHARE_NUM / PREVIEW_SHARE_DEN,
+                    true,
+                )
+                val file = File("src/main/res/$folder/widget_preview_$name.webp")
+                if (write) {
+                    file.outputStream().use {
+                        picture.compress(Bitmap.CompressFormat.WEBP_LOSSY, PREVIEW_QUALITY, it)
+                    }
+                } else {
+                    val committed = BitmapFactory.decodeFile(file.path)
+                    if (committed == null || difference(picture, committed) > PREVIEW_TOLERANCE) {
+                        stale += "$name ($theme)"
+                    }
+                }
+            }
+        }
+        assertTrue(
+            "Widget previews out of date: ${stale.joinToString()}. Redraw them with " +
+                "WIDGET_PREVIEWS=write ./gradlew :app:testDebugUnitTest " +
+                "--tests '*WidgetGalleryTest.pickerPreviewsAreCurrent'",
+            stale.isEmpty(),
+        )
+    }
+
+    /** Mean difference per channel, 0..255; the largest when the sizes differ. */
+    private fun difference(a: Bitmap, b: Bitmap): Double {
+        if (a.width != b.width || a.height != b.height) return Double.MAX_VALUE
+        val pa = IntArray(a.width * a.height).also {
+            a.getPixels(it, 0, a.width, 0, 0, a.width, a.height)
+        }
+        val pb = IntArray(b.width * b.height).also {
+            b.getPixels(it, 0, b.width, 0, 0, b.width, b.height)
+        }
+        var total = 0L
+        for (i in pa.indices) {
+            for (shift in intArrayOf(0, 8, 16, 24)) {
+                total += abs((pa[i] ushr shift and 0xFF) - (pb[i] ushr shift and 0xFF))
+            }
+        }
+        return total.toDouble() / (pa.size * 4)
+    }
 
     private fun check(
         name: String,
@@ -295,6 +361,24 @@ class WidgetGalleryTest {
         const val WIDTH_STEP = 35f
         const val HEIGHT_STEP = 15f
         const val MAX_REPORTED = 40
+
+        /** Each widget's picker preview: rain, at a size it is commonly placed at. */
+        val PREVIEWS = listOf(
+            Triple("rain", RainWidget(), 250f to 70f),
+            Triple("now", NowWidget(), 145f to 145f),
+            Triple("hours", HoursWidget(), 320f to 70f),
+            Triple("week", WeekWidget(), 320f to 70f),
+            Triple("overview", OverviewWidget(), 320f to 290f),
+        )
+        val PREVIEW_FOLDERS = listOf("light" to "drawable-nodpi", "dark" to "drawable-night-nodpi")
+
+        /** Two thirds of the gallery's density: plenty for a picker thumbnail. */
+        const val PREVIEW_SHARE_NUM = 2
+        const val PREVIEW_SHARE_DEN = 3
+        const val PREVIEW_QUALITY = 90
+
+        /** Compression noise, well under any real change to what a widget draws. */
+        const val PREVIEW_TOLERANCE = 4.0
 
         /**
          * Sizes real launchers report, besides the grid: a Xiaomi HyperOS phone's

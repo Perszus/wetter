@@ -18,7 +18,7 @@ import org.junit.Test
  */
 class WeatherFormatTest {
 
-    // formatMillimetres deliberately formats in the user's locale, so the
+    // formatMillimetres formats in the user's locale, so the
     // expected separator depends on it. Pinning the locale keeps the test about
     // the rounding rule rather than about whoever runs it.
     private lateinit var original: Locale

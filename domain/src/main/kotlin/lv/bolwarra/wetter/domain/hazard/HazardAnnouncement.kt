@@ -84,7 +84,7 @@ object HazardAnnouncements {
     }
 
     /**
-     * Whether this kind is an event that arrives, or a condition that simply is the
+     * Whether this kind is an event that arrives, or a condition that is the
      * case. Only the first is worth interrupting somebody for.
      */
     val HazardKind.isWorthWaking: Boolean

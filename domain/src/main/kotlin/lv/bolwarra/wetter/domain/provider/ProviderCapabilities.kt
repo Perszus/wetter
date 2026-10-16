@@ -15,7 +15,7 @@ data class ProviderCapabilities(
     val variables: Set<WeatherVariable>,
     val maximumForecastDays: Int,
     /**
-     * How far ahead the provider publishes genuinely hour-by-hour values.
+     * How far ahead the provider publishes hour-by-hour values.
      *
      * Distinct from [maximumForecastDays], and the distinction matters: MET
      * Norway forecasts nine days but is hourly for only the first sixty hours,

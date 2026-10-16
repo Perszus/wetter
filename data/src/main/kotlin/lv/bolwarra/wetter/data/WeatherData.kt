@@ -95,7 +95,7 @@ class WeatherData(
     private val observationSource by lazy { MetarObservationSource(httpClient) }
 
     /**
-     * The record of what was forecast and what happened: the one thing in the
+     * The record of what was forecast and what happened, the only data in the
      * database that cannot be fetched again.
      */
     val verification: VerificationRepository by lazy {

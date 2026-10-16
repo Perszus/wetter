@@ -21,7 +21,7 @@ import org.junit.Test
  * [MoonPhase] is a mean synodic model and says so: it carries no correction for
  * the moon's elliptical orbit, and its own documentation claims about half a day
  * of error at worst. This checks that claim rather than assuming it, because a
- * wrong epoch or a sign error would look exactly like a model that is simply
+ * wrong epoch or a sign error would look like a model that is simply
  * approximate until somebody measures it.
  */
 class MoonPhaseReliabilityTest {

@@ -23,7 +23,7 @@ import org.junit.Test
  * The projection being held to its word.
  *
  * The nowcast is the one source here that can be marked without outside help: a
- * real sweep lands every ten minutes and measures exactly the quantity the
+ * real sweep lands every ten minutes and measures the quantity the
  * projection guessed at, over exactly the same field.
  */
 class NowcastScoringTest {

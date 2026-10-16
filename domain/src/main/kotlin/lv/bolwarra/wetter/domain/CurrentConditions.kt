@@ -28,7 +28,7 @@ fun List<HourlyWeather>.at(instant: Instant): HourlyWeather? {
  *
  * [WeatherForecast.current] is stamped at fetch time and nothing ages it, while
  * the rest of the screen moves with the clock. While the observation falls in the
- * same hourly slot as [instant] this is exactly that observation; once overtaken,
+ * same hourly slot as [instant] this is that observation; once overtaken,
  * the forecast for the hour covering [instant] stands in.
  *
  * Fields the hourly row does not carry (wind direction, humidity, pressure) are

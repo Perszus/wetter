@@ -7,7 +7,7 @@ import java.time.Duration
 import java.time.Instant
 
 /**
- * Somewhere recent radar sweeps come from, deliberately not named after any
+ * Somewhere recent radar sweeps come from, not named after any
  * service: radar licensing differs by country, so which service answers is a
  * routing decision (docs/providers.md).
  *

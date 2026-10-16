@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.sp
 
 /**
  * "tnum" locks every digit to the same advance width. Without it a temperature
- * ticking 9 -> 10, or a column of times, visibly jitters — which is exactly the
+ * ticking 9 -> 10, or a column of times, visibly jitters — which is the
  * kind of imprecision an instrument must not show. Every style that can carry a
  * number sets it.
  */

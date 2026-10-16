@@ -74,7 +74,7 @@ class PrecipitationKindTest {
         )
         assertEquals(PrecipitationKind.MIXED, hour(2.0, condition = WeatherCondition.SLEET).kind)
         // With a temperature to match: this helper's hours are at minus three by
-        // default, where a rain code is now read as snow on purpose.
+        // default, where a rain code is now read as snow.
         assertEquals(
             PrecipitationKind.RAIN,
             hour(2.0, condition = WeatherCondition.RAIN, temperature = 8.0).kind,
@@ -87,8 +87,7 @@ class PrecipitationKindTest {
 
     @Test
     fun `an amount with no breakdown and no usable condition is not called rain`() {
-        // The old behaviour assumed rain here. It is more honest to say that
-        // something is falling without claiming to know what.
+        // Something is falling, and nothing says what.
         assertEquals(PrecipitationKind.NONE, hour(2.0, condition = WeatherCondition.UNKNOWN).kind)
     }
 

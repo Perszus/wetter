@@ -6,6 +6,7 @@ package lv.bolwarra.wetter.data.provider
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
@@ -30,6 +31,7 @@ import org.junit.Test
  * fallback should get its turn; having no connection is not, and asking a second
  * service would fail identically a few seconds later.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class WeatherProviderRouterTest {
 
     private val now = Instant.parse("2026-03-14T09:00:00Z")

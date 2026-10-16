@@ -41,7 +41,7 @@ internal class RoomForecastCache(
      * A forecast is stored as one JSON document covering seven days hour by
      * hour, so parsing it is not free - and this flow emits on every write,
      * which is to say every time a refresh lands. Left in the collector's
-     * context that parse happened on the main thread at exactly the moment the
+     * context that parse happened on the main thread at the moment the
      * screen was busiest.
      */
     override fun observe(location: WeatherLocation): Flow<WeatherForecast?> =

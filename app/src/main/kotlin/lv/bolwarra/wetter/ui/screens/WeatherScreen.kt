@@ -202,7 +202,7 @@ fun WeatherScreen(
  * showing a forecast, never over an empty one.
  *
  * Asked at most once per install: `shouldShowRequestPermissionRationale` is true
- * exactly when the permission has been refused but not for good, which is when
+ * when the permission has been refused but not for good, which is when
  * this stays quiet. A permanent refusal shows nothing anyway. The Settings switch
  * and the system's app settings remain for a change of mind.
  */

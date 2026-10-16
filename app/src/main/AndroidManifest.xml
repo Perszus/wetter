@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Asking the weather services about a place. There is no backend of ours. -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -13,14 +14,13 @@
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!--
-      The background clock (work/Heartbeat.kt). A reboot or an update wipes its
-      alarm, so boot restarts it. Exact alarms land the wake on a new radar sweep;
-      from Android 12 that is granted in Settings, and without it the clock runs
-      a few minutes late.
-    -->
+    <!-- The background clock (work/Heartbeat.kt): a reboot wipes its alarm, so boot restarts it. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- WorkManager's foreground service, which nothing here uses. -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:node="remove" />
 
     <!--
       Severe weather warnings and nothing else, switchable in Settings. Asked for
@@ -58,7 +58,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
 
@@ -141,5 +140,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/overview_widget_info" />
         </receiver>
+
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            tools:node="remove" />
     </application>
 </manifest>

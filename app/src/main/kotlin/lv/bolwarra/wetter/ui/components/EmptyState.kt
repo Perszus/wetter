@@ -18,7 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * Shown when there is genuinely nothing to draw. States what is true and offers
+ * Shown when there is nothing to draw. States what is true and offers
  * the one action that changes it — no illustration, no apology.
  */
 @Composable

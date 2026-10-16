@@ -106,7 +106,7 @@ class LocalEstimateTest {
         assertTrue("was ${corrected.temperature}", corrected.temperature!! > 16.0)
 
         // 125 m at 6.5 C/km is about 0.8 C.
-        assertEquals(16.81, corrected.temperature!!, 0.05)
+        assertEquals(16.81, corrected.temperature, 0.05)
     }
 
     @Test

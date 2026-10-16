@@ -83,7 +83,6 @@ import lv.bolwarra.wetter.ui.components.ChoiceRow
 import lv.bolwarra.wetter.ui.components.ScreenTitle
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 import lv.bolwarra.wetter.ui.theme.plateFor
-import lv.bolwarra.wetter.work.Heartbeat
 
 /** The pages the settings list opens, in the order they are listed. */
 private enum class SettingsPage(val titleRes: Int) {
@@ -386,10 +385,9 @@ private fun ColumnScope.UnitsPage(preferences: Preferences, onChange: (Preferenc
 
 /**
  * What stands between the app and keeping itself fresh, and the way past it:
- * precise timing (Android 12's "Alarms & reminders"), which lets the background
- * wake land on a radar sweep, and unrestricted battery, which on several makers'
- * phones is what keeps background work running at all. Shown only while one of
- * them is missing, and re-checked on every return.
+ * unrestricted battery, which on several makers' phones is what keeps background
+ * work running at all. Shown only while it is missing, and re-checked on every
+ * return.
  */
 @Composable
 private fun ColumnScope.BackgroundUpdates() {
@@ -398,15 +396,13 @@ private fun ColumnScope.BackgroundUpdates() {
     val colors = WetterTheme.colors
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    var exact by remember { mutableStateOf(Heartbeat.exactAllowed(context)) }
     var unrestricted by remember { mutableStateOf(context.batteryUnrestricted()) }
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            exact = Heartbeat.exactAllowed(context)
             unrestricted = context.batteryUnrestricted()
         }
     }
-    if (exact && unrestricted) return
+    if (unrestricted) return
 
     Text(
         text = stringResource(R.string.setting_background),
@@ -420,14 +416,7 @@ private fun ColumnScope.BackgroundUpdates() {
         color = colors.textTertiary,
     )
     Spacer(Modifier.height(spacing.s))
-    if (!exact) {
-        ActionRow(stringResource(R.string.setting_background_exact)) {
-            context.openExactAlarmSettings()
-        }
-    }
-    if (!unrestricted) {
-        ActionRow(stringResource(R.string.setting_background_battery)) { context.openAppDetails() }
-    }
+    ActionRow(stringResource(R.string.setting_background_battery)) { context.openAppDetails() }
 }
 
 /** A row that takes the reader to a system page: a card, so it reads as something to press. */
@@ -462,15 +451,6 @@ private fun ActionRow(label: String, onClick: () -> Unit) {
 
 private fun Context.batteryUnrestricted(): Boolean =
     getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName) == true
-
-/** "Alarms & reminders" for this app, on Android 12 and later. */
-private fun Context.openExactAlarmSettings() {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-    val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-        .setData(Uri.fromParts("package", packageName, null))
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    runCatching { startActivity(intent) }
-}
 
 /**
  * The app's own info page, where battery restriction lives on every phone, with

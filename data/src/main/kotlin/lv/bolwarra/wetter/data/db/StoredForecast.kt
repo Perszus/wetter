@@ -94,7 +94,7 @@ internal data class StoredDay(
     val condition: String,
     val precipitationTotal: Double?,
     // Defaulted, so a forecast cached before this existed still reads back - it
-    // simply has no measured rate and keeps the provider's own word.
+    // has no measured rate and keeps the provider's own word.
     val precipitationPeakRate: Double? = null,
     val precipitationProbabilityMax: Int?,
     val precipitationHours: Double?,

@@ -11,7 +11,7 @@ import lv.bolwarra.wetter.domain.model.WeatherError
 /**
  * What recently happened when Wetter talked to a provider.
  *
- * Deliberately not monitoring. Its whole purpose is to stop Wetter reaching for
+ * Not monitoring. Its whole purpose is to stop Wetter reaching for
  * a provider that just failed twice in a row, and to let it go back once the
  * cooldown expires. Nothing is permanent and nothing is aggregated
  * (docs/providers.md).

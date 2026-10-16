@@ -36,7 +36,7 @@ fun MetricGrid(metrics: List<Metric>, modifier: Modifier = Modifier) {
     val spacing = WetterTheme.spacing
 
     // A reading the provider never supplies would sit here as a dash for ever.
-    // Dropping it is not hiding anything: the tile simply has one fewer thing in
+    // Dropping it is not hiding anything: the tile has one fewer thing in
     // it, which is the truth.
     val present = metrics.filter { it.value != NO_READING }
     if (present.isEmpty()) return

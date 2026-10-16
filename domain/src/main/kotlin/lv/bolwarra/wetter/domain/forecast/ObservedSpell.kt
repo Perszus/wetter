@@ -56,9 +56,8 @@ object ObservedSpell {
         val ranToTheEnd = last == steps.lastIndex
 
         // A run touching the end of the timeline has not been seen to stop. The
-        // model may know when it does; if it does not, the honest answer is that
-        // the forecast ran out, which PrecipitationSpell carries as open-ended
-        // rather than inventing a time.
+        // model may know when it does; if not, the forecast ran out, which
+        // PrecipitationSpell carries as open-ended rather than inventing a time.
         val continuation = if (ranToTheEnd) hourly.precipitationAt(steps.last().at) else null
 
         return PrecipitationSpell(

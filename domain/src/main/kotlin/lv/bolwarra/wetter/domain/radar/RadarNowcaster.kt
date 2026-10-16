@@ -211,7 +211,7 @@ object RadarNowcaster {
     }
 
     /**
-     * One projected field. Blocks with no measured trend simply advect: absent
+     * One projected field. Blocks with no measured trend advect: absent
      * evidence of growth, rain carries on as it is.
      */
     private fun advance(

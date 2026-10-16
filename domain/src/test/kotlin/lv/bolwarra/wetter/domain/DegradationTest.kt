@@ -109,7 +109,7 @@ class DegradationTest {
     fun `a forecast entirely in the past yields no window and no hazard`() {
         val stale = forecast((1..12).map { hour(-it) })
         assertTrue(Hazards.scan(stale, air = null, now = now).isEmpty())
-        // Every row is behind us, so the row covering now is genuinely absent.
+        // Every row is behind us, so the row covering now is absent.
         assertNull(stale.hourly.at(now))
     }
 
@@ -120,7 +120,7 @@ class DegradationTest {
         assertNotNull(one.hourly.at(now))
     }
 
-    // ---- G3: fields that are simply absent -------------------------------------
+    // ---- G3: fields that are absent -------------------------------------
 
     @Test
     fun `an hour with no temperature raises no temperature hazard`() {

@@ -24,12 +24,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -199,8 +203,17 @@ fun RainCurve(
             HairlineRule()
             Spacer(Modifier.height(spacing.xs))
 
-            Canvas(Modifier.fillMaxWidth().height(AXIS_HEIGHT)) {
+            Canvas(
+                Modifier
+                    .fillMaxWidth()
+                    .height(AXIS_HEIGHT)
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+            ) {
                 drawTimeAxis(points, zone, measurer, axisStyle, colors.hairline)
+                // Read inside the draw, like the band labels, so the axis dissolves at
+                // whichever edge has more beyond it rather than cutting a label.
+                val left = scroll.value.toFloat()
+                fadeEdges(left, left + viewport.toPx(), AXIS_FADE.toPx())
             }
         }
 
@@ -335,7 +348,7 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
 /**
  * The line's colour, deepening as it climbs into heavier rain: a vertical gradient
  * with a hard step at each band edge, so a line crossing a boundary changes tone
- * exactly there. It runs in ink rather than the rain colour, which is reserved for
+ * there. It runs in ink rather than the rain colour, which is reserved for
  * precipitation that is actually falling.
  */
 private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
@@ -502,6 +515,34 @@ private fun DrawScope.drawTimeAxis(
     }
 }
 
+/** Fades the content out towards each edge of the visible window that has more beyond it. */
+private fun DrawScope.fadeEdges(left: Float, right: Float, fade: Float) {
+    if (left > 0f) {
+        drawRect(
+            brush = Brush.horizontalGradient(
+                listOf(Color.Transparent, Color.Black),
+                left,
+                left + fade,
+            ),
+            topLeft = Offset(left, 0f),
+            size = Size(fade, size.height),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+    if (right < size.width) {
+        drawRect(
+            brush = Brush.horizontalGradient(
+                listOf(Color.Black, Color.Transparent),
+                right - fade,
+                right,
+            ),
+            topLeft = Offset(right - fade, 0f),
+            size = Size(fade, size.height),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+}
+
 private fun DrawScope.drawCursor(
     index: Int,
     points: List<CurvePoint>,
@@ -583,6 +624,10 @@ private const val LABEL_EVERY_MINUTES = 30
 private val TRACK_HEIGHT = 148.dp
 private val READOUT_HEIGHT = 24.dp
 private val AXIS_HEIGHT = 26.dp
+
+/** How far the time axis dissolves into each scrolling edge. */
+private val AXIS_FADE = 24.dp
+
 private val STROKE = 2.dp
 private val CURSOR_WIDTH = 1.5.dp
 private val DOT_RADIUS = 4.dp

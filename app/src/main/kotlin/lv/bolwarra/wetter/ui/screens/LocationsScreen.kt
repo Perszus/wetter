@@ -191,7 +191,7 @@ fun LocationsScreen(
                     isSelected = isSelected,
                     // A search result is not yet anywhere to be removed from, and
                     // the place you are currently looking at cannot be forgotten
-                    // while you are looking at it - the list would simply put it
+                    // while you are looking at it - the list would put it
                     // back, which reads as the button not working.
                     onRemove = if (state.searchable || isSelected) {
                         null
@@ -209,7 +209,7 @@ fun LocationsScreen(
 /**
  * The search box.
  *
- * Deliberately plain: no placeholder animation, no leading label, and the
+ * Plain: no placeholder animation, no leading label, and the
  * clear button appears only once there is something to clear.
  */
 @Composable

@@ -8,7 +8,7 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition
 /**
  * WMO code table 4677, as used by Open-Meteo and most models derived from it.
  *
- * This lives in the data layer on purpose: the codes are a wire format, and
+ * This lives in the data layer: the codes are a wire format, and
  * translating them is a provider's job. Nothing above `data/` should ever see an
  * integer where a condition belongs (docs/design-principles.md).
  *

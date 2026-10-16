@@ -7,7 +7,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Open-Meteo's forecast response, exactly as it arrives; nothing outside
+ * Open-Meteo's forecast response, as it arrives; nothing outside
  * `data/provider/openmeteo/` names these types (docs/providers.md).
  *
  * Every field is nullable or defaulted, since whole blocks are omitted where a

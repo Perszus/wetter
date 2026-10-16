@@ -21,7 +21,7 @@ import lv.bolwarra.wetter.domain.radar.isNoEcho
  * picture-only, and nothing reads rates back out of the bitmap.
  *
  * Where the observed ground ends, the rain fades: an observed mask feathered over
- * [FEATHER_PX] sets the opacity, reaching nothing exactly at the boundary, so the
+ * [FEATHER_PX] sets the opacity, reaching nothing at the boundary, so the
  * upwind edge of a projection thins out rather than stepping in blocks.
  */
 internal object RadarPainter {
@@ -78,7 +78,7 @@ internal object RadarPainter {
             mask = boxBlur(mask, width, height, horizontal = false)
         }
         // Two measures, and the smaller wins: the blurred mask rounds the edge's steps,
-        // and the distance to unobserved ground guarantees the fade ends exactly at the
+        // and the distance to unobserved ground guarantees the fade ends at the
         // edge, including at inside corners.
         val distance = distanceToUnobserved(raw, width, height)
         return FloatArray(mask.size) {

@@ -138,8 +138,8 @@ fun DomainSwitcher(
  */
 @Composable
 private fun TravellingFill(target: Segment, shape: RoundedCornerShape) {
-    // The pages use slideInHorizontally, whose default is this spring. Matching
-    // it is the whole point - the fill and the page are one movement.
+    // The pages use slideInHorizontally, whose default is this spring, so the fill
+    // and the page move as one.
     val motion = spring<Int>(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMediumLow,

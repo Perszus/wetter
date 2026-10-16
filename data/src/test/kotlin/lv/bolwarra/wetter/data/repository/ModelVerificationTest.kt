@@ -176,9 +176,8 @@ class ModelVerificationTest {
 
     @Test
     fun `a reading taken after the moment cannot describe it`() = runBlocking {
-        // Not a technicality. Settling 09:00 from a 09:20 report would be
-        // marking a forecast against weather that had not happened when the
-        // forecast was for, and the whole point of the store is that it cannot.
+        // Settling 09:00 from a 09:20 report would mark a forecast against
+        // weather that had not yet happened at the hour it was for.
         val dao = FakeRecordDao(listOf(claim().copy(id = 1)))
         val reports = Reports(listOf(reportAt(minute = 20, temperature = 15.0)))
 

@@ -178,7 +178,7 @@ class CorrectedForecastTest {
             bias(offset = 2.0, samples = BiasCorrection.CONFIDENT_SAMPLES),
         )
         val earlyShift = forecast.current.temperature!! - early.current.temperature!!
-        val settledShift = forecast.current.temperature!! - settled.current.temperature!!
+        val settledShift = forecast.current.temperature - settled.current.temperature!!
 
         assertEquals(2.0, settledShift, 0.001)
         // A quarter of the way to confident, so a quarter of the correction.

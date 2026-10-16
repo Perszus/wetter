@@ -235,7 +235,7 @@ class HazardsTest {
         // Severity stops at "change the plan", so without the peak a gale and a
         // hurricane are the same warning. This is what tells them apart.
         assertEquals(38.0, wind.peak!!, 1e-9)
-        assertTrue(wind.peak!! >= Hazards.HURRICANE_MS)
+        assertTrue(wind.peak >= Hazards.HURRICANE_MS)
     }
 
     @Test
@@ -319,7 +319,7 @@ class HazardsTest {
         // -59.5. One global number cannot serve both, and the one this app used
         // to carry - minus twenty-five - served neither: it is a temperature
         // Rīga reaches about never, so the warning was dead code in a country
-        // that gets genuinely dangerous winters.
+        // that gets dangerous winters.
         val night = List(4) { hour(it, temperature = -20.0, apparent = -20.0) }
 
         val riga = Hazards.scan(

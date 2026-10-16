@@ -50,8 +50,8 @@ class HazardAnnouncementTest {
 
     @Test
     fun `a storm that moves in the forecast is still the same storm`() {
-        // The whole point of the key. Every refresh nudges the start time by a
-        // few minutes; a key built from the instant would fire all night.
+        // Every refresh nudges the start time by a few minutes; a key built from
+        // the instant would fire all night.
         val atSix = hazard(HazardKind.THUNDERSTORM, inHours = 6)
         val atHalfPast = atSix.copy(from = atSix.from.plus(Duration.ofMinutes(35)))
         assertEquals(
@@ -135,7 +135,7 @@ class HazardAnnouncementTest {
     fun `a dangerous day that is ordinary here does not wake anybody`() {
         // Measured by replaying a year of archive: Doha reached the absolute heat
         // danger on 129 days and Yakutsk the absolute cold danger on 104. Both
-        // are genuinely dangerous and both belong on the dial; neither is worth
+        // are dangerous and both belong on the dial; neither is worth
         // a phone going off every other day for two months.
         //
         // Doha's own mid-July tails are 46.8 warning, 47.7 exceptional.

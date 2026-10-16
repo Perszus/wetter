@@ -41,14 +41,14 @@ class ReadingReliabilityTest {
     fun `a difference is not converted like a reading`() {
         // One degree of difference is 1.8 F, not 33.8. This is the arithmetic
         // that the deleted local-correction figure used, and the distinction is
-        // exactly the kind that survives review and fails in the field - so it
+        // the kind that survives review and fails in the field - so it
         // is pinned here whether or not anything currently calls it.
         assertEquals(1.8, TemperatureUnit.FAHRENHEIT.difference(1.0), 0.0001)
         assertEquals(-1.8, TemperatureUnit.FAHRENHEIT.difference(-1.0), 0.0001)
         assertEquals(0.0, TemperatureUnit.FAHRENHEIT.difference(0.0), 0.0001)
         assertEquals(1.0, TemperatureUnit.CELSIUS.difference(1.0), 0.0001)
 
-        // And they must genuinely differ, or one of them is wrong.
+        // And they must differ, or one of them is wrong.
         assertTrue(
             "difference() and from() must not be the same function",
             abs(TemperatureUnit.FAHRENHEIT.from(1.0) - TemperatureUnit.FAHRENHEIT.difference(1.0)) >

@@ -67,7 +67,7 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
                         // Waking the radio with no connection to use it is the
                         // one guaranteed way to spend battery for nothing.
                         .setRequiredNetworkType(NetworkType.CONNECTED)
-                        // Deliberately not requiring a charged battery: somebody
+                        // Not requiring a charged battery: somebody
                         // on 12% still wants to know whether to take a coat, and
                         // one small request every half hour is not what is
                         // draining their phone.

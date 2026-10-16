@@ -15,7 +15,7 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
  * climate stops being read.
  *
  * Asked of the whole calendar day, from midnight, so the mark is stable: somebody
- * decides once, on the way out, and it should not quietly go out at eleven. It
+ * decides once, on the way out, and it should not go out at eleven. It
  * moves only when the forecast does.
  *
  * The bar is lower than the one rain claims use, because the costs run the other

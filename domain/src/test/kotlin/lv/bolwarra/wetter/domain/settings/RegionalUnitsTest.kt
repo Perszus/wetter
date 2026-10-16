@@ -9,7 +9,7 @@ import org.junit.Test
 /**
  * The first guess at somebody's units, checked against real places.
  *
- * Written as cities rather than as corners of boxes on purpose. A test that
+ * Written as cities rather than as corners of boxes. A test that
  * asserts the box is the box it was written as proves nothing; a test that says
  * "Monterrey is metric" is a claim about the world that stays true if the boxes
  * are ever replaced with something better.
@@ -66,7 +66,7 @@ class RegionalUnitsTest {
 
         // El Paso and Ciudad Juárez share a river and their centres are three
         // kilometres apart - closer than a nine-point line can resolve, and
-        // deliberately not claimed. These are the far sides of each city, which
+        // not claimed. These are the far sides of each city, which
         // is the resolution this is honestly good to.
         assertEquals(imperial, at(31.87, -106.44)) // north-east El Paso
         assertEquals(metric, at(31.65, -106.42)) // southern Ciudad Juárez

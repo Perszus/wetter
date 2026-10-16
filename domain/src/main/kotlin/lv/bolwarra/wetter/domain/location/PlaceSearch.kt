@@ -29,7 +29,7 @@ interface PlaceSearch {
 
         /**
          * Below this a query matches half the world and the answer is noise.
-         * Two letters is enough for somewhere genuinely short.
+         * Two letters is enough for somewhere short.
          */
         const val MINIMUM_QUERY = 2
     }

@@ -46,6 +46,8 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // A warning is a defect that has not been fixed yet; it fails the build instead.
+        allWarningsAsErrors.set(true)
     }
 }
 

@@ -18,7 +18,7 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
  * regional model is kept where it has hours and a global one continues beyond.
  *
  * - **Nothing is invented.** Six-hourly steps are never spread into hours, and
- * the join is exactly where the first source's hourly data stops.
+ * the join is where the first source's hourly data stops.
  * - **A day's summary comes from whoever drew most of that day's hours**, so the
  * daily row describes the same model as the bars under it.
  */

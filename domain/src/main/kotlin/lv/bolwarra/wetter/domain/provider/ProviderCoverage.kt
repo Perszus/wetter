@@ -125,7 +125,7 @@ data class ProviderCoverage(
 
     /**
      * The finest resolution available at this point: a region's own figure where the
-     * point is genuinely inside one, otherwise the provider's baseline.
+     * point is inside one, otherwise the provider's baseline.
      */
     fun resolutionKmAt(latitude: Double, longitude: Double, baseline: Double?): Double? =
         preferredRegions

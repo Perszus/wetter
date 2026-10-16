@@ -231,7 +231,7 @@ class PrecipitationFusionTest {
         // observation by the time it is ten minutes away.
         //
         // Here the same event is asked about at two removes, with the radar
-        // confidence each would genuinely carry at that lead.
+        // confidence each would carry at that lead.
         val sharp = RadarNowcaster.GOOD_MATCH_SHARPNESS
 
         fun askedAt(leadMinutes: Long) = PrecipitationFusion.fuse(
@@ -304,14 +304,14 @@ class PrecipitationFusionTest {
         // The model says a steady 4 mm an hour. The radar has looked and there
         // is nothing there. Within the window the answer is what was seen.
         //
-        // Stepped every twenty minutes, so the later samples deliberately fall
+        // Stepped every twenty minutes, so the later samples fall
         // outside the hour and are not what this asserts on.
         val dryRadar = List(6) { index ->
             RadarSample(
                 at = start.plus(Duration.ofMinutes(index * 20L)),
                 lead = Duration.ofMinutes(index * 20L),
                 millimetresPerHour = 0f,
-                // A middling confidence on purpose: it must not water the
+                // A middling confidence: it must not water the
                 // observation down inside the window.
                 confidence = 0.4f,
             )

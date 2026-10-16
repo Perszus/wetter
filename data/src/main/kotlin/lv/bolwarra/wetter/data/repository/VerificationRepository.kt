@@ -83,7 +83,7 @@ class VerificationRepository internal constructor(
     /**
      * Record what the radar projection claimed, so it can be held to it.
      *
-     * Every sweep is a measurement of exactly the quantity the projection guessed at,
+     * Every sweep is a measurement of the quantity the projection guessed at,
      * over the same field, so the nowcast can be scored without any station. With
      * radar and models both scored, the hand-over can sit where their errors actually
      * cross. The zero-lead sample is the observation itself and is not recorded.

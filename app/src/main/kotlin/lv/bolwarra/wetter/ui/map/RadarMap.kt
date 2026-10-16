@@ -458,7 +458,7 @@ internal fun basemapZoomFor(geometry: RadarGeometry, widthPx: Int): Int {
 }
 
 /**
- * Exactly the basemap tiles under the radar block, nothing around it (see
+ * The basemap tiles under the radar block, nothing around it (see
  * MapTileSource).
  */
 internal fun basemapKeys(geometry: RadarGeometry, zoom: Int): List<TileKey> {

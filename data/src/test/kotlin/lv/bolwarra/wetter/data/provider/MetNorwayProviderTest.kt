@@ -206,7 +206,7 @@ class MetNorwayProviderTest {
  * MET Norway really does publish both for the same moment, and this is the shape
  * that put a rain mark on a dry Saturday. Written out here rather than added to
  * the shared fixture: everything else reads that one, and this is a shape that
- * has to stay exactly as it is.
+ * has to stay as it is.
  */
 private val DRY_HOURS_UNDER_A_WET_SIX = """
 {

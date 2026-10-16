@@ -7,7 +7,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * MET Norway's locationforecast 2.0 response, exactly as it arrives; these types
+ * MET Norway's locationforecast 2.0 response, as it arrives; these types
  * stop at the edge of this package (docs/providers.md).
  *
  * There is no daily or hourly block, only one `timeseries` of instants with

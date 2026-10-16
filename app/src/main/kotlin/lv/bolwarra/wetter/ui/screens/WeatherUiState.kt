@@ -33,7 +33,7 @@ data class WeatherUiState(
      * Separate from [forecast] because it arrives later and can fail on its own:
      * radar is a second network call that is often unavailable, and a screen
      * that waited for it would be blank for the many places it has nothing to
-     * say about. Empty simply means the model is on its own.
+     * say about. Empty means the model is on its own.
      */
     val timeline: List<FusedPrecipitation> = emptyList(),
     /**

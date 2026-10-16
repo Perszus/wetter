@@ -17,7 +17,7 @@ import lv.bolwarra.wetter.domain.provider.ProviderMetadata
 
 /**
  * A fixed forecast for @Preview and for tests that need something shaped like real
- * data. Deliberately awkward (a shower that builds and stops, a null probability,
+ * data. Awkward on purpose (a shower that builds and stops, a null probability,
  * an overnight stretch, a minimum below zero), and derived from one fixed epoch so
  * previews are reproducible.
  */

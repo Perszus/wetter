@@ -176,8 +176,7 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="setting_warnings_on">On</string>
     <string name="setting_warnings_off">Off</string>
     <string name="setting_background">Background updates</string>
-    <string name="setting_background_why">Wetter refreshes every ten minutes, in step with the radar. Your phone is holding it back; these let it keep time.</string>
-    <string name="setting_background_exact">Allow precise timing</string>
+    <string name="setting_background_why">Wetter refreshes every ten minutes, in step with the radar. Your phone is holding it back; this lets it keep time.</string>
     <string name="setting_background_battery">Allow unrestricted battery</string>
     <string name="hazard_heat">Extreme heat</string>
     <string name="hazard_cold">Extreme cold</string>

@@ -138,7 +138,7 @@ class ScoringProviderSelector : WeatherProviderSelector {
             }
         }
 
-        // A resting provider stays eligible on purpose. If every provider is
+        // A resting provider stays eligible. If every provider is
         // resting the app must still try the least-bad one, or an outage on both
         // sides of a fallback pair would leave Wetter unable to recover on its
         // own (docs/providers.md — no permanent demotion).

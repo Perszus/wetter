@@ -8,9 +8,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// Signing material for the Play upload key. Absent from the repository, absent
-// on a fresh clone, and absent on F-Droid's build servers — which is the point:
-// F-Droid builds the same source with no keystore and signs the result itself.
+// The Play upload key, from keystore.properties when present. It is never in the
+// repository; F-Droid builds without it and signs the APK itself.
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val hasKeystore = keystorePropertiesFile.exists()
 val keystoreProperties = Properties().apply {
@@ -18,6 +17,10 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
+    // Unused resources and version checks below the minimum SDK fail `check`.
+    lint {
+        error += setOf("UnusedResources", "ObsoleteSdkInt")
+    }
     namespace = "lv.bolwarra.wetter"
     compileSdk = 36
 
@@ -26,12 +29,8 @@ android {
         minSdk = 26
         targetSdk = 36
 
-        // Both are written out by hand, one release at a time, and both must
-        // match the git tag. Deriving them from the repository — a commit count,
-        // a `git describe` — would make the build depend on clone depth, which
-        // F-Droid's build servers do not guarantee and which would quietly
-        // change the version of a build nobody expected to change.
-        // See docs/RELEASING.md.
+        // Written by hand and matched to the git tag. Derived from git, they would
+        // depend on clone depth, which F-Droid does not guarantee (docs/RELEASING.md).
         versionCode = 1
         versionName = "0.1.0"
 
@@ -71,19 +70,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Signed only where the keystore exists. Without it the release build
-            // still succeeds and produces an unsigned APK, because that is
-            // exactly what F-Droid asks for and failing here would break their
-            // build. The guard against an unsigned *Play* upload is below, on
-            // bundleRelease alone.
+            // Unsigned without a keystore, as F-Droid's build expects. An unsigned
+            // Play upload is stopped below, on bundleRelease alone.
             signingConfig = if (hasKeystore) signingConfigs.getByName("release") else null
 
-            // AGP otherwise embeds META-INF/version-control-info.textproto,
-            // describing the git checkout the build came from. It is the only
-            // thing that differed between two independent builds of the same
-            // commit, so switching it off is what makes the release APK
-            // byte-for-byte reproducible — and it keeps details of the build
-            // machine's working copy out of a shipped artefact.
+            // Leaves out META-INF/version-control-info.textproto, the one file
+            // that differed between two builds of the same commit, so the release
+            // APK is reproducible byte for byte.
             vcsInfo {
                 include = false
             }
@@ -98,9 +91,8 @@ android {
     }
 
     androidResources {
-        // The set of locales is fixed by what is translated, so it does not vary
-        // with whatever happens to be installed on the build machine. One less
-        // way for two builds of the same commit to differ.
+        // Fixed to the translated locales, so the build does not vary with the
+        // machine it runs on.
         localeFilters += listOf("en")
     }
 
@@ -111,8 +103,7 @@ android {
 
     buildFeatures {
         compose = true
-        // Needed for BuildConfig.VERSION_NAME, which the About section reads so
-        // the version on screen can never drift from the one that was built.
+        // For BuildConfig.VERSION_NAME, shown in About.
         buildConfig = true
     }
 
@@ -132,6 +123,8 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // A warning is a defect that has not been fixed yet; it fails the build instead.
+        allWarningsAsErrors.set(true)
     }
 }
 
@@ -181,6 +174,20 @@ tasks.withType<Test>().configureEach {
     providers.gradleProperty("robolectricRepository").orNull?.let {
         systemProperty("maven.repo.local", it)
     }
+    // ReleaseReadinessTest reads the repository's documents, so a change to one
+    // of them has to rerun the tests rather than leave them up to date.
+    inputs.files(
+        rootProject.fileTree(rootDir) {
+            include(
+                "README.md",
+                "CHANGELOG.md",
+                "docs/**",
+                "fastlane/**",
+                "fdroid/**",
+                ".github/**",
+            )
+        },
+    ).withPropertyName("releaseDocuments").withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 // An AAB is only ever built to be uploaded to Play, and Play will reject an

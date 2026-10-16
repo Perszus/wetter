@@ -55,7 +55,7 @@ internal object RainStrip {
     /**
      * Where light becomes moderate, and moderate becomes heavy: two hairlines and no
      * words. There is no room for a band name here, so the colour carries the level
-     * and the lines mark exactly where it changes.
+     * and the lines mark where it changes.
      */
     private fun drawBands(canvas: Canvas, chart: RectF, scale: Float, colors: WetterColors) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -138,7 +138,7 @@ internal object RainStrip {
      * The curve, coloured by the band each part of it is in.
      *
      * A vertical gradient with hard steps at the band edges: height is intensity on
-     * this axis, so a stroke changes colour exactly where it crosses a level. The
+     * this axis, so a stroke changes colour where it crosses a level. The
      * same construction as the app's chart, sharing [RainCurveBands] for the edges.
      */
     private fun drawCurve(

@@ -89,7 +89,7 @@ class ModelAgreementTest {
     @Test
     fun `the measured Riga disagreement comes out as real uncertainty`() {
         // The seven models over Riga at twelve hours out, spanning 3.4 C. That
-        // is a genuinely uncertain hour and must not score as a confident one.
+        // is an uncertain hour and must not score as a confident one.
         val riga = listOf(19.0, 19.4, 18.6, 21.2, 19.9, 20.8, 17.8)
         val summary = ModelAgreement.summarise(at, riga)!!
 

@@ -268,7 +268,7 @@ private fun DrawScope.drawTiles(
 }
 
 /**
- * Exactly the tiles the viewport covers. A ring around the edge for smoother
+ * The tiles the viewport covers, and no more. A ring around the edge for smoother
  * panning would be the pre-emptive fetching the tile policy prohibits.
  */
 internal fun visibleTiles(world: WorldPoint, zoom: Int, size: IntSize): List<TileKey> {

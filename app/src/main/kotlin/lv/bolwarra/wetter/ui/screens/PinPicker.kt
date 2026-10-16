@@ -178,10 +178,9 @@ fun PinPicker(
             }
         }
         Text(
-            // The instruction until there is something to report. A blank line
-            // here would leave the screen looking finished when it is not, and
-            // the one thing a reader needs to know is that the map is waiting to
-            // be tapped.
+            // The instruction until there is something to report: a blank line
+            // would leave the screen looking finished while the map waits to be
+            // tapped.
             text = chosen?.format() ?: stringResource(R.string.locations_pin_hint),
             style = if (place == null) WetterTheme.type.body else WetterTheme.type.meta,
             color = colors.textTertiary,

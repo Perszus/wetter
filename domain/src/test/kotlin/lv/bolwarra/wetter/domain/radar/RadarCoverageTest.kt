@@ -15,7 +15,7 @@ import org.junit.Test
  * draws an empty pixel for both. Measured on one afternoon, blocks around Lagos
  * and over the mid-Atlantic carried no echo at all, against 14% over Riga, so for
  * most of the world reading the empty pixel as dry would contradict the models
- * exactly where no radar can correct them.
+ * where no radar can correct them.
  */
 class RadarCoverageTest {
 

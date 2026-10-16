@@ -17,7 +17,7 @@ import org.junit.Test
  * 53% of the time, and an hour at light or above 79% of the time. A sentence
  * built on the first of those is a coin flip stated as a fact.
  *
- * So there are two bars and they are deliberately different heights. The curve
+ * So there are two bars and they are different heights. The curve
  * draws anything measurable, because something is falling and the chart is a
  * picture of the data. The words and the marks wait for rain.
  */

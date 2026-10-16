@@ -27,7 +27,7 @@ data class ObservationStation(
      * Spherical rather than a flat approximation: at the latitudes this app is
      * used in, a degree of longitude is about half a degree of latitude, and
      * treating them alike would make a station due east look twice as far away
-     * as it is - which is exactly the error that would pick the wrong station.
+     * as it is - which is the error that would pick the wrong station.
      */
     fun distanceKmTo(latitude: Double, longitude: Double): Double {
         val dLat = Math.toRadians(latitude - this.latitude)

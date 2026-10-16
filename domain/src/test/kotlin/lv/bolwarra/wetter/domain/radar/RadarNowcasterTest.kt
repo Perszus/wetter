@@ -20,7 +20,7 @@ class RadarNowcasterTest {
     private val start: Instant = Instant.parse("2026-09-03T12:00:00Z")
 
     /**
-     * Deliberately larger than one tile. At 2 px/min a feature travels 240 px in
+     * Larger than one tile. At 2 px/min a feature travels 240 px in
      * two hours, so on a single 256 px tile everything being tracked runs off
      * the edge before the last lead and the test ends up measuring the grid
      * boundary rather than the projection.
@@ -114,7 +114,7 @@ class RadarNowcasterTest {
         assertTrue(RadarNowcaster.confidenceAt(90.0, good) > 0.5f)
         assertTrue(RadarNowcaster.confidenceAt(150.0, good) < 0.5f)
 
-        // And genuinely spent by the time the model is all there is.
+        // And spent by the time the model is all there is.
         assertTrue(RadarNowcaster.confidenceAt(360.0, good) < 0.1f)
     }
 

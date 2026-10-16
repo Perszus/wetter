@@ -8,7 +8,6 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import java.time.Duration
 import java.time.Instant
@@ -30,8 +29,9 @@ import lv.bolwarra.wetter.widget.Widgets
  *
  * An allow-while-idle alarm, because periodic work is a floor that Doze stretches
  * to hours. Its delivery carries a few seconds of network even in Doze, which
- * [Refresh] spends on radar first. Exact when allowed ([exactAllowed]), inexact
- * otherwise. The periodic job stays as a net and re-arms the alarm on every run.
+ * [Refresh] spends on radar first. Inexact: the system may deliver it a little
+ * late, which an exact alarm would not fix in Doze either. The periodic job stays
+ * as a net and re-arms the alarm on every run.
  */
 internal object Heartbeat {
 
@@ -116,30 +116,11 @@ internal object Heartbeat {
         val alarms = context.getSystemService(AlarmManager::class.java) ?: return
         val intent = pendingIntent(context, PendingIntent.FLAG_UPDATE_CURRENT) ?: return
         val millis = at.toEpochMilli()
-        // The permission can be withdrawn between the check and the call, which then
-        // throws. Inexact is the fallback, never no wake.
-        val exact = exactAllowed(context) &&
-            runCatching {
-                alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, intent)
-            }.isSuccess
-        if (!exact) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, intent)
+        alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, intent)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putLong(KEY_AT, millis)
             .apply()
-        log(
-            "next wake ${Duration.between(Instant.now(), at).seconds}s from now" +
-                if (exactAllowed(context)) " (exact)" else " (inexact)",
-        )
-    }
-
-    /**
-     * Whether the wake can be set to the minute. From Android 12 this is the "Alarms &
-     * reminders" permission, which settings offers the way to; without it the wake
-     * is inexact, costing minutes.
-     */
-    fun exactAllowed(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
-        return context.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true
+        log("next wake ${Duration.between(Instant.now(), at).seconds}s from now")
     }
 
     private fun scheduledAt(context: Context): Instant? {
@@ -185,9 +166,8 @@ class HeartbeatReceiver : BroadcastReceiver() {
                     when (intent.action) {
                         Heartbeat.ACTION_WAKE -> wake(context)
                         else -> {
-                            // Booted, updated, or the exact-alarm permission changed: redraw from
-                            // disk at once, then a full pass in moments, since what is on disk may
-                            // be hours behind.
+                            // Booted or updated: redraw from disk at once, then a full pass in
+                            // moments, since what is on disk may be hours behind.
                             withTimeoutOrNull(DRAW_MS) {
                                 runCatching { Widgets.refresh(context) }
                             }

@@ -11,7 +11,7 @@ package lv.bolwarra.wetter.domain.settings
  * always present and offline, and the only question is whether this is the one
  * place that measures weather in Fahrenheit.
  *
- * Approximate on purpose: boxes, with polylines along the two borders where a
+ * Approximate: boxes, with polylines along the two borders where a
  * straight edge would be badly wrong. The Mexican border is followed so northern
  * Mexico stays metric, and the Canadian border follows the Great Lakes and the St
  * Lawrence, since Toronto and Montréal lie south of the 49th parallel. Where it

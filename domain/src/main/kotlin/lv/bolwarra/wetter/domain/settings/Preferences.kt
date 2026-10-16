@@ -20,7 +20,7 @@ data class Preferences(
     /**
      * Whether severe weather is worth a notification, up to a day ahead. On by
      * default: the one interruption this app makes. The bar is the dial's warning
-     * mark, set high on purpose.
+     * mark, set high.
      */
     val warnings: Boolean = true,
 )

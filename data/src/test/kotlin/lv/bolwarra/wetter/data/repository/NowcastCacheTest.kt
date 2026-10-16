@@ -202,7 +202,7 @@ class NowcastCacheTest {
 
     @Test
     fun `exactly one download per sweep over an hour`() = runBlocking {
-        // The whole point. Six sweeps published, sixty timeline rebuilds.
+        // Six sweeps published, sixty timeline rebuilds.
         var sweep = Instant.parse("2026-09-03T12:00:00Z")
         val clock = TestClock(sweep.plus(Duration.ofSeconds(10)))
         val radar = FakeRadar(latest = sweep)

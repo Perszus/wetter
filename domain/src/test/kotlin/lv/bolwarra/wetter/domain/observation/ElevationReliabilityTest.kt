@@ -17,7 +17,7 @@ import org.junit.Test
  * Aerodromes are on flat ground near sea level far more often than towns are,
  * so the station verifying a place is frequently several hundred metres below
  * it. Uncorrected, that gap is a constant temperature offset - and a constant
- * offset is precisely the shape `BiasCorrection` is built to find and subtract,
+ * offset is the shape `BiasCorrection` is built to find and subtract,
  * which would make the app confidently wrong at every hill town it learns
  * about.
  */
@@ -93,7 +93,7 @@ class ElevationReliabilityTest {
         assertEquals(18.0, uncorrected!!.temperature!!, 0.001)
         assertEquals(18.0 - 2.6, corrected!!.temperature!!, 0.001)
 
-        val gap = abs(uncorrected.temperature!! - corrected.temperature!!)
+        val gap = abs(uncorrected.temperature - corrected.temperature)
         assertTrue("the correction must be worth making, got $gap", gap > 2.0)
     }
 

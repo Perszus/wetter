@@ -85,7 +85,7 @@ class PreferencesTest {
         assertEquals(WindUnit.METRES_PER_SECOND, fresh.wind)
         assertEquals(PrecipitationUnit.MILLIMETRES, fresh.precipitation)
         // Black. A weather app is opened at the ends of the day rather than the
-        // middle, and deliberately not from the phone's dark mode: there is no
+        // middle, and not from the phone's dark mode: there is no
         // "follow the system" here, because each of these is a whole design
         // rather than a light switch.
         assertEquals(ThemeChoice.PURE_BLACK, fresh.theme)
