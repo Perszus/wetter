@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Clock
@@ -19,25 +22,14 @@ import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.verification.VerifiedVariable
 
 /**
- * The loop that lets the app find out whether it was right.
+ * Finds out whether the app was right.
  *
- * Three things happen here, at different times and deliberately not together.
- * A forecast is written down when it is made. Later, once the hours it described
- * have passed, they are compared against what the aerodromes actually reported.
- * Later still, the accumulated errors are read back as a correction.
+ * A forecast is written down when it is made; once its hours have passed they are
+ * compared against what the aerodromes reported; the accumulated errors are read
+ * back as a correction. None of it is on the path that draws the screen.
  *
- * Nothing about this is fast or urgent, and none of it belongs on the path that
- * draws the screen - the recording is cheap, the verification is a network call
- * for weather that has already happened, and the correction is worth applying
- * only after weeks of records exist.
- *
- * ### Why it records the blend rather than each model
- *
- * The screen shows one forecast, which is what somebody acted on, so that is
- * what is scored. Verifying each of the seven models separately would be the
- * more interesting experiment and a much larger store, and would answer a
- * question nothing currently asks. The ensemble's own disagreement is already
- * available for free and does most of that work.
+ * The blend is scored rather than each model, because the blend is what the
+ * reader saw and acted on.
  */
 class VerificationRepository internal constructor(
     private val dao: ForecastRecordDao,
@@ -46,12 +38,9 @@ class VerificationRepository internal constructor(
 ) {
 
     /**
-     * Write down what was just forecast, so it can be marked later.
-     *
-     * Only the near term is kept. A three-day-old prediction for next Tuesday is
-     * a legitimate thing to score, but the store would grow by every hour of
-     * every horizon on every refresh, and the near term is where an error
-     * actually costs somebody something.
+     * Write down what was just forecast, so it can be marked later. Only the near
+     * term ([RECORD_HORIZON]) is kept: that is where an error costs somebody something,
+     * and every horizon on every refresh would grow the store without limit.
      */
     suspend fun record(forecast: WeatherForecast) {
         val now = Instant.now(clock)
@@ -94,21 +83,10 @@ class VerificationRepository internal constructor(
     /**
      * Record what the radar projection claimed, so it can be held to it.
      *
-     * The nowcast is the one source in this app that can be marked without any
-     * outside help. Every ten minutes a real sweep arrives, and it is a
-     * measurement of exactly the quantity the projection guessed at, over
-     * exactly the same field. No station, no interpolation, no waiting an hour
-     * for a METAR that may say nothing useful.
-     *
-     * That matters more than convenience. The hour the radar is trusted for is
-     * currently a judgement - a reasoned one, but nobody has measured where the
-     * projection actually stops beating the model. With both scored the
-     * hand-over can sit where the two curves genuinely cross, per location,
-     * rather than where anybody reasoned it should.
-     *
-     * The zero-lead sample is deliberately not recorded. It is the observation
-     * itself, and scoring it would be marking the radar's homework against a
-     * copy of the same homework.
+     * Every sweep is a measurement of exactly the quantity the projection guessed at,
+     * over the same field, so the nowcast can be scored without any station. With
+     * radar and models both scored, the hand-over can sit where their errors actually
+     * cross. The zero-lead sample is the observation itself and is not recorded.
      */
     suspend fun recordNowcast(
         location: WeatherLocation,
@@ -129,11 +107,8 @@ class VerificationRepository internal constructor(
                     variable = VerifiedVariable.PRECIPITATION.name,
                     predicted = sample.millimetresPerHour.toDouble(),
                     observed = null,
-                    // Written down at the time, because afterwards there is no
-                    // way to recover how much this projection deserved to be
-                    // believed - and an error is only worth learning from if
-                    // something separates the times it happens from the times
-                    // it does not.
+                    // Kept with the record: afterwards there is no way to recover how much this
+                    // projection deserved belief.
                     confidence = sample.confidence.toDouble(),
                     motionQuality = sample.motionQuality.toDouble(),
                 )
@@ -142,15 +117,9 @@ class VerificationRepository internal constructor(
     }
 
     /**
-     * How far back unsettled radar claims reach, or null if there are none.
-     *
-     * A claim can only be marked while a sweep near its moment is in hand, so a
-     * routine run - which carries half an hour of them - settles nothing that
-     * came due while the device was asleep. Measured over sixteen hours on a
-     * phone, that showed up as a settle rate falling from 77% at five minutes
-     * out to 19% at two hours, purely because the long leads came due in the
-     * gaps. Asking this lets a run reach back far enough to clear what it
-     * missed.
+     * How far back unsettled radar claims reach, or null if there are none. A claim
+     * can only be settled while a sweep near its moment is in hand, so a run after the
+     * device slept must reach back far enough to clear what came due in the gap.
      */
     suspend fun oldestUnsettledNowcast(now: Instant): Instant? = dao.oldestAwaiting(
         source = NOWCAST_SOURCE,
@@ -181,36 +150,12 @@ class VerificationRepository internal constructor(
     }
 
     /**
-     * Check every outstanding prediction whose hour has passed.
+     * Marks past predictions against what the aerodromes reported. The estimate is
+     * asked for at the verified moment itself, since METAR is issued at twenty and
+     * fifty past and [LocalEstimate] takes the latest report at or before a moment.
      *
-     * @return how many were settled. Zero is the normal answer when there is
-     *   nothing new to check, or when no station near enough had anything to say.
-     */
-    /**
-     * Marks past predictions against what the aerodromes actually reported.
-     *
-     * ### The hour that could never match
-     *
-     * This used to bucket the reports by their own truncated hour and then ask
-     * [LocalEstimate] for an estimate *at the start* of that hour. Every report
-     * in a bucket is by construction at or after the hour it was bucketed into,
-     * and LocalEstimate rejects observations from the future - a reading cannot
-     * describe a moment before it was taken. So every candidate was filtered out
-     * and the answer was always null.
-     *
-     * It settled nothing, ever, and did it silently: a fetch that works, a
-     * grouping that looks reasonable, and a count of zero that reads like "no
-     * observations yet". Measured on a phone after sixteen hours: 119 model
-     * predictions due, 119 unsettled, while the radar half - which never went
-     * through this path - had scored 186.
-     *
-     * The tell is in the data rather than the code. METAR is issued at twenty
-     * and fifty minutes past; across forty consecutive reports around Riga, the
-     * number landing exactly on the hour was zero. Nothing could have matched.
-     *
-     * So the estimate is now asked for at the moment actually being verified,
-     * and LocalEstimate does what it was built to do: take the most recent
-     * report at or before that moment, within the two hours it considers fresh.
+     * @return how many were settled. Zero is normal when there is nothing new or no
+     * station near enough had anything to say.
      */
     suspend fun verify(location: WeatherLocation): Int {
         val now = Instant.now(clock)
@@ -239,9 +184,8 @@ class VerificationRepository internal constructor(
     }
 
     /**
-     * What this location's forecasts get systematically wrong, once enough
-     * records exist to tell. Null until they do, which is the normal state for
-     * the first few weeks.
+     * What this location's forecasts get systematically wrong, once enough records
+     * exist to tell; null until then.
      */
     suspend fun learnedBias(
         location: WeatherLocation,
@@ -249,9 +193,7 @@ class VerificationRepository internal constructor(
     ): LearnedBias? {
         val since = Instant.now(clock).minus(BiasCorrection.MAX_AGE)
         val rows = dao.verifiedFor(cacheKeyOf(location), since.epochSecond)
-        // Up to thirty days of records mapped and regressed. Room runs the query
-        // off the main thread but hands the rows back on the caller's, and the
-        // caller is a view model - so the arithmetic landed on the frame clock.
+        // The regression runs off the main thread; Room hands rows back on the caller's.
         return withContext(Dispatchers.Default) {
             BiasCorrection.learn(rows.map { it.toDomain() }, variable)
         }
@@ -267,13 +209,9 @@ class VerificationRepository internal constructor(
     }
 
     /**
-     * What actually happened in an hour, as one number.
-     *
-     * Temperature comes from the weighted local estimate. Precipitation is the
-     * share of nearby stations reporting something falling, turned into a rate
-     * only far enough to be comparable against a forecast - the reports carry no
-     * amount, so this is deliberately coarse and is used as a yes-or-no event
-     * rather than as a measurement.
+     * What actually happened in an hour, as one number. Temperature comes from the
+     * weighted local estimate. Precipitation is the share of nearby stations reporting
+     * something falling: the reports carry no amount, so it is a yes-or-no event.
      */
     private fun observedValue(
         variable: String,
@@ -284,27 +222,9 @@ class VerificationRepository internal constructor(
         val estimate = LocalEstimate.at(
             latitude = location.latitude,
             longitude = location.longitude,
-            // The place's own height, which was being thrown away here.
-            //
-            // LocalEstimate uses it for two things: it brings each station's
-            // reading to this height at the standard lapse rate, and it prefers
-            // stations at a similar height when several are in range. Passing
-            // null turned both off, so the "observation" for a town in the hills
-            // was the temperature of the aerodrome on the plain below it - and
-            // the whole difference was then handed to BiasCorrection, which has
-            // no way to tell an elevation gap from a model that runs warm. It
-            // would learn the gap and subtract it from every temperature on
-            // screen, making the app wrong at exactly the places terrain makes
-            // it hard.
-            //
-            // The extremes were already safe by accident: a gap over about 770 m
-            // exceeds MAX_TEMPERATURE_OFFSET and the correction is refused
-            // outright. The dangerous band was underneath that - four hundred
-            // metres is 2.6 C, which is large enough to matter and small enough
-            // to be believed.
-            //
-            // Null when the place has no recorded height, which is what a pin
-            // dropped on a map has, and then this behaves exactly as before.
+            // The place's height lets the estimate bring each station to it at the lapse
+            // rate and prefer stations at a similar height. Without it a hill town would be
+            // scored against the aerodrome below, and the gap learned as model bias.
             elevationMetres = location.elevationMetres,
             observations = reports,
             at = hour,
@@ -352,11 +272,8 @@ class VerificationRepository internal constructor(
     )
 
     /**
-     * Two nearby points share a record set.
-     *
-     * Matches how the forecast cache is keyed, so a bias learned for a place is
-     * not split across a handful of near-identical coordinates and never reaches
-     * the sample count it needs.
+     * Rounded like the forecast cache, so a bias learned for a place is not split
+     * across near-identical coordinates.
      */
     private fun cacheKeyOf(location: WeatherLocation): String {
         val latitude = String.format(java.util.Locale.ROOT, "%.2f", location.latitude)
@@ -366,28 +283,20 @@ class VerificationRepository internal constructor(
 
     companion object {
         /**
-         * The name the radar projection is scored under.
-         *
-         * A source like any other, which is the point: it sits in the same
-         * table as the providers and is compared on the same terms, so the
-         * hand-over between them can be read off the numbers rather than
-         * argued about.
+         * The name the radar projection is scored under, in the same table as the
+         * providers and on the same terms.
          */
         const val NOWCAST_SOURCE = "radar-nowcast"
 
         /**
-         * How close a projected step must sit to a sweep to be the same moment.
-         *
-         * Sweeps land about every ten minutes and the projection steps at the
-         * same cadence, so half a step either way pairs each claim with the
-         * observation that answers it and no other.
+         * How close a projected step must sit to a sweep to be the same moment: half the
+         * ten-minute cadence either way.
          */
         val SWEEP_TOLERANCE: Duration = Duration.ofMinutes(5)
 
         /**
-         * How far ahead the projection is held to its word. Beyond this the
-         * model already carries the answer, so scoring it would be scoring
-         * something nobody is shown.
+         * How far ahead the projection is held to its word. Beyond this the models carry
+         * the answer.
          */
         val NOWCAST_HORIZON: Duration = Duration.ofHours(2)
 
@@ -401,12 +310,8 @@ class VerificationRepository internal constructor(
         const val WET_SHARE = 0.5
 
         /**
-         * The rate a confirmed wet hour is recorded as.
-         *
-         * Reports give no amount, so this is a token above the trace threshold
-         * rather than a measurement - enough to make the record compare equal to
-         * a forecast that said rain, which is the only question being asked of
-         * it.
+         * The rate a confirmed wet hour is recorded as: a token above the trace
+         * threshold, since reports give no amount.
          */
         const val OBSERVED_WET_MM = 0.5
     }

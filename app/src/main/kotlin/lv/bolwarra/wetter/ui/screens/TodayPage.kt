@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.compose.foundation.background
@@ -65,10 +68,8 @@ import lv.bolwarra.wetter.ui.format.uvBandLabel
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * Today: what the next few hours do.
- *
- * The rain curve is first and largest because it is the reason the app exists.
- * Everything under it is context for reading it.
+ * Today: what the next few hours do. The rain curve is first and largest; the rest
+ * is context for reading it.
  */
 @Composable
 fun TodayPage(
@@ -79,9 +80,8 @@ fun TodayPage(
     /** Whether a fetch is outstanding, shown as a turning arc beside the label. */
     isRefreshing: Boolean = false,
     /**
-     * Opens the rain map. Offered whenever there is a forecast, not only once
-     * radar has landed: nobody waits half a minute for a button to appear, and
-     * the map says for itself that it is still fetching.
+     * Opens the rain map. Offered whenever there is a forecast, not only once radar
+     * has landed: the map says for itself that it is still fetching.
      */
     onOpenMap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -91,13 +91,12 @@ fun TodayPage(
     val spacing = WetterTheme.spacing
     val span = Duration.ofHours(TIMELINE_HOURS)
     val window = Duration.ofHours(WINDOW_HOURS)
-    // One hour more than is drawn. The window rolls by the minute but the data
-    // arrives in whole hours, so covering a day from 14:45 needs the row that
-    // starts at 14:00 tomorrow.
+    // One hour more than is drawn: the window rolls by the minute, the data comes in
+    // whole hours.
     val ahead = forecast.hourly.window(now, TIMELINE_HOURS + 1)
 
-    // What the window is made of, or - when nothing is coming - what would fall
-    // if it did, so the tile still has an honest word on it in a dry January.
+    // What the window is made of or, when nothing is coming, what would fall if it
+    // did, so the tile has an honest word on it either way.
     val falling = ahead.dominantKind().takeIf { it != PrecipitationKind.NONE }
         ?: PrecipitationKind.likelyAt(forecast.conditionsAt(now).temperature)
 
@@ -107,26 +106,20 @@ fun TodayPage(
     ) {
         if (ahead.isNotEmpty()) {
             Tile(
-                // Named for what is actually going to fall. A chart headed
-                // "rain" during a January cold snap is wrong in the way that
-                // matters most: it is the one word on the tile somebody reads
-                // without looking at anything else.
+                // Named for what is actually going to fall: the one word on the tile somebody
+                // reads without looking at anything else.
                 label = stringResource(
                     R.string.tile_precipitation,
                     stringResource(falling.labelRes()),
                 ),
-                // The rate right now, not the six-hour total. The total read as a
-                // current measurement sitting beside a live chart - it would say
-                // "2.1 mm" through a dry window because of rain due at five - and
-                // the number next to a reading should be the reading.
+                // The rate right now, not the window's total: the number beside a live chart
+                // should be a reading.
                 trailing = stringResource(
                     R.string.curve_rate,
                     formatMillimetres(rateNow(timeline, ahead, now), units.precipitation),
                     units.precipitation.label,
                 ),
-                // This tile and no other. It is the one the reader is watching
-                // and the one the radar refresh actually changes; putting the
-                // same mark on the moon phase would be the app fidgeting.
+                // This tile only: it is the one the radar refresh changes.
                 busy = isRefreshing,
                 action = onOpenMap?.let {
                     TileAction(stringResource(R.string.radar_open), { ink ->
@@ -152,17 +145,8 @@ fun TodayPage(
 }
 
 /**
- * Everything else that is known, behind one tap.
- *
- * The Sun and Air tiles used to sit open on this page. They were accurate and
- * almost nobody needed them: sunrise is the same to within minutes as yesterday,
- * and pressure means nothing to most readers on any given morning. Two tiles of
- * that under the one chart this app exists for was the wrong ratio, so they are
- * one shut drawer now.
- *
- * Being shut is also what makes it safe to be generous with what goes in. Dew
- * point, the moon, wind bearing - none of them has to earn its place against the
- * rain chart any more, only against the other things already in the drawer.
+ * Everything else that is known, behind one tap: sun, air, wind, sky and moon,
+ * none of which competes with the rain chart while shut.
  */
 @Composable
 private fun AdvancedTile(
@@ -182,13 +166,9 @@ private fun AdvancedTile(
 
     val hour = forecast.hourly.at(now)
 
-    // The mark on the dial answers "right now", which is the wrong horizon for
-    // this one thing - nobody decides to go and look at the sky at the instant
-    // they open a weather app. Here it is the coming night.
-    //
-    // Hoisted above every conditional in this composable and remembered, because
-    // it walks the next 24 hours in ten-minute steps and the clock behind `now`
-    // ticks far more often than the answer changes.
+    // The coming night rather than now: nobody decides to look at the sky the moment
+    // they open a weather app. Remembered, since it walks the next day in ten-minute
+    // steps and `now` ticks far more often than the answer changes.
     val night = remember(forecast, now) {
         StarWatch.tonight(
             hours = forecast.hourly,
@@ -203,10 +183,8 @@ private fun AdvancedTile(
         label = stringResource(R.string.tile_advanced),
         summary = stringResource(R.string.advanced_summary),
     ) {
-        // Grouped, because a dozen readings in one grid is a wall somebody has to
-        // read all of to find the one they came for. The headings are the
-        // questions being asked - what the air is doing, what the wind is doing,
-        // what is overhead - so an eye can skip three quarters of it.
+        // Grouped under the questions being asked, so an eye can skip to the one it came
+        // for.
         MetricGroup(stringResource(R.string.group_air)) {
             MetricGrid(
                 listOf(
@@ -261,11 +239,8 @@ private fun AdvancedTile(
                         stringResource(R.string.metric_cloud),
                         formatPercent(hour?.cloudCover),
                     ),
-                    // Broken out because the total cannot tell a bright day from
-                    // a grey one - 99% of thin cirrus is a hazy sun, 99% of low
-                    // stratus is a lid. They do not sum to the total and are not
-                    // meant to: a deck seen through a gap in the one below it is
-                    // counted twice.
+                    // The three decks, because the total cannot tell thin cirrus from low stratus.
+                    // They do not sum to the total: a deck seen through a gap is counted twice.
                     Metric(
                         stringResource(R.string.metric_cloud_low),
                         formatPercent(hour?.cloudLow),
@@ -299,8 +274,8 @@ private fun AdvancedTile(
             )
         }
 
-        // Absent where the service has nothing for this place, because an
-        // empty air quality section reads as an all-clear.
+        // Absent where the service has nothing for this place: an empty section would
+        // read as an all-clear.
         if (air != null) {
             MetricGroup(stringResource(R.string.group_air_quality)) {
                 MetricGrid(
@@ -334,8 +309,7 @@ private fun AdvancedTile(
             MetricGroup(stringResource(R.string.group_stars)) {
                 MetricGrid(
                     listOf(
-                        // A plain answer first, because that is the whole
-                        // question - everything under it is the working.
+                        // A plain answer first; everything under it is the working.
                         Metric(
                             stringResource(R.string.metric_worth_watching),
                             stringResource(
@@ -346,9 +320,8 @@ private fun AdvancedTile(
                                 },
                             ),
                         ),
-                        // Absent when the answer is no, rather than sitting
-                        // there as a dash: there is no "when" for a night that
-                        // never comes good.
+                        // Absent when the answer is no: there is no "when" for a night that never
+                        // clears.
                         Metric(
                             stringResource(R.string.metric_stars_when),
                             night.best
@@ -361,10 +334,9 @@ private fun AdvancedTile(
                                 }
                                 ?: NO_READING,
                         ),
-                        // Named "now" because it is, and the answer above it
-                        // is about tonight. A clear midday over a forecast
-                        // overcast night is an ordinary thing, and without the
-                        // word the two rows read as contradicting each other.
+                        // Named "now", because the answer above it is about tonight and the two
+                        // would
+                        // otherwise read as contradicting each other.
                         Metric(
                             stringResource(R.string.metric_sky_open),
                             Stargazing
@@ -395,8 +367,7 @@ private fun AdvancedTile(
                         if (sunrise != null && sunset != null) {
                             formatDuration(Duration.between(sunrise, sunset))
                         } else {
-                            // Above the arctic circle there is no sunrise to
-                            // report, and a zero would be the wrong kind of wrong.
+                            // Above the Arctic Circle there may be no sunrise to report.
                             NO_READING
                         },
                     ),
@@ -415,9 +386,8 @@ private fun AdvancedTile(
                         stringResource(R.string.metric_moon_illumination),
                         formatPercent((MoonPhase.illuminationAt(now) * PERCENT).roundToInt()),
                     ),
-                    // The one thing the moon does that is not about light. Twice
-                    // a month it lines up with the sun and the two tides add;
-                    // at the quarters they pull square and cancel.
+                    // Spring and neap tides: twice a month the moon lines up with the sun and the
+                    // tides add; at the quarters they cancel.
                     Metric(
                         stringResource(R.string.metric_tide),
                         stringResource(Tides.stateAt(now).labelRes()),
@@ -431,16 +401,8 @@ private fun AdvancedTile(
 private const val PERCENT = 100
 
 /**
- * When it next rains, in one line.
- *
- * It sits under the curve because it answers the question the curve cannot: the
- * chart covers the next day, and "nothing in the next day" is only half an
- * answer. The other half is usually the one somebody wanted, and it is short
- * enough to be a bar rather than a card of its own.
- *
- * It also answers it without asking anybody to travel. The chart now holds four
- * screens, and a reader who has not scrolled has seen six hours of it; this line
- * has read the whole thing.
+ * When it next rains, in one line. It reads the whole timeline and beyond, so a
+ * reader who has seen only the first screen of the chart still gets the answer.
  */
 @Composable
 private fun NextRainBar(
@@ -450,8 +412,7 @@ private fun NextRainBar(
 ) {
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
-    // Worked out in NextRain, which the widgets read too, so the home screen
-    // and this line cannot say two different things about the same rain.
+    // Worked out in NextRain, which the widgets read too, so the two cannot disagree.
     val line = NextRain.of(LocalResources.current, forecast, timeline, now)
     val ink = if (line.matters) colors.textPrimary else colors.textTertiary
 
@@ -481,25 +442,10 @@ private fun NextRainBar(
 private val DOT = 7.dp
 
 /**
- * How much of the day the chart holds, rolling from the current hour.
- *
- * This was six hours for a long time, and the reason was sound: a day drawn
- * across a phone flattens the part anybody is going to act on into an eighth of
- * the width. What was wrong was the conclusion drawn from it — that the *chart*
- * had to be six hours, when what had to be six hours was the screen.
- *
- * So the day is all here and only six hours of it are in front of you, at
- * exactly the size those hours were before. Nothing about the near term is any
- * smaller, and "will it have stopped by the time I come home" stopped being a
- * question the chart refuses to take.
+ * How much of the day the chart holds, rolling from the current hour. Only
+ * [WINDOW_HOURS] of it is on screen at once, at full scale; the rest scrolls.
  */
 private const val TIMELINE_HOURS = 24L
 
-/**
- * How much of it is on screen at once.
- *
- * The scale, in other words: six hours to a screen is what one pixel is worth,
- * and it is fixed the way the height is fixed. A chart that changed its
- * resolution would have to be re-read every time it was opened.
- */
+/** How much of it is on screen at once: the chart's fixed horizontal scale. */
 private const val WINDOW_HOURS = 6L

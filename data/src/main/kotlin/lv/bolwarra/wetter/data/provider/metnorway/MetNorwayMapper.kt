@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metnorway
 
 import java.time.Instant
@@ -16,20 +19,16 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.ProviderMetadata
 
 /**
- * MET Norway's timeseries, turned into Wetter's models.
+ * MET Norway's timeseries, turned into Wetter's models. MET Norway publishes one
+ * stream of instants and leaves the rest to the client:
  *
- * More work than Open-Meteo's mapper, because MET Norway publishes one stream of
- * instants and leaves the rest to the client. Three things happen here:
- *
- *  1. The hourly forecast is the prefix of the series that carries `next_1_hours`.
- *     Beyond about two and a half days the series drops to six-hourly, and those
- *     steps are not hours — presenting them as hours would draw a rain bar six
- *     times too wide.
- *  2. The daily forecast is aggregated. Each step contributes its precipitation
- *     once, from the finest window it has, so the six-hourly tail still counts
- *     towards a day's total without being double counted.
- *  3. Daylight is computed, not read. MET Norway publishes no sunrise, no sunset
- *     and only a partial day/night hint, so [SolarTime] supplies all three.
+ * 1. The hourly forecast is the prefix of the series that carries `next_1_hours`.
+ *     Beyond about two and a half days the series drops to six-hourly steps, which
+ *     are not hours.
+ * 2. The daily forecast is aggregated, each step contributing its precipitation
+ *     once, from the finest window it has.
+ * 3. Daylight is computed by [SolarTime]: MET Norway publishes no sunrise, no
+ *     sunset and only a partial day/night hint.
  */
 internal object MetNorwayMapper {
 
@@ -69,10 +68,7 @@ internal object MetNorwayMapper {
         return CurrentWeather(
             observedAt = at,
             temperature = details?.airTemperature ?: hourly.firstOrNull()?.temperature,
-            // It does publish one, on the complete endpoint this provider already
-            // calls. A comment here claimed otherwise and the field was left
-            // empty, so "feels like" was blank across the whole region this
-            // provider is chosen for.
+            // Published on the complete endpoint.
             apparentTemperature = details?.apparentTemperature,
             condition = weatherConditionFromMetSymbol(nextHour?.summary?.symbolCode)
                 .ifUnknown { hourly.firstOrNull()?.condition ?: WeatherCondition.UNKNOWN },
@@ -87,9 +83,8 @@ internal object MetNorwayMapper {
     }
 
     /**
-     * Only the steps that carry a one-hour forecast become hourly rows. A step
-     * with just `next_6_hours` describes six hours, and the timeline draws one
-     * bar per row.
+     * Only the steps that carry a one-hour forecast become hourly rows: the timeline
+     * draws one bar per row.
      */
     private fun toHourly(steps: List<ParsedStep>, location: WeatherLocation): List<HourlyWeather> =
         steps.mapNotNull { parsed ->
@@ -104,10 +99,8 @@ internal object MetNorwayMapper {
                     ?.roundToInt()
                     ?.coerceIn(0, 100),
                 precipitation = nextHour.details.precipitationAmount,
-                // MET Norway reports one precipitation figure, as liquid
-                // equivalent. Splitting it into rain and snow would mean deciding
-                // from a symbol how much of a millimetre was frozen, so the split
-                // is left absent and the condition carries that information.
+                // MET Norway reports one liquid-equivalent figure. No rain/snow split is guessed;
+                // the condition carries that information.
                 rain = null,
                 snowfall = null,
                 condition = weatherConditionFromMetSymbol(nextHour.summary.symbolCode),
@@ -130,8 +123,8 @@ internal object MetNorwayMapper {
         if (steps.isEmpty()) return emptyList()
 
         return steps
-            // atZone().toLocalDate() rather than LocalDate.ofInstant(): the latter
-            // is a Java 9 API, and Android's java.time at minSdk 26 is Java 8.
+            // atZone().toLocalDate() rather than LocalDate.ofInstant(), a Java 9 API absent
+            // at minSdk 26.
             .groupBy { it.at.atZone(zone).toLocalDate() }
             .toSortedMap()
             .mapNotNull { (date, daySteps) -> toDay(date, daySteps, location, zone) }
@@ -144,13 +137,11 @@ internal object MetNorwayMapper {
         zone: ZoneId,
     ): DailyWeather? {
         val temperatures = steps.mapNotNull { it.step.data.instant.details.airTemperature }
-        // A day represented by a single six-hourly step has no meaningful range,
-        // and a row showing the same number twice is worse than no row.
+        // A day represented by a single six-hourly step has no meaningful range.
         if (temperatures.isEmpty()) return null
 
-        // Each step contributes precipitation once, from the finest window it
-        // publishes. Hourly steps are an hour apart and six-hourly steps six, so
-        // taking the finest available never double counts the same rain.
+        // Each step contributes once, from the finest window it publishes, so the same
+        // rain is never counted twice.
         val contributions = steps.map { it.precipitationContribution() }
         val total = contributions.mapNotNull { it }.takeIf { it.isNotEmpty() }?.sum()
 
@@ -167,21 +158,20 @@ internal object MetNorwayMapper {
             temperatureMax = temperatures.max(),
             condition = dominantCondition(steps, zone),
             precipitationTotal = total,
-            // The hardest hour in the day, which is what names it. Taken from
-            // the finest window each step publishes, so a six-hourly block
-            // contributes its rate rather than its total.
+            // The hardest hour in the day, which names it: a six-hourly block contributes its
+            // rate, not its total.
             precipitationPeakRate = steps.mapNotNull { it.precipitationRate() }.maxOrNull(),
             precipitationProbabilityMax = probabilities.maxOrNull()?.roundToInt()?.coerceIn(0, 100),
-            // Counted only where the day is covered hour by hour. Estimating it
-            // from six-hourly totals would be a guess presented as a measurement.
+            // Counted only where the day is covered hour by hour; from six-hourly totals it
+            // would be a guess.
             precipitationHours = if (hourlySteps.isEmpty()) {
                 null
             } else {
                 hourlySteps.count { step ->
                     val mm = step.step.data.next1Hours?.details?.precipitationAmount ?: 0.0
-                    // Hours worth calling wet. A one-hour window's amount is
-                    // numerically its rate, so this is the same bar the rest of
-                    // the app names rain at.
+                    // Hours worth calling wet. A one-hour window's amount is numerically its rate,
+                    // so
+                    // this is the bar the rest of the app names rain at.
                     PrecipitationIntensity.ofRate(mm).isWorthNaming
                 }.toDouble()
             },
@@ -192,57 +182,22 @@ internal object MetNorwayMapper {
     }
 
     /**
-     * The condition worth showing beside a date: the wettest step if anything
-     * falls that day, otherwise whatever the sky is doing around midday.
+     * The condition worth showing beside a date: the wettest step if anything falls
+     * that day, otherwise whatever the sky is doing around midday.
      *
-     * A day of sun with one heavy shower in it is a day you take a coat, and the
-     * daily row is the only place that can say so.
-     *
-     * ### Rates, not totals
-     *
-     * This compared each step's raw *amount* against [TRACE_MM_PER_HOUR], which
-     * is a rate, and the two are only the same number for a step that covers one
-     * hour. A six-hourly step carrying 0.4 mm cleared an hourly threshold it was
-     * never measured against, so it became the day's wettest step and the day
-     * was marked rain — while every hourly row underneath it sat at a fifteenth
-     * of a millimetre and drew nothing at all.
-     *
-     * That was visible on screen the moment the week's rows could be opened: a
-     * Saturday headed with a rain mark whose twenty-four hours were, every one of
-     * them, dry. A reader's fair conclusion is that the mark is lying, and the
-     * mark was the honest half — it was reading a real 0.4 mm. It was the
-     * comparison that was wrong.
-     *
-     * So each step is asked how hard it is raining rather than how much it has,
-     * and the answer is compared against a threshold in the same unit.
-     *
-     * ### And an hour-by-hour day is named by its hours
-     *
-     * Fixing the unit was not enough on its own, because a six-hourly step can
-     * also win the fallback: with nothing over a trace all day, the sky was taken
-     * from whichever step sat nearest midday, and where both kinds overlap that
-     * can be the six-hour one. The day went back to saying rain over
-     * twenty-four dry hours by a different route.
-     *
-     * So a day that is covered hour by hour is named only from those hours. The
-     * six-hourly steps still count towards its total — that rain is real — but
-     * they are not allowed to put a word on a day whose every hour the reader can
-     * open and check. This is the same rule `precipitationHours` above already
-     * follows, and the reason is the one in ObservedSpell: two readings of one
-     * day, at two resolutions, must not be shown contradicting each other.
-     *
-     * Past the hourly forecast's reach there is nothing to contradict, so the
-     * six-hourly steps name the day as they always did.
+     * Steps are compared by rate, not amount, against a threshold in the same unit. A
+     * day covered hour by hour is named only from those hours, so its word cannot
+     * contradict hours the reader can open and check (as in ObservedSpell); the
+     * six-hourly steps still count towards its total. Past the hourly reach, the
+     * six-hourly steps name the day.
      */
     private fun dominantCondition(steps: List<ParsedStep>, zone: ZoneId): WeatherCondition {
         val candidates = steps
             .filter { it.step.data.next1Hours != null }
             .ifEmpty { steps }
 
-        // Wet enough to name the day after. Below this the day is described by
-        // its sky instead, which is what a cloudy afternoon with a tenth of a
-        // millimetre in it actually is - and stops a week of drizzle marks
-        // sitting over days nobody would call rainy.
+        // Wet enough to name the day after. Below this the day is described by its sky,
+        // which is what a cloudy afternoon with a tenth of a millimetre in it is.
         val wettest = candidates
             .filter { PrecipitationIntensity.ofRate(it.precipitationRate()).isWorthNaming }
             .maxByOrNull { it.precipitationRate() ?: 0.0 }
@@ -281,13 +236,8 @@ internal object MetNorwayMapper {
         fun precipitationContribution(): Double? = finestPeriod()?.details?.precipitationAmount
 
         /**
-         * The same rain as a rate, which is the only form comparable to a
-         * threshold in millimetres per hour.
-         *
-         * Flat across the window, because that is all a window total can
-         * support. It is a floor on how hard it rained at the worst moment and
-         * never an overstatement, which is the right direction for a figure that
-         * decides whether a day gets called wet.
+         * The same rain as a rate, the only form comparable to a threshold in mm/h. Flat
+         * across the window, so it is a floor on the worst moment, never an overstatement.
          */
         fun precipitationRate(): Double? = precipitationContribution()?.div(finestPeriodHours())
     }

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.rainviewer
 
 import kotlin.math.pow
@@ -5,57 +8,24 @@ import kotlin.math.pow
 /**
  * Turns a radar tile pixel into a rainfall rate.
  *
- * The tiles are pictures. They carry no numbers, only a colour scale with no
- * published physical meaning, so every part of this had to be established by
- * measurement rather than read out of a document.
+ * The tiles carry no numbers, only a colour scale with no published meaning, so
+ * its order was established by measurement: a translucent tan ramp, then opaque
+ * cool colours (dark blue to pale cyan), then warm ones (dark red to yellow), with
+ * magenta on top. Storms are stratified, and around measured cores each family
+ * sat inside the one below it, with the translucent ramp's alpha rising towards
+ * the cores.
  *
- * ### What was measured, and how
- *
- * The scale has three families: a translucent tan ramp, then opaque cool colours
- * (dark blue up to pale cyan), then opaque warm ones (dark red through orange to
- * yellow), with magenta above that. Two independent checks put them in that
- * order.
- *
- * Storms are stratified - the heaviest core sits inside progressively lighter
- * rain - so intensity should fall with distance from a core, and each family
- * should be enclosed by the one below it. Both hold. Over a 2560x1280 sample of
- * central Europe the mean index fell monotonically with distance from the warm
- * cores, and the ring around each family sat where the ordering predicts: the
- * translucent pixels are surrounded by higher values, the cool ones by lower,
- * and the warm ones are innermost. Within the translucent family, alpha rose
- * steadily the closer a pixel sat to a core, from 46 far out to 165 against the
- * cores, which is what makes it the *low end of one scale* rather than a
- * separate overlay.
- *
- * ### What is not established
- *
- * The absolute calibration. Fitting the scale against Open-Meteo's precipitation
- * produced a correlation of only +0.37 and implied half a millimetre an hour at
- * full scale, which is nonsense for a saturated echo - the reference is an 11 km
- * forecast quantised to tenths, compared against kilometre observations, and
- * noise in both variables flattens the fit rather than sharpening it. So the
- * span below is the conventional one for a radar composite, not a fitted result.
- * [MIN_DBZ] and [MAX_DBZ] are the two numbers to revisit once the verification
- * store has enough observed rain to fit against something real.
- *
- * Rates from here are therefore good for *shape* - where the rain is, which way
- * it is going, whether it is growing - and only approximate in magnitude. The
- * fusion layer weights them accordingly.
+ * The absolute calibration is not established; the span is the conventional one
+ * for a radar composite ([MIN_DBZ], [MAX_DBZ]). Rates are good for shape (where,
+ * which way, growing or not) and approximate in magnitude, and the fusion weights
+ * them accordingly.
  */
 internal object RainViewerPalette {
 
     /**
-     * The span the colour scale is read across.
-     *
-     * The top is 55 rather than the 75 a radar scale actually reaches, and that
-     * is a deliberate hail cap rather than a shortened scale. Marshall-Palmer
-     * relates reflectivity to *rain*, and above roughly 55 dBZ the echo is hail
-     * or a melting layer, which reflects far more strongly than the equivalent
-     * rain. Read literally, 73 dBZ comes out as 1300 mm/h - a number with no
-     * physical meaning, arrived at by applying a rain relation to something that
-     * is not rain. Capping is what operational radar processing does for the
-     * same reason, and it puts the top of this scale near 100 mm/h, which is
-     * about as hard as rain ever actually falls.
+     * The span the colour scale is read across. The top is capped at 55 dBZ: above
+     * that the echo is hail or a melting layer, and Marshall-Palmer, a rain relation,
+     * would read it as over 1000 mm/h. The cap puts the top near 100 mm/h.
      */
     const val MIN_DBZ = 5.0
     const val MAX_DBZ = 55.0
@@ -85,15 +55,10 @@ internal object RainViewerPalette {
     /**
      * Millimetres per hour for one pixel, from packed ARGB.
      *
-     * A fully transparent pixel is 0.0 rather than unobserved. That is a real
-     * concession: this source draws "no echo" and "outside radar coverage"
-     * identically, so the two genuinely cannot be told apart here. Reporting the
-     * whole map as unobserved would make it useless, so within the composite's
-     * footprint transparent is read as dry - and the honest consequence is that
-     * a coverage hole in this source looks like fine weather. Sources that do
-     * publish a coverage mask should mark it with
-     * [lv.bolwarra.wetter.domain.radar.RadarField.NO_ECHO], which the rest of the
-     * engine already handles.
+     * A fully transparent pixel is 0.0, not unobserved: this source draws "no echo"
+     * and "outside coverage" identically, so within the composite transparent is read
+     * as dry. [lv.bolwarra.wetter.domain.radar.RadarField.hasEchoNear] guards the
+     * places it cannot see.
      */
     fun rateOf(argb: Int): Float {
         val alpha = (argb ushr 24) and 0xFF
@@ -117,10 +82,8 @@ internal object RainViewerPalette {
         }
 
         val luma = 0.299 * red + 0.587 * green + 0.114 * blue
-        // Magenta first. It sits at the very top of the scale and has *both* red
-        // and blue at full, so a "blue is at least as strong as red" test for the
-        // cool family claims it - filing the most extreme colour on the scale
-        // among the lightest.
+        // Magenta first: with red and blue both at full, the cool family's test would
+        // otherwise claim it.
         if (red >= MAGENTA_CHANNEL && blue >= MAGENTA_CHANNEL) {
             val within = (green / 255.0).coerceIn(0.0, 1.0)
             return WARM_TOP + within * (1.0 - WARM_TOP)

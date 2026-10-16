@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metar
 
 import io.ktor.client.HttpClient
@@ -35,38 +38,19 @@ internal data class MetarDto(
     /** The present-weather group, when there is one. */
     val wxString: String? = null,
     /**
-     * The report as it was filed.
-     *
-     * Kept for one reason: it is the difference between "the observer saw
-     * nothing falling" and "nobody reported". See [PresentWeather].
+     * The report as filed: it tells "the observer saw nothing falling" from "nobody
+     * reported" (see [PresentWeather]).
      */
     val rawOb: String? = null,
 )
 
 /**
- * Aerodrome observations, which are the only free measurements of the actual
- * weather this app can get at.
+ * Aerodrome observations: free, standardised, calibrated measurements of the
+ * actual weather, worldwide and without a key.
  *
- * Airports report on a fixed schedule, to a published standard, from calibrated
- * instruments, and the whole world's reports are available without a key. Around
- * Riga there are thirteen stations inside 350 km reporting every half hour, with
- * two days of history retained - enough to check a forecast against what
- * happened.
- *
- * ### What this is for
- *
- * Not for display. The screen already has a forecast for the current hour and
- * showing an airport's reading beside it would only raise the question of which
- * to believe. These exist so the app can find out which to believe: an
- * observation is the only thing that can settle whether a prediction was right,
- * and without that every source's claim to accuracy is just its own word.
- *
- * ### What it cannot give
- *
- * A rain rate. Reports carry present weather - light rain, moderate snow - and
- * no accumulation, so precipitation is verified as an event that did or did not
- * happen rather than as a quantity. That is the right question anyway: whether
- * the rain arrived when it was forecast to.
+ * Not for display. They exist so the app can find out whether its predictions
+ * were right. Reports carry present weather but no accumulation, so precipitation
+ * is verified as an event: whether the rain arrived when forecast.
  */
 internal class MetarObservationSource(
     private val client: HttpClient,
@@ -111,12 +95,8 @@ internal class MetarObservationSource(
     }
 
     /**
-     * A box around a point, in the order the service expects.
-     *
-     * A degree of longitude shrinks towards the poles, so the box has to widen
-     * to hold the same ground distance - at 57 north it is nearly twice as wide
-     * in degrees as it is tall. Using the same span for both would search an
-     * ellipse half the intended width and miss stations to the east and west.
+     * A box around a point, in the order the service expects. A degree of longitude
+     * shrinks towards the poles, so the box widens to hold the same ground distance.
      */
     private fun boundingBox(latitude: Double, longitude: Double, radiusKm: Double): String {
         val latSpan = radiusKm / KM_PER_DEGREE_LATITUDE
@@ -159,12 +139,8 @@ internal class MetarObservationSource(
     }
 
     /**
-     * Visibility in metres.
-     *
-     * Reported in statute miles, and often as "6+" or "10+" meaning "at least
-     * this, we stopped measuring". The plus is dropped and the number taken as
-     * the floor, which is what it is - the true value is unbounded above and no
-     * larger number would be more honest.
+     * Visibility in metres. Reported in statute miles, often as "10+"; the plus is
+     * dropped and the number taken as the floor it is.
      */
     private fun visibilityMetresOf(raw: String?): Double? {
         val text = raw?.trim()?.removeSuffix("+") ?: return null
@@ -174,7 +150,7 @@ internal class MetarObservationSource(
     internal companion object {
         const val ID = "metar"
 
-        /** The service is a public product of the United States weather service. */
+        /** A public product of the United States weather service. */
         const val ATTRIBUTION = "Aerodrome observations from NOAA/NWS Aviation Weather Center"
 
         const val DEFAULT_BASE_URL = "https://aviationweather.gov/api/data/metar"

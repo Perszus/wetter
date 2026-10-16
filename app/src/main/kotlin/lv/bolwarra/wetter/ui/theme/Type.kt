@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.theme
 
 import androidx.compose.material3.Typography
@@ -17,15 +20,8 @@ import androidx.compose.ui.unit.sp
 private const val TABULAR = "tnum"
 
 /**
- * The type scale.
- *
- * Deliberately narrow: one display size, two heading sizes, two body sizes and
- * two label sizes. A weather screen that needs a ninth size has a hierarchy
- * problem, not a typography problem (docs/design-principles.md).
- *
- * The system sans is used as-is. Roboto's tabular figures are good, it costs no
- * APK size, and it ships on every device — a bundled face is an open question,
- * not a default (docs/decisions.md).
+ * The type scale: one display size, two heading, two body and two label sizes
+ * (docs/design-principles.md). The system sans, as shipped (docs/decisions.md).
  */
 object WetterType {
 
@@ -104,13 +100,9 @@ object WetterType {
     )
 
     /**
-     * The heading over a group of readings.
-     *
-     * Deliberately not [sectionLabel], which is what the readings inside the
-     * group are labelled with. Set in the same style, a heading and the first
-     * label under it read as two items in one list rather than as a title and
-     * its contents, and the grouping does no work. Heavier, a size larger,
-     * tracked wider and drawn in a darker ink than what it introduces.
+     * The heading over a group of readings: heavier, larger, wider and darker than
+     * [sectionLabel], so it reads as a title over its contents rather than a first
+     * item.
      */
     val groupLabel = TextStyle(
         fontFamily = FontFamily.SansSerif,

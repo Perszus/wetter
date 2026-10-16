@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.model
 
 import java.time.Duration
@@ -11,16 +14,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * A day's row against the hours it is a summary of.
- *
- * The case these were written from, on a real stitched forecast for Rīga: Sunday
- * held 3.2 mm with two hours at or above half a millimetre, and its row said
- * `OVERCAST` with a peak of 0.27 mm/h — which is 1.6 divided by six, the rate of
- * a six-hour block. The week drew a plain cloud on a day whose own bar said rain
- * began at eight in the evening.
- *
- * Neither provider was wrong. The disagreement was created by joining them, and
- * can only be repaired after the join.
+ * A day's row against the hours it summarises. From a stitched forecast for Rīga:
+ * Sunday held 3.2 mm with two hours at or above half a millimetre, yet its row
+ * said `OVERCAST` with a peak of 0.27 mm/h, the rate of a six-hour block. The
+ * disagreement is created by the join, so it is repaired after it.
  */
 class DailyFromHoursTest {
 
@@ -103,7 +100,7 @@ class DailyFromHoursTest {
         // a six-hour block they never see.
         assertEquals(0.9, after.precipitationPeakRate!!, 0.0001)
 
-        // And the day no longer headlines itself as dry.
+        // And the day does not headline itself as dry.
         assertTrue("the day still hides its rain", after.condition.isPrecipitating)
         assertEquals(WeatherCondition.RAIN, after.appearance)
     }

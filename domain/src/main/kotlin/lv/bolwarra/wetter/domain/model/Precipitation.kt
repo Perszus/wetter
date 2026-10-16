@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.model
 
 /**
@@ -13,20 +16,12 @@ enum class PrecipitationKind {
 
     companion object {
         /**
-         * What would fall, if anything did, at this temperature.
+         * What would fall, if anything did, at this temperature: for naming rain before it
+         * arrives, and for radar, which cannot tell frozen echoes from liquid.
          *
-         * For naming the thing before it arrives - a chart headed "rain" during
-         * a January cold snap is wrong in a way that matters to whoever reads
-         * it - and for radar, which returns echoes from hydrometeors and cannot
-         * say whether they are frozen.
-         *
-         * Screen-level air temperature, which is what every provider publishes
-         * and what almost every consumer forecast uses. It is a proxy: what
-         * actually decides the answer is the depth of the warm layer the flake
-         * falls through, so snow reaches the ground at +3 in a dry column and
-         * rain falls at -1 under an inversion. Hence a band of genuine
-         * uncertainty around freezing answered with MIXED rather than a
-         * confident guess either way.
+         * Screen-level air temperature is a proxy; the real answer depends on the warm
+         * layer aloft, so snow can reach the ground at +3 and rain at -1. The band of
+         * genuine uncertainty around freezing answers MIXED.
          */
         fun likelyAt(temperatureCelsius: Double?): PrecipitationKind = when {
             temperatureCelsius == null -> RAIN
@@ -44,11 +39,8 @@ enum class PrecipitationKind {
 }
 
 /**
- * How hard it is falling, in the conventional meteorological bands for rainfall
- * rate (mm per hour). These are the thresholds the timeline's bar heights and
- * colours are keyed to, so they live in one place and are tested.
- *
- * VIOLENT is included because the scale has a top; it is not expected often.
+ * How hard it is falling, in the conventional bands for rainfall rate (mm/h). The
+ * timeline's bar heights and colours are keyed to these.
  */
 enum class PrecipitationIntensity {
     NONE,
@@ -64,24 +56,12 @@ enum class PrecipitationIntensity {
     val isWet: Boolean get() = this != NONE
 
     /**
-     * Whether this is worth *calling* rain, as opposed to being measurable.
+     * Whether this is worth calling rain, as opposed to being measurable.
      *
-     * [TRACE] is measurable and is not rain. Its own comment says so - damp
-     * ground, no more - and the numbers agree: checked against aerodrome reports
-     * over 1295 hours at ten airports, an hour the model put in the trace band
-     * was actually precipitating at the station **53% of the time**. A coin
-     * flip. An hour at light or above was raining 79% of the time.
-     *
-     * So the app draws the trace, because something is falling and the curve is
-     * a picture of the data, and it does not *say* rain about it. Requiring
-     * light before the words appear cut wrong claims by 53% - forty-three down
-     * to twenty - while giving up a quarter of the ones it used to name, and
-     * took the app from being right 70% of the time when it says rain to 79%.
-     *
-     * The alternative everybody reaches for first is raising the measurable
-     * threshold instead, and that was tried and is worse: at 0.5 mm/h the app
-     * catches 44% of real rain rather than 60%, and the curve loses hours that
-     * genuinely had something in them.
+     * Against aerodrome reports over 1295 hours at ten airports, an hour forecast in
+     * the trace band was precipitating at the station 53% of the time; at light or
+     * above, 79%. So a trace is drawn but never named. Raising the measurable
+     * threshold instead loses real rain from the curve.
      */
     val isWorthNaming: Boolean get() = this >= LIGHT
 
@@ -94,12 +74,9 @@ enum class PrecipitationIntensity {
         const val VIOLENT_MM_PER_HOUR = 50.0
 
         /**
-         * Classify a rate in millimetres per hour.
-         *
-         * A null rate means the provider had nothing to say, which is not the same
-         * as zero — but for the purposes of drawing a bar both are "no bar", so
-         * both map to [NONE]. Callers that need to distinguish "dry" from
-         * "unknown" must check the source value.
+         * Classify a rate in millimetres per hour. Null (the provider said nothing) and
+         * zero both draw no bar, so both map to [NONE]; callers that must tell "dry" from
+         * "unknown" check the source value.
          */
         fun ofRate(millimetresPerHour: Double?): PrecipitationIntensity = when {
             millimetresPerHour == null -> NONE

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.compose.foundation.background
@@ -149,10 +152,8 @@ fun LocationsScreen(
         }
         Spacer(Modifier.height(spacing.s))
 
-        // Deduplicated by the same function that keys the list, so the two
-        // cannot disagree about what one place is - which is exactly how this
-        // crashed before, with a tolerant sameness test on one side and exact
-        // coordinates on the other.
+        // Deduplicated by the same function that keys the list, so the two cannot
+        // disagree about what one place is.
         val showing = (if (state.searchable) state.results else state.places)
             .distinctBy { it.rowKey() }
 

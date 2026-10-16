@@ -1,19 +1,18 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metnorway
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * MET Norway's locationforecast 2.0 response, exactly as it arrives.
+ * MET Norway's locationforecast 2.0 response, exactly as it arrives; these types
+ * stop at the edge of this package (docs/providers.md).
  *
- * These types stop at the edge of this package (docs/providers.md).
- *
- * The shape is worth knowing before reading the mapper. There is no daily block
- * and no hourly block — only one `timeseries` of instants, each carrying the
- * conditions at that moment plus optional forecasts for the following 1, 6 and
- * 12 hours. The series is hourly for roughly the first two and a half days and
- * six-hourly after that, so "the hourly forecast" is a subset of it rather than
- * a field, and anything daily has to be aggregated by us.
+ * There is no daily or hourly block, only one `timeseries` of instants with
+ * optional forecasts for the following 1, 6 and 12 hours: hourly for about two
+ * and a half days, six-hourly after.
  */
 @Serializable
 data class MetNorwayResponse(val properties: MetNorwayProperties = MetNorwayProperties())

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.radar
 
 import java.time.Duration
@@ -6,54 +9,34 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * Works out which way the rain is moving, by matching one sweep against the last.
+ * Works out which way the rain is moving, by matching one sweep against an
+ * earlier one.
  *
- * ### Why the search is bounded by physics
- *
- * The cost of a block match grows with the square of the search radius, so the
- * radius is the whole performance question. Rather than pick a number that feels
- * fast, it is derived from how fast precipitation can actually travel: past
- * [MAX_GROUND_SPEED_KMH] we are no longer looking at weather, and any match
- * found out there is a coincidence. That makes the search both cheap and a
- * quality control - an implausible displacement is never even considered.
- *
- * ### Why global first, then per block
- *
- * A block on its own is easy to fool. A uniform sheet of drizzle matches itself
- * equally well at every displacement, and an isolated cell can lock onto a
- * different cell entirely. Estimating one robust vector from the whole field
- * first, then letting each block refine within a short leash of it, keeps the
- * answer spatially varying where there is structure to justify it and stops
- * blocks with nothing to track from inventing their own weather.
- *
- * ### Why it may answer nothing
- *
- * With too little echo there is no honest estimate, and a fabricated one is
- * worse than none: it advects a nearly dry map into a confident forecast of dry
- * weather somewhere else. Returning null lets the caller fall back to the
- * numerical model, which is the right source when the radar has nothing to say.
+ * The search radius comes from how fast precipitation can travel
+ * ([MAX_GROUND_SPEED_KMH]), which keeps the match cheap and rules out implausible
+ * displacements. One vector is found for the whole field first and each block
+ * refines within a short leash of it, so blocks with nothing to track cannot
+ * invent motion. With too little echo it answers nothing, and the caller falls
+ * back to the models.
  */
 object MotionEstimator {
 
     /**
-     * Faster than this is not precipitation being carried by the wind. Generous
-     * on purpose - a fast squall line genuinely does move at over 100 km/h.
+     * Faster than this is not precipitation carried by the wind. Generous: a squall
+     * line can move at over 100 km/h.
      */
     const val MAX_GROUND_SPEED_KMH = 150.0
 
     /**
-     * How far back the long baseline reaches, in frames.
-     *
-     * Three frames is half an hour at the usual ten-minute cadence. Far enough
-     * that a slow, smooth field has actually moved a measurable distance; near
-     * enough that it has not also changed shape, which would break the
-     * assumption the match rests on.
+     * How far back the long baseline reaches, in frames: half an hour at the usual
+     * cadence, far enough for a slow field to move measurably and near enough that it
+     * has not changed shape.
      */
     const val LONG_BASELINE_FRAMES = 3
 
     /**
-     * The floor on agreement. Two estimates pointing opposite ways discount a
-     * projection hard; they do not erase a field that is still right about now.
+     * The floor on agreement: opposed estimates discount a projection hard but do not
+     * erase a field that is still right about now.
      */
     const val LEAST_AGREEMENT = 0.25
 
@@ -67,9 +50,8 @@ object MotionEstimator {
     const val MIN_COVERAGE = 0.25f
 
     /**
-     * Blocks are 64 px, which at the zooms used here is a few tens of kilometres
-     * - about the scale over which storm motion stays coherent. Smaller blocks
-     * track noise; larger ones average a curving front into a straight one.
+     * Blocks of a few tens of kilometres, about the scale over which storm motion
+     * stays coherent: smaller tracks noise, larger straightens a curving front.
      */
     const val BLOCK_SIZE = 64
 
@@ -81,9 +63,8 @@ object MotionEstimator {
     private const val BLOCK_STEP = 2
 
     /**
-     * Displacement step of the coarse pass. Three pixels is well inside the
-     * width of any feature big enough to track, so the coarse pass cannot step
-     * over a minimum and leave the fine pass hunting in the wrong place.
+     * Displacement step of the coarse pass, well inside the width of any trackable
+     * feature, so the fine pass is never left hunting in the wrong place.
      */
     private const val COARSE_STRIDE = 3
 
@@ -93,28 +74,11 @@ object MotionEstimator {
     /**
      * The best motion available from a run of sweeps.
      *
-     * Two sweeps ten minutes apart was all this ever used, and on a smooth field
-     * that is the hardest possible question: ten minutes of drift may move the
-     * pattern less than the noise in it, so the match is ambiguous and the
-     * vector is close to a guess. The frames to do better were already being
-     * fetched and thrown away - thirteen of them, two hours of history.
-     *
-     * So the same measurement is made twice, over a short span and a long one.
-     * The long span moves the field further, which is a larger signal against
-     * the same noise, and on a featureless sheet it often finds a match the
-     * short one cannot.
-     *
-     * ### The two answers are also a check on each other
-     *
-     * Match sharpness says how distinctly one displacement beat the others
-     * *within a single comparison*. It cannot tell that the whole comparison was
-     * misled - a repeating texture matches itself sharply at the wrong offset.
-     * Two spans measured independently can: if they agree the motion is real, and
-     * if they disagree something is wrong that neither could have reported alone.
-     *
-     * That disagreement is folded into the confidence the field carries, so a
-     * projection built on an unstable estimate is trusted less far. Sharpness
-     * says "this match was clean"; agreement says "and it was not a coincidence".
+     * Measured twice, over a short span and a long one: the long span moves a smooth
+     * field further, a larger signal against the same noise. The two also check each
+     * other. Sharpness says one match was clean; agreement between independent spans
+     * says it was not a coincidence, such as a repeating texture matching at the wrong
+     * offset. Disagreement lowers the field's confidence.
      */
     fun estimate(frames: List<RadarField>): MotionField? {
         val sorted = frames.sortedBy { it.at }
@@ -133,22 +97,16 @@ object MotionEstimator {
         if (long == null) return short
         if (short == null) return long
 
-        // Whichever matched more distinctly carries the answer; the other one
-        // is kept only to say whether to believe it.
+        // Whichever matched more distinctly carries the answer; the other only says
+        // whether to believe it.
         val best = if (long.confidence > short.confidence) long else short
         return best.withConfidence(best.confidence * agreementBetween(short, long))
     }
 
     /**
-     * How far two independent estimates of the same motion agree, 0..1.
-     *
-     * Measured as the size of their difference against their combined size, so
-     * it is scale-free: two vectors that differ by 2 px/min agree well if the
-     * wind is 40 and barely at all if it is 3.
-     *
-     * Never returns zero. Total disagreement should discount a projection
-     * heavily, not delete a field that may still be right about the present
-     * moment - which needs no motion at all.
+     * How far two independent estimates of the same motion agree, 0..1: the size of
+     * their difference against their combined size, so it is scale-free. Never zero,
+     * since the present moment needs no motion at all.
      */
     fun agreementBetween(a: MotionField, b: MotionField): Float {
         val first = a.meanVector()
@@ -203,7 +161,7 @@ object MotionEstimator {
 
     /**
      * The furthest precipitation could plausibly have travelled between the two
-     * sweeps, in pixels. Everything beyond it is excluded from the search.
+     * sweeps, in pixels.
      */
     private fun searchRadius(metresPerPixel: Double, minutes: Double): Int {
         val metres = MAX_GROUND_SPEED_KMH * METRES_PER_KM / MINUTES_PER_HOUR * minutes
@@ -213,20 +171,13 @@ object MotionEstimator {
     private data class Global(val offset: Pair<Int, Int>, val confidence: Float)
 
     /**
-     * One vector for the whole field, found coarse then fine.
+     * One vector for the whole field, found coarse then fine: the coarse pass samples
+     * every [COARSE_STRIDE] pixels and only the winner's neighbourhood is searched
+     * fully.
      *
-     * Searching every displacement is quadratic in the radius, and at the grid
-     * sizes this runs on that is hundreds of millions of comparisons for a
-     * result that a coarse pass already locates. So the surface is sampled every
-     * [COARSE_STRIDE] pixels first and only the neighbourhood of the winner is
-     * examined properly. Precipitation fields are smooth at these scales, so the
-     * coarse pass cannot step over a minimum that the fine pass would then miss.
-     *
-     * The confidence is the sharpness of the minimum, not its depth: a
-     * featureless sheet of drizzle produces a low cost at every displacement, and
-     * a low cost no better than its neighbours is not evidence of motion. It is
-     * measured on the coarse pass because that is the pass that sees the whole
-     * surface, which is what "sharper than the rest" is relative to.
+     * The confidence is the sharpness of the minimum, not its depth: featureless
+     * drizzle costs little at every displacement, which is not evidence of motion.
+     * Measured on the coarse pass, which sees the whole surface.
      */
     private fun searchGlobal(previous: RadarField, current: RadarField, radius: Int): Global? {
         var best = Double.MAX_VALUE
@@ -272,19 +223,14 @@ object MotionEstimator {
             }
         }
 
-        return Global(bestOffset ?: coarse, sharpness.coerceIn(0f, 1f))
+        return Global(bestOffset, sharpness.coerceIn(0f, 1f))
     }
 
     /**
-     * One block, searched on a short leash around the global vector.
-     *
-     * The global vector is measured first and holds the block unless something
-     * strictly beats it. That tie-break is not a detail: a block of uniform rain
-     * - or of nothing at all - costs the same at every displacement, so with
-     * ties resolved by scan order the winner is simply whichever candidate the
-     * loops reach first, which is the most negative one. Across a whole field of
-     * such blocks that bias does not cancel, and a perfectly stationary rain
-     * field came out drifting steadily north-west.
+     * One block, searched on a short leash around the global vector. The global
+     * vector holds unless something strictly beats it: a uniform block ties
+     * everywhere, and resolving ties by scan order would drift a stationary field
+     * north-west.
      */
     private fun searchBlock(
         previous: RadarField,
@@ -324,11 +270,9 @@ object MotionEstimator {
     }
 
     /**
-     * Mean absolute difference between this frame and the last one shifted.
-     *
-     * Null when too few pixels are comparable. Pixels the radar did not observe
-     * take no part: a coverage hole is not agreement, and counting it as a zero
-     * difference would make the emptiest displacement look like the best match.
+     * Mean absolute difference between this frame and the last one shifted, or null
+     * when too few pixels are comparable. Unobserved pixels take no part, or the
+     * emptiest displacement would look like the best match.
      */
     private fun costOf(
         previous: RadarField,

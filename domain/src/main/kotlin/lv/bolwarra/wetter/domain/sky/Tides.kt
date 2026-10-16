@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.sky
 
 import java.time.Instant
@@ -6,29 +9,12 @@ import kotlin.math.cos
 import lv.bolwarra.wetter.domain.MoonPhase
 
 /**
- * How hard the moon and sun are pulling together, and so how far the sea moves.
+ * The spring-neap rhythm: twice a month the moon and sun line up and their tides
+ * add (spring tides); at the quarters they partly cancel (neap tides). "Spring"
+ * as in a spring of water, not the season.
  *
- * The moon raises the tide and the sun raises a smaller one of its own. Twice a
- * month they line up - at new moon, with the sun behind it, and at full moon,
- * with the sun opposite - and the two bulges add: spring tides, the highest highs
- * and the lowest lows of the month. At the quarters they pull at right angles
- * and partly cancel: neap tides, when the sea barely moves.
- *
- * "Spring" is nothing to do with the season. It is the older sense, as in a
- * spring of water - the tide springing forth.
- *
- * ### What this deliberately does not claim
- *
- * Not a tide table. When high water arrives and how deep it is are local facts,
- * set by the shape of the coast and the basin it sits in - the Mediterranean
- * barely moves while the Bay of Fundy swings sixteen metres on the same sky.
- * Those need harmonic constants from a tide gauge, which is a different kind of
- * data source entirely.
- *
- * What is global is the *rhythm*: everywhere with a sea, spring tides fall on
- * the same days, because the geometry causing them is the same geometry
- * everywhere. That is the part worth showing beside the moon, and the only part
- * this can honestly say.
+ * Not a tide table: times and heights of high water are local to each coast. The
+ * rhythm is global, so it is the part shown beside the moon.
  */
 object Tides {
 

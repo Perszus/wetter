@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Instant
@@ -16,21 +19,14 @@ data class ModelSpread(
     /** How many models actually answered for this hour. */
     val models: Int,
     /**
-     * What each model actually said, so a caller can put another value among
-     * them and take the median of the lot.
-     *
-     * The summary alone cannot do that. A median over seven values and a median
-     * over those seven plus an eighth are different ranks of a different list,
-     * and there is no way to get the second from the first.
+     * What each model said, so a caller can add another value and take the median of
+     * the lot, which the summary alone cannot give.
      */
     val values: List<Double> = emptyList(),
 ) {
     /**
-     * 0..1, how much the consensus deserves to be believed.
-     *
-     * Zero models is not uncertainty, it is ignorance, and one model agreeing
-     * with itself is not evidence - so both are reported as low rather than as
-     * perfect agreement, which a spread of zero would otherwise imply.
+     * 0..1, how much the consensus deserves to be believed. Zero models and one model
+     * are both reported as low, not as the perfect agreement a zero spread implies.
      */
     val agreement: Double
         get() = when {
@@ -40,29 +36,15 @@ data class ModelSpread(
 }
 
 /**
- * Several models, read together.
- *
- * A single model's forecast has no error bar attached. Run several independent
- * ones over the same hour and the width of their disagreement is a direct
- * measurement of how hard that hour is to forecast - the one uncertainty signal
- * available without a verification history, and it costs nothing: Open-Meteo
- * returns seven models in a single 5 KB request.
- *
- * That disagreement is real and it is large. Measured over Riga, the seven
- * models spanned 3.4 C at twelve hours out and split five to two on whether it
- * would rain at all; three days out the spread on precipitation exceeded the
- * mean. A screen drawing one of those seven and saying nothing is not more
- * accurate than one drawing the consensus, it is only quieter about being wrong.
+ * Several models, read together. The width of their disagreement over the same
+ * hour measures how hard that hour is to forecast: the one uncertainty signal
+ * available without a verification history, from a single small request.
  */
 object ModelAgreement {
 
     /**
-     * The median, not the mean.
-     *
-     * One model going badly wrong is the normal failure - a single run picking
-     * up a spurious feature - and the mean carries it into the answer while the
-     * median steps over it. With seven models, three can be nonsense before the
-     * consensus moves.
+     * The median, not the mean: one model going badly wrong is the normal failure, and
+     * the median steps over it.
      */
     fun consensusOf(values: List<Double>): Double? {
         if (values.isEmpty()) return null
@@ -75,7 +57,7 @@ object ModelAgreement {
         }
     }
 
-    /** Population standard deviation - the models are the whole set, not a sample. */
+    /** Population standard deviation: the models are the whole set, not a sample. */
     fun spreadOf(values: List<Double>): Double {
         if (values.size < 2) return 0.0
         val mean = values.average()
@@ -83,12 +65,10 @@ object ModelAgreement {
     }
 
     /**
-     * Turn a spread into a confidence, judged against what is being measured.
-     *
-     * Relative rather than absolute, because a degree of disagreement is nothing
-     * on a temperature and total disagreement on a rainfall rate of one
-     * millimetre. The floor stops a near-zero consensus - the usual case, since
-     * most hours are dry - from making any disagreement at all look catastrophic.
+     * Turn a spread into a confidence, relative to what is measured: a degree is
+     * nothing on a temperature, total disagreement on a millimetre of rain. The floor
+     * keeps a near-zero consensus (most hours are dry) from making any disagreement
+     * look catastrophic.
      */
     fun agreementOf(spread: Double, consensus: Double): Double {
         val scale = maxOf(abs(consensus), SCALE_FLOOR)
@@ -114,12 +94,8 @@ object ModelAgreement {
     }
 
     /**
-     * The share of models expecting measurable precipitation.
-     *
-     * This is a probability in the only honest sense available here: not a
-     * confidence dressed as a percentage, but the actual proportion of
-     * independent forecasts that say it rains. Five of seven is 0.71, and means
-     * exactly that.
+     * The share of models expecting measurable precipitation: a probability in the
+     * plain sense, five of seven independent forecasts being 0.71.
      */
     fun probabilityOfPrecipitation(values: List<Double>, threshold: Double = WET_MM): Double? {
         if (values.isEmpty()) return null
@@ -141,22 +117,12 @@ data class ModelReading(
     val at: Instant,
     val temperature: ModelSpread?,
     val precipitation: ModelSpread?,
-    /**
-     * The share of models forecasting measurable rain, 0..1.
-     *
-     * The one figure on this screen that is a probability in the plain sense:
-     * five of seven independent forecasts saying it rains is 0.71, and means
-     * that and nothing else.
-     */
+    /** The share of models forecasting measurable rain, 0..1. */
     val chanceOfRain: Double?,
     /**
-     * What each model said about precipitation this hour, by position, with a
-     * null where a model did not answer.
-     *
-     * Position is the model, and it means the same model in every reading. That
-     * is the difference between this and [ModelSpread.values], which is compacted
-     * and sorted for statistics: from these one can follow a single model across
-     * the hours, which is what taking a median *at a moment* requires.
+     * What each model said about precipitation this hour, by position, null where a
+     * model did not answer. Position is the same model in every reading, so one model
+     * can be followed across the hours; [ModelSpread.values] is compacted and sorted.
      */
     val precipitationByModel: List<Double?> = emptyList(),
 )
@@ -185,11 +151,8 @@ data class ModelEnsemble(val readings: List<ModelReading>) {
 }
 
 /**
- * Somewhere several models' forecasts come from at once.
- *
- * Behind an interface for the same reason every other source is: what the fusion
- * needs is an ensemble, not Open-Meteo. It is also the difference between a
- * repository that can be tested and one that can only be run.
+ * Somewhere several models' forecasts come from at once; an interface so the
+ * repository can be tested.
  */
 interface EnsembleSource {
 

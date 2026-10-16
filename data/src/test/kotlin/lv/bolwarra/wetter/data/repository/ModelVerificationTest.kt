@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Clock
@@ -18,18 +21,9 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 /**
- * The model's homework, marked against the aerodromes.
- *
- * This half of verification had never settled a single record. The reason was a
- * mismatch nothing would surface: records were matched to reports bucketed by
- * the hour, and the estimate was then asked for at the *start* of that hour -
- * which every report in the bucket is necessarily later than, and a reading
- * cannot describe a moment before it was taken.
- *
- * Aerodromes report at twenty and fifty minutes past. Across forty consecutive
- * reports around Riga, the number landing exactly on the hour was zero, so the
- * match could never be made and the count of zero read like "no observations
- * yet" rather than like a fault.
+ * The model's predictions, marked against the aerodromes. Reports land at twenty
+ * and fifty past, never on the hour, so the estimate must be asked for at the
+ * verified moment itself rather than at the start of an hour bucket.
  */
 class ModelVerificationTest {
 

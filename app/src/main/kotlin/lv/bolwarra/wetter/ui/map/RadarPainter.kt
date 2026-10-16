@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.map
 
 import android.graphics.Bitmap
@@ -8,50 +11,25 @@ import lv.bolwarra.wetter.domain.radar.RadarGeometry
 import lv.bolwarra.wetter.domain.radar.isNoEcho
 
 /**
- * A rain field as a picture: purple where it rains, running to red where the
- * rain concentrates.
+ * A rain field as a picture: purple where it rains, running to red where the rain
+ * concentrates. Not the source's rainbow, which needs a legend.
  *
- * Not the source's colours. The tiles arrive in somebody else's palette, a
- * rainbow whose steps nobody can read without a legend. Two hues and the road
- * between them say the one thing the map is for - where it rains, and where it
- * rains hardest - so the eye goes to the red without being told to.
+ * Colour and opacity follow [RainCurveBands], so a cell drawn moderate is moderate
+ * on the chart too (docs/design-principles.md, "The rain axis").
  *
- * **Colour and opacity follow the chart's height.** Both run through
- * [RainCurveBands], so a cell drawn at the moderate step is moderate on the
- * curve too - the one thing the two surfaces must never disagree about
- * (docs/design-principles.md, "The rain axis").
+ * A small Gaussian pass softens the kilometre grid before colouring; it is
+ * picture-only, and nothing reads rates back out of the bitmap.
  *
- * ### Smoothed for the eye, not for the numbers
- *
- * The field is a grid of kilometre pixels, and drawn as it is it reads as a
- * mosaic - the grid, not the rain. A small Gaussian pass softens that grid
- * before the colours are chosen. It is a picture-only step: nothing reads rates
- * back out of the bitmap, and the kernel is a pixel wide, well inside what the
- * composite itself resolves, so it removes the staircase without inventing
- * structure.
- *
- * ### Where the picture runs out, it fades
- *
- * A projection carries rain in from upwind, and at the upwind edge of the grid
- * there is nothing to carry: those pixels are unobserved. They used to be
- * veiled in the plate colour, and because motion is estimated in blocks the
- * edge of that veil was a staircase - dark blocks marching in from the side as
- * the loop played, with the rain beside them cut off along the same steps.
- *
- * So the edge of what is known is feathered instead. An observed mask is
- * blurred over [FEATHER_PX] and the rain's opacity follows it, reaching nothing
- * exactly at the boundary. Nothing is drawn where nothing was seen, and the
- * rain thins out towards that ground rather than stopping at a wall - which is
- * also the honest picture: confidence in a pixel falls the nearer its
- * trajectory came to the edge of what was observed.
+ * Where the observed ground ends, the rain fades: an observed mask feathered over
+ * [FEATHER_PX] sets the opacity, reaching nothing exactly at the boundary, so the
+ * upwind edge of a projection thins out rather than stepping in blocks.
  */
 internal object RadarPainter {
 
     /**
-     * The part of [field] under [view], which must lie inside its grid.
-     *
-     * Smoothing and the fade are worked out over the whole field and only then
-     * cropped, so the picture's edge is not treated as the edge of the data.
+     * The part of [field] under [view], which must lie inside its grid. Smoothing and
+     * the fade are worked over the whole field before cropping, so the picture's edge
+     * is not treated as the edge of the data.
      */
     fun paint(field: RadarField, view: RadarGeometry = field.geometry): Bitmap =
         Bitmap.createBitmap(pixels(field, view), view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -90,8 +68,7 @@ internal object RadarPainter {
 
     /**
      * How far inside the observed ground each pixel sits, 0 at its edge and 1 at
-     * [FEATHER_PX] or more. A fully observed field is 1 everywhere, including at
-     * the grid's own border: past the grid is off the picture, not unobserved.
+     * [FEATHER_PX] or more. The grid's own border is off the picture, not unobserved.
      */
     private fun feathered(raw: FloatArray, width: Int, height: Int): FloatArray {
         if (raw.none { it.isNoEcho() }) return FloatArray(raw.size) { 1f }
@@ -100,12 +77,9 @@ internal object RadarPainter {
             mask = boxBlur(mask, width, height, horizontal = true)
             mask = boxBlur(mask, width, height, horizontal = false)
         }
-        // Two measures, and the smaller wins. The blurred mask rounds the steps
-        // off the edge's shape, but at the inside corner of a step it is still
-        // over a half beside unobserved ground, so on its own the rain there
-        // stopped dead. Distance to the nearest unobserved pixel is nothing at
-        // every boundary pixel and climbs at a fixed rate, which is what
-        // guarantees the fade finishes exactly at the edge.
+        // Two measures, and the smaller wins: the blurred mask rounds the edge's steps,
+        // and the distance to unobserved ground guarantees the fade ends exactly at the
+        // edge, including at inside corners.
         val distance = distanceToUnobserved(raw, width, height)
         return FloatArray(mask.size) {
             val rounded = ((mask[it] - 0.5f) * 2f).coerceIn(0f, 1f)
@@ -115,8 +89,8 @@ internal object RadarPainter {
     }
 
     /**
-     * Pixels to the nearest unobserved pixel, by a two-pass chamfer - close
-     * enough to Euclidean that the fade's contours do not come out octagonal.
+     * Pixels to the nearest unobserved pixel, by a two-pass chamfer: close enough to
+     * Euclidean that the fade's contours are not octagonal.
      */
     private fun distanceToUnobserved(raw: FloatArray, width: Int, height: Int): FloatArray {
         val far = Float.MAX_VALUE / 2f
@@ -208,11 +182,8 @@ internal object RadarPainter {
     }
 
     /**
-     * A separable [1 2 1] pass, twice - close to a Gaussian of about a pixel.
-     *
-     * Unobserved pixels neither contribute nor receive: a coverage hole must not
-     * bleed into observed ground as if it were dry, or pick up rain from beside
-     * it and look observed.
+     * A separable [1 2 1] pass, twice: close to a Gaussian of about a pixel.
+     * Unobserved pixels neither contribute nor receive.
      */
     private fun smoothed(values: FloatArray, width: Int, height: Int): FloatArray {
         var current = values

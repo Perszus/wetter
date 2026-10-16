@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui
 
 import androidx.lifecycle.ViewModelProvider
@@ -32,7 +35,12 @@ object WetterViewModels {
             )
         }
         initializer {
-            SettingsViewModel(application().container.preferences)
+            val container = application().container
+            SettingsViewModel(
+                container.preferences,
+                container.selectedLocation,
+                container.repository,
+            )
         }
         initializer {
             val container = application().container

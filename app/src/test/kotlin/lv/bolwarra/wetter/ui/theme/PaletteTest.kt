@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.theme
 
 import androidx.compose.ui.graphics.Color
@@ -9,18 +12,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The palette's rules, enforced.
+ * The palette's rules, enforced: generated tones can be checked, so a failing
+ * contrast or two roles sharing a value is caught the day it is introduced.
  *
- * The point of generating tones rather than picking them is that the rules can
- * be checked. Measuring the hand-picked palette this replaced found the most
- * used colour in the app failing WCAG AA in both themes, two roles holding
- * identical values under different names, and a temperature that was the same
- * colour as a severe-weather alert. Every one of those would have been caught
- * here on the day it was introduced.
- *
- * Contrast is computed from the sRGB values the screen actually receives, not
- * from the lightness they were asked for, so gamut clamping cannot hide a
- * failure behind a correct-looking specification.
+ * Contrast is computed from the sRGB values the screen actually receives, so gamut
+ * clamping cannot hide a failure behind a correct-looking specification.
  */
 class PaletteTest {
 
@@ -33,13 +29,8 @@ class PaletteTest {
     }
 
     /**
-     * CIE chroma, which is what "loud" means here.
-     *
-     * The first version of this test used the spread between the largest and
-     * smallest sRGB channel, which is not chroma and ranked a saturated blue
-     * below a duller orange - the channels simply do not distribute evenly
-     * across hues. Converting properly is twenty lines and is the difference
-     * between a rule and a coincidence.
+     * CIE chroma, which is what "loud" means here. The spread between sRGB channels
+     * is not chroma, and would rank a saturated blue below a duller orange.
      */
     private fun chroma(c: Color): Double {
         fun linear(v: Float): Double {

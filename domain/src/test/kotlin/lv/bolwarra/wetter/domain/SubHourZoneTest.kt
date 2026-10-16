@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import java.time.Duration
@@ -11,18 +14,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Zones that do not run on the whole hour.
- *
- * About a fifth of the people on earth live on a clock offset from UTC by half
- * or three quarters of an hour - India alone is 1.4 billion - and their forecast
- * rows land at :15, :30 or :45 past the UTC hour. Every piece of logic that
- * reaches for "the hour we are in" has to find it there.
- *
- * Written after a measured failure: in Kathmandu at 21:54 local the rain tile
- * read `0.0 mm/h` while the dial beside it said `Drizzle` and the hour covering
- * the reader held 0.4 mm. The window had been opened by truncating the clock to
- * a whole UTC hour, which landed before the row covering now, dropped it, and
- * left the lookup falling off the front into a default of zero.
+ * Zones that do not run on the whole hour. About a fifth of the people on earth
+ * live on a clock offset from UTC by half or three quarters of an hour, and their
+ * forecast rows land at :15, :30 or :45 past the UTC hour. Every lookup of "the
+ * hour we are in" has to find it there: in Kathmandu, truncating to the UTC hour
+ * dropped the row covering now and read the rain as zero.
  */
 class SubHourZoneTest {
 
@@ -93,8 +89,7 @@ class SubHourZoneTest {
 
     @Test
     fun `a whole-hour zone is completely unaffected`() {
-        // The fix must be a no-op wherever the clock and UTC agree, which is
-        // most of the world and every existing test.
+        // A no-op wherever the clock and UTC agree, which is most of the world.
         val onTheHour = listOf(
             hour("2026-09-10T15:00:00Z", 0.4),
             hour("2026-09-10T16:00:00Z", 0.7),

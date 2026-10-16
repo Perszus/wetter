@@ -1,23 +1,18 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.sky
 
 /**
- * Whether the sky overhead is worth looking up at.
- *
- * Built on the cloud decks rather than the total, because the total cannot
- * answer this question at all: 90% of high cirrus is a sky you can still pick
- * constellations out of, and 40% of low stratus is a lid with holes in it. Only
- * the split says which one you have.
+ * Whether the sky overhead is worth looking up at, from the cloud decks rather
+ * than the total: 90% high cirrus still shows constellations, 40% low stratus is a
+ * lid with holes in it.
  */
 object Stargazing {
 
     /**
-     * How far the sun must be below the horizon before the sky is dark enough.
-     *
-     * The end of nautical twilight. Astronomers want -18°, the end of
-     * astronomical twilight, and get it here as the top of the scale rather than
-     * as the gate - at -12° the bright stars and every planet are already out,
-     * and in a Nordic summer -18° never arrives at all, so a mark that waited
-     * for it would simply never appear for half the year at these latitudes.
+     * The end of nautical twilight. At -12° the bright stars and planets are out, and
+     * in a northern summer the astronomical -18° never arrives at all.
      */
     const val DARK_ENOUGH_DEGREES = -12.0
 
@@ -33,36 +28,22 @@ object Stargazing {
     const val WORTH_LOOKING_UP = 0.66f
 
     /**
-     * How opaque high cloud is, against low and medium taken as solid.
-     *
-     * Cirrus is ice crystals kilometres thick and mostly empty; it dims a sky
-     * and puts a ring round the moon without hiding much. Stratus is a ceiling.
-     * Treating them alike is what makes a total cloud figure useless for this.
+     * How opaque high cloud is, against low and medium taken as solid: cirrus dims a
+     * sky without hiding much.
      */
     const val HIGH_CLOUD_OPACITY = 0.45f
 
     /**
-     * How much a full moon costs.
-     *
-     * It does not hide the sky, it raises its floor: the moon washes out faint
-     * stars while the bright ones and the planets carry on regardless. So it
-     * grades the answer rather than gating it - a clear night under a full moon
-     * is still a clear night, and telling somebody to stay in would be wrong.
-     *
-     * Illumination stands in for the moon actually being up, which is an
-     * approximation and a knowingly rough one. It leans the right way - a near
-     * full moon rises about when the sun sets and is up all night, a new moon
-     * is up all day - but it is wrong for a gibbous moon in the hours before it
-     * rises, and correcting that needs a lunar ephemeris this app does not have.
+     * How much a full moon costs. It washes out faint stars but not bright ones, so it
+     * grades the answer rather than gating it. Illumination stands in for the moon
+     * being up, which is rough for a gibbous moon before it rises.
      */
     const val FULL_MOON_COST = 0.45f
 
     /**
      * What the sky is doing, from the readings that decide it.
      *
-     * @param cloudLow percent, 0..100. Null where the provider did not say, and
-     *   treated as unknown rather than as clear: claiming a good night from a
-     *   reading nobody took is the one failure mode worth designing out.
+     * @param cloudLow percent, 0..100. Null is treated as unknown, never as clear.
      */
     fun assess(
         cloudLow: Int?,
@@ -95,11 +76,8 @@ object Stargazing {
     }
 
     /**
-     * How much of the sky is actually open, from the three decks.
-     *
-     * The decks overlap - a deck seen through a gap in the one below is counted
-     * by both - so they are combined as independent layers of cover rather than
-     * added. Adding them is what produces a "150% cloudy" sky.
+     * How much of the sky is open, combining the decks as independent layers of cover
+     * rather than adding them, since a deck seen through a gap is counted by both.
      */
     fun clarityOf(cloudLow: Int?, cloudMedium: Int?, cloudHigh: Int?): Float? {
         // High cloud alone is enough to answer with, but low cloud alone is not:
@@ -126,9 +104,7 @@ object Stargazing {
     /**
      * The sky, as far as looking at it goes.
      *
-     * @param quality 0..1, for grading the words. Not shown as a number: a sky
-     *   is not 0.72 good, and printing it would claim a precision that three
-     *   cloud percentages and a moon phase cannot support.
+     * @param quality 0..1, for grading the words. Never shown as a number.
      */
     data class Sky(
         val isDark: Boolean,

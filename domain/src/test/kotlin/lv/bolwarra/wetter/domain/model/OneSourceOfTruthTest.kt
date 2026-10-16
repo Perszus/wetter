@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.model
 
 import java.time.Instant
@@ -8,17 +11,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * One answer to "how hard is it falling", for every surface.
- *
- * A provider's symbol carries two claims in one word: what is falling, and how
- * hard. The first is theirs. The second this app measures against its own
- * published scale, and until these tests existed the two were displayed side by
- * side without ever being reconciled.
- *
- * The failure was real and reported from use. On a MET Norway forecast for Rīga
- * the 20th peaked at 1.0 mm/h and came back as `DRIZZLE`, while the app's own
- * scale calls anything from 0.5 light rain — so the week showed a drizzle mark
- * on a day whose own bar said rain, and elsewhere the reverse.
+ * One answer to "how hard is it falling", for every surface. A provider's symbol
+ * claims what is falling and how hard; the second is measured against the app's
+ * own scale. On a MET Norway forecast for Rīga a day peaking at 1.0 mm/h came back
+ * as `DRIZZLE`, while the app calls anything from 0.5 light rain.
  */
 class OneSourceOfTruthTest {
 

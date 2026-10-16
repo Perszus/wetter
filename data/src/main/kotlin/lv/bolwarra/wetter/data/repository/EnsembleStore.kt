@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Instant
@@ -21,18 +24,12 @@ private data class StoredHour(
 )
 
 /**
- * Keeps the model ensemble for a place across a restart.
+ * Keeps the model ensemble for a place across a restart, so a fresh process has a
+ * model median before the first fetch returns.
  *
- * The forecast and the radar projection were already kept; this was not, and it
- * was the only one of the three that decides anything past the first hour. So
- * every fresh process filled that stretch from the single chosen provider until
- * a fetch returned - which is how a wet evening that six of seven models agreed
- * on could draw as flat and dry for the first tick after opening.
- *
- * The member values are stored rather than the summary. A median over seven
- * numbers cannot be recovered from the median of those seven, and the provider
- * has to join them as an eighth vote, so the raw values are the thing worth
- * keeping. Spread and agreement are recomputed on read, being cheap and derived.
+ * The member values are stored rather than the summary: the provider joins them
+ * as an extra vote, which a stored median cannot take. Spread and agreement are
+ * recomputed on read.
  */
 internal class EnsembleStore(private val dao: EnsembleDao, private val json: Json) {
 

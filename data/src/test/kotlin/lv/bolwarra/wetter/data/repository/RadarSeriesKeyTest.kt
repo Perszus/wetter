@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.ZoneId
@@ -7,13 +10,9 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
- * Whose radar a place gets.
- *
- * The kept series is a list of samples already taken at one point - unlike the
- * projection in memory, there is no way to re-aim it at somebody else's
- * coordinates. So the key that files it has to be fine enough that two
- * distinguishable places never share one, or the map's whole purpose is lost on
- * the first draw after opening.
+ * Whose radar a place gets. A kept series is samples at one point and cannot be
+ * re-aimed, so the key must be fine enough that two distinguishable places never
+ * share one.
  */
 class RadarSeriesKeyTest {
 

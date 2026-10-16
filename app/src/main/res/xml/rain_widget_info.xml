@@ -2,22 +2,13 @@
 <!--
   Three cells across, one down.
 
-  minWidth and minHeight are the old way of saying that and still the only way
-  older launchers hear it: the grid formula is 70n - 30, so three columns is
-  180dp and one row is 40dp. targetCellWidth and targetCellHeight say the same
-  thing in cells for Android 12 and later, which places widgets by grid rather
-  than by guessing from dp.
+  minWidth and minHeight use the 70n - 30 dp cell formula for older launchers;
+  targetCellWidth and targetCellHeight say the same for Android 12 and later.
 
-  One row is about 56dp of real height on a phone, which is why the chart's
-  insets are proportions rather than fixed dp and the hour labels shrink a step.
-
-  updatePeriodMillis is the system floor of thirty minutes, and it is a backstop
-  rather than the plan. The plan is the heartbeat (work/Heartbeat.kt): an alarm
-  timed to the radar that redraws the widget at every wake and again the moment a
-  pass lands new data. This update belongs to the system instead, and it starts
-  the process even where an aggressive OEM battery manager has stopped everything
-  of ours - so the widget is redrawn from disk, and the heartbeat re-armed, even
-  then. The redraw itself is a cache read; it never waits on the network.
+  updatePeriodMillis, the system's thirty-minute floor, is a backstop to the
+  heartbeat (work/Heartbeat.kt), which redraws at each radar sweep. It still
+  starts the process where a battery manager has stopped everything else, so the
+  widget is redrawn from disk and the heartbeat re-armed even then.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_rain_description"

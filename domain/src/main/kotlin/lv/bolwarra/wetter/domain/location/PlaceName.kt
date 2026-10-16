@@ -1,16 +1,12 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.location
 
 /**
- * What somewhere is called, once something has looked it up.
- *
- * Three fields because that is what a person reads: the thing itself, the town
- * it is in, and the country - the same shape [lv.bolwarra.wetter.domain.model.WeatherLocation]
- * already uses, so a looked-up name drops straight into a saved place.
- *
- * All of it optional, and the whole thing absent for most of the earth. Two
- * thirds of the surface is water and a good deal of the land has nothing named
- * on it; a pin in the middle of the Atlantic resolves to nothing at all, which
- * is a correct answer and not a failure.
+ * What somewhere is called, once looked up: the thing itself, its town and its
+ * country, the shape [lv.bolwarra.wetter.domain.model.WeatherLocation] uses. All
+ * optional; a pin mid-Atlantic resolves to nothing, which is a correct answer.
  */
 data class PlaceName(
     /** The most specific thing there is: a street and number, or a district. */

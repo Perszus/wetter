@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -77,57 +80,34 @@ import lv.bolwarra.wetter.ui.theme.Emphasis
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * The current reading, as a dial.
+ * The current reading as a thermostat dial: a porcelain disc with the
+ * temperature and its word at the centre, the weather's picture on the glass, an
+ * hour scale with a pointer for now, and a light travelling the rim at the speed
+ * of the wind.
  *
- * A thermostat face: a porcelain disc with the temperature at its centre and a
- * glass edge around it, along which a light travels at the speed of the wind.
- *
- * Two marks sit in the gutter outside the glass, on the lower diagonals. They
- * are outside on purpose — the face is a reading, and these are advice about
- * what to do with it.
- *
- * ### The wind is said twice, deliberately
- *
- * The travelling light gives a *feel* for it: a drift in still air, a rush in a
- * gale. The three lines at the lower right give a *reading* of it, taken at a
- * glance. One is continuous and needs watching; the other is discrete and
- * immediate. Neither is redundant, because they answer at different speeds.
- *
- * Wind *direction* is on neither. The angle around this circle already means
- * time of day, and a compass bearing on the same degrees would be two coordinate
- * systems sharing one set of numbers. Direction belongs in the Air tile, in
- * words.
- *
- * ### The light is one gradient, not several arcs
- *
- * A sweep gradient rotated as a whole, so the tail is a genuine continuous
- * falloff. A few arcs of stepped opacity is the easy approximation and it looks
- * like what it is: banding. The seam where the sweep wraps sits at full
- * transparency, so it never shows.
+ * Marks beside the dial (umbrella, wind level, stars, warning) explain themselves
+ * when tapped. Wind direction is not shown here: the angle round this face
+ * already means time of day.
  */
 @Composable
 fun WeatherPlate(
     forecast: WeatherForecast,
     now: Instant,
     /**
-     * The fused precipitation timeline, so the umbrella and the chart below
-     * it are reading the same rain. Empty simply means the model is on its
-     * own, which is what the umbrella used to be given always.
+     * The fused precipitation timeline, so the umbrella reads the same rain as
+     * the chart below it. Empty when only the model is available.
      */
     timeline: List<FusedPrecipitation> = emptyList(),
     /** Whatever in the next day could hurt somebody, worst first. */
     hazards: List<Hazard> = emptyList(),
     modifier: Modifier = Modifier,
     /**
-     * Which mark is currently explaining itself, held by the caller.
-     *
-     * Hoisted because dismissing it is a screen-wide gesture: tapping anywhere
-     * that is not the card should put it away, and the dial cannot see taps that
-     * land on the chart below it.
+     * Which mark is explaining itself. Hoisted so a tap anywhere outside the card,
+     * including on the chart below, can dismiss it.
      */
     explaining: PlateMark? = null,
     onExplain: (PlateMark?) -> Unit = {},
-    /** Notably poor air, from the Air tile's data: it makes a heat hazard hazy on the glass. */
+    /** Notably poor air, which makes a heat hazard hazy on the glass. */
     hazyAir: Boolean = false,
 ) {
     val units = WetterTheme.units
@@ -135,34 +115,21 @@ fun WeatherPlate(
     val spacing = WetterTheme.spacing
     val zone = forecast.location.zone
 
-    // Resolved against the clock, not taken from the fetch. Everything else on
-    // this face moves - the mark, the light - and a temperature that did not
-    // would end up contradicting the mark beside it. The word and the glass come
-    // with it, worked out where the widgets work them out too.
+    // Resolved against the clock rather than taken from the fetch, so the reading
+    // keeps pace with the moving parts of the face. Shared with the widgets.
     val face = FaceReading.of(forecast, timeline, hazards, now, hazyAir)
     val current = face.current
     val windSpeed = current.windSpeed ?: 0.0
-    // Falling back to the mean means a provider that does not publish gusts
-    // simply reports one figure rather than a nonsensical one.
+    // Without a published gust, the gust is the mean.
     val windGust = (current.windGust ?: windSpeed).coerceAtLeast(windSpeed)
     val beamAngle = rememberBeamAngle(windSpeed)
     val showUmbrella = UmbrellaDay.isUmbrellaDay(forecast, timeline, now)
 
-    // The cloud decks are what make this answerable at all: the total cannot
-    // tell a veil of cirrus from a lid of stratus, and for this question that
-    // is the only distinction that matters.
+    // Cloud decks, which tell thin high cloud from low overcast for the stars mark.
     val hour = forecast.hourly.at(now)
 
-    // The one word on this face, taken from whatever actually looked.
-    //
-    // It used to be the provider's symbol for the hour while everything under it
-    // on the same screen - the chart, the rate, the bar saying when it stops -
-    // had already moved to the radar. The most prominent word on the page was
-    // the least evidenced thing on it, and it could contradict the chart
-    // directly beneath it. See FaceReading.
+    // The word from whatever actually looked: the radar where it can see.
     val seen = face.seen
-    // What the weather has left on the glass, chosen from exactly what the face
-    // prints, so the glass can never disagree with the word on it.
     val glass = face.glass
 
     val sky = Stargazing.assess(
@@ -192,19 +159,13 @@ fun WeatherPlate(
                 .height(PLATE_MAX + MARK_SIZE),
             contentAlignment = Alignment.Center,
         ) {
-            // Picture a line drawn across the bottom of the dial: the marks stand on
-            // it, and move out along it to either side. Kept on the diagonal they
-            // crowded the glass and looked like they were squeezing it; out here the
-            // dial keeps its full width and they read as things standing beside it.
-            //
-            // The dial gives up whatever room the marks need, so it is measured from
-            // what is left rather than assumed.
+            // The marks stand on the line tangent to the bottom of the dial, outside it;
+            // the dial takes the width that is left.
             val lane = MARK_SIZE + MARK_GAP
             val dial = minOf(maxWidth - lane * 2, PLATE_MAX, maxHeight)
 
-            // The reading's text and where it sits, so the glass can keep a soft
-            // margin round its glyphs. Measured against this box rather than the
-            // screen, so scrolling the page moves nothing here.
+            // The reading's text and position, so the glass can keep a margin round its
+            // glyphs. Measured against this box, so scrolling moves nothing here.
             var dialAt by remember { mutableStateOf(Offset.Zero) }
             var readingAt by remember { mutableStateOf(Offset.Zero) }
             var rowAt by remember { mutableStateOf(Offset.Zero) }
@@ -232,22 +193,16 @@ fun WeatherPlate(
                 Canvas(Modifier.fillMaxSize()) {
                     drawPorcelain(
                         face = colors.surface,
-                        // Pulled toward the face by the plate's relief factor, so
-                        // the bowl is the same depth on every plate. Taken raw,
-                        // these are rungs of a ladder built to separate panels -
-                        // and on a plate whose rungs are twice as far apart the
-                        // dial's ramp stopped being a ramp and became three
-                        // visible bands. See WetterColors.relief.
+                        // Pulled toward the face by the plate's relief factor, so the well is the
+                        // same
+                        // depth on every plate (see WetterColors.relief).
                         lip = lerp(colors.surface, colors.surfaceShade, colors.relief),
                         floorCatch = lerp(colors.surface, colors.surfaceRaised, colors.relief),
                         occlusion = colors.hairline,
                     )
                 }
-                // On the glass, so between the porcelain and the instrument: the
-                // edge, the ticks and the pointers are drawn over it and stay crisp.
-                // White on both plates: the marks are the render's own light, as
-                // the glass catches it, not ink that changes with the theme. Thinned
-                // round the reading's glyphs so the figure always stands clear.
+                // Between the porcelain and the instrument, so the edge, ticks and pointers stay
+                // crisp over it. White light on both plates.
                 GlassMarks(
                     name = glass,
                     ink = Color.White,
@@ -257,17 +212,10 @@ fun WeatherPlate(
                 Canvas(Modifier.fillMaxSize()) {
                     drawFiredEdge(colors.hairline)
                     drawHourTicks(colors.hairline)
-                    // The pointer is ink, where the scale it aims at is hairline.
-                    // One step of tone was not enough separation to tell the mark
-                    // that means "now" from the twelve that mean nothing.
+                    // Ink rather than hairline, so the pointer stands apart from the scale.
                     drawTimeMark(now, zone, colors.textPrimary)
                     if (windSpeed >= STILL_AIR_MS) {
-                        // Ink, not a wash. This was briefly drawn in the
-                        // day/night tones, which are solved as fills - they sit
-                        // close to the ground by design, and a moving pointer
-                        // drawn in one simply disappeared. The one thing on the
-                        // face that moves has to be the most legible thing on
-                        // it.
+                        // Ink: the one moving thing on the face must be the most legible.
                         drawWindLight(beamAngle, colors.textPrimary)
                     }
                 }
@@ -296,9 +244,7 @@ fun WeatherPlate(
                 Icon(
                     painter = painterResource(R.drawable.ic_umbrella),
                     contentDescription = stringResource(R.string.plate_umbrella),
-                    // The one coloured thing here, and the only reason that is
-                    // allowed: it means rain, rain owns that hue, and this is the
-                    // single mark whose job is to catch the eye on the way out.
+                    // The only coloured mark: it means rain, and rain owns that hue.
                     tint = colors.precipitation,
                     modifier = Modifier
                         .offset(x = -outwards, y = downwards)
@@ -370,14 +316,8 @@ fun WeatherPlate(
 }
 
 /**
- * Clickable without the ripple.
- *
- * These marks are drawn objects on a porcelain face, not buttons on a sheet, and
- * a Material ripple washing across the dial behind one of them reads as damage
- * rather than as feedback. The answer to the tap is the card appearing, which is
- * a far clearer acknowledgement than a grey flash.
- *
- * The click semantics are untouched, so this stays reachable and announced.
+ * Clickable without the ripple: these are marks on a face, and the card that
+ * appears is the acknowledgement. Click semantics are unchanged.
  */
 private fun Modifier.quietlyClickable(onClick: () -> Unit): Modifier = composed {
     clickable(
@@ -387,20 +327,12 @@ private fun Modifier.quietlyClickable(onClick: () -> Unit): Modifier = composed 
     )
 }
 
-/** The two marks standing beside the dial, each of which can explain itself. */
+/** The marks beside the dial, each of which can explain itself. */
 enum class PlateMark { UMBRELLA, WIND, STARS, HAZARD }
 
 /**
- * What the mark you just tapped actually means.
- *
- * These symbols carry real information and no label, which is the right trade
- * for something read at a glance every day but leaves nowhere to say what they
- * mean the first time. A tap is the least intrusive place to put that: absent
- * until asked for, and gone again on the next tap.
- *
- * It appears beneath the dial rather than over it. Floating it on top would
- * cover the temperature - the one thing on this screen most likely to be the
- * reason the app was opened.
+ * What a tapped mark means, shown beneath the dial so it never covers the
+ * temperature, and dismissed by the next tap.
  */
 @Composable
 private fun MarkExplanation(
@@ -417,9 +349,8 @@ private fun MarkExplanation(
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
 
-    // The card outlives the selection by the length of the collapse animation, so
-    // it needs its own copy of what to say. Reading `mark` directly would blank
-    // the text the instant it cleared and animate an empty box shut.
+    // Kept separately from `mark` so the text survives the collapse animation
+    // instead of blanking as it starts.
     var shown by remember { mutableStateOf(PlateMark.WIND) }
     LaunchedEffect(mark) { if (mark != null) shown = mark }
 
@@ -434,9 +365,7 @@ private fun MarkExplanation(
             PlateMark.STARS -> stringResource(starsTitle(sky))
             PlateMark.HAZARD -> stringResource(R.string.hazard_title)
         }
-        // Null for the hazard card: the rows are the answer, and a paragraph
-        // explaining how the thresholds were chosen is our reasoning, not the
-        // reader's business. Somebody looking at a storm warning wants the storm.
+        // No paragraph for hazards: the rows are the answer.
         val body: String? = when (shown) {
             PlateMark.UMBRELLA -> stringResource(R.string.explain_umbrella_body)
             PlateMark.WIND -> stringResource(R.string.explain_wind_body)
@@ -447,15 +376,9 @@ private fun MarkExplanation(
             }
             PlateMark.HAZARD -> null
         }
-        // The wind card carries the number the whole indicator is derived from.
-        // Without it the levels and the speed of the light are two things you
-        // have to take on trust; with it they are two readings of one figure you
-        // can see, and either can be checked against it.
+        // The wind card shows the figure the indicator and the light are derived from.
         val reading = when (shown) {
-            // The gust is a reading, not something the dial acts out. A mean of
-            // five gusting to six is a different afternoon from a mean of five
-            // gusting to twelve, and that is worth saying in a number even
-            // though the light itself holds a steady pace.
+            // Gusts are stated as a number; the light holds a steady pace.
             PlateMark.WIND -> if (windGustMs > windSpeedMs + GUST_WORTH_SAYING) {
                 stringResource(
                     R.string.explain_wind_reading,
@@ -466,15 +389,11 @@ private fun MarkExplanation(
                 formatWindSpeed(windSpeedMs, units.wind)
             }
             PlateMark.UMBRELLA -> null
-            // The figure the mark is derived from, as the wind card does it:
-            // "clear" is a judgement, and the share of open sky is the reading
-            // it was made from.
+            // The share of open sky behind the judgement.
             PlateMark.STARS -> stringResource(
                 R.string.explain_stars_reading,
                 (sky.clarity * PERCENT).roundToInt(),
             )
-            // The hazards are listed in full below rather than squeezed into
-            // this one line, so the header stays empty.
             PlateMark.HAZARD -> null
         }
 
@@ -507,9 +426,7 @@ private fun MarkExplanation(
             }
             Spacer(Modifier.height(spacing.xs))
             if (shown == PlateMark.HAZARD) {
-                // Every one of them, not just the worst. Somebody deciding
-                // whether to go out needs to know the gale is followed by ice,
-                // and the second line is where that lives.
+                // Every hazard, not just the worst: a gale followed by ice is two things to know.
                 hazards.forEach { hazard ->
                     Row(
                         modifier = Modifier
@@ -537,10 +454,7 @@ private fun MarkExplanation(
                 Spacer(Modifier.height(spacing.s))
             }
             if (shown == PlateMark.WIND) {
-                // The three bands as a scale, with the one you are in picked out.
-                // A reader wants to know what the lines mean and where they
-                // currently stand, and both are easier to take from a short list
-                // than from a paragraph describing them.
+                // The three bands as a short scale, with the current one picked out.
                 val level = windLevel(windSpeedMs)
                 WindBands(level)
                 Spacer(Modifier.height(spacing.m))
@@ -553,11 +467,8 @@ private fun MarkExplanation(
 }
 
 /**
- * The three wind bands, as a scale.
- *
- * The thresholds are formatted from the same constants the indicator switches
- * on, so the numbers a reader is given cannot drift away from the ones the dial
- * is actually using.
+ * The three wind bands as a scale, formatted from the same constants the
+ * indicator switches on.
  */
 @Composable
 private fun WindBands(currentLevel: Int) {
@@ -586,11 +497,8 @@ private fun WindBands(currentLevel: Int) {
 }
 
 /**
- * How windy it is, as three stacked lines that fill like a level.
- *
- * All three are always drawn. An indicator that hides its unfilled steps cannot
- * be read as a level at all: two lines showing would leave you unable to tell
- * whether that meant two of three or two of two.
+ * Wind as three stacked lines that fill like a level. All three are always
+ * drawn, so the level can be read.
  */
 @Composable
 private fun WindLevels(speedMs: Double, modifier: Modifier = Modifier) {
@@ -601,7 +509,6 @@ private fun WindLevels(speedMs: Double, modifier: Modifier = Modifier) {
     Canvas(modifier.semantics { contentDescription = description }) {
         val gap = size.height / (WIND_LINES + 1)
         repeat(WIND_LINES) { index ->
-            // Filled from the bottom up, the way a level fills.
             val lit = index >= WIND_LINES - level
             drawWave(
                 y = gap * (index + 1),
@@ -612,7 +519,7 @@ private fun WindLevels(speedMs: Double, modifier: Modifier = Modifier) {
     }
 }
 
-/** One wind line: a shallow wave, because a straight line would be a rule. */
+/** One wind line: a shallow wave. */
 private fun DrawScope.drawWave(y: Float, gap: Float, colour: Color) {
     val amplitude = gap * WAVE_AMPLITUDE
     val path = Path()
@@ -620,20 +527,14 @@ private fun DrawScope.drawWave(y: Float, gap: Float, colour: Color) {
     var x = 0f
     while (x <= size.width) {
         val phase = (x / size.width) * WAVE_CYCLES * TAU
-        // Minus, not plus: screen y grows downward, so a positive sine dips
-        // first and the wave arrives back to front - down on the left, up on the
-        // right.
+        // Minus, because screen y grows downward.
         path.lineTo(x, y - amplitude * sin(phase))
         x += WAVE_RESOLUTION
     }
     drawPath(path, colour, style = Stroke(width = WAVE_STROKE.toPx(), cap = StrokeCap.Round))
 }
 
-/**
- * Three bands, cut near the Beaufort boundaries people already have words for: a
- * breeze you would not remark on, a wind that moves branches, and one you lean
- * into.
- */
+/** Three bands near the Beaufort boundaries: a breeze, a wind, and a strong wind. */
 private fun windLevel(speedMs: Double): Int = when {
     speedMs < MODERATE_WIND_MS -> 1
     speedMs < STRONG_WIND_MS -> 2
@@ -647,28 +548,13 @@ private fun windLevelLabel(level: Int) = when (level) {
 }
 
 /**
- * The light's position, turning at the speed of the wind.
- *
- * The angle is integrated frame by frame rather than handed to a repeating
- * animation, and both halves of that matter.
- *
- * A repeating tween has to be told a duration up front, so a change in wind
- * speed can only take effect by replacing the animation - which restarts it, and
- * the light jumps back to the top of the dial. Worse, the old version worked out
- * the duration *after* an early return for still air, which put a `remember`
- * behind a condition. Compose matches remembered state by position, so on the
- * frame the wind crossed that threshold the slots moved and the animation was
- * rebuilt from nothing. Between them, that is why the level indicator could
- * climb to two while the light carried on at its original speed.
- *
- * Accumulating an angle has neither problem. Each frame advances it by however
- * far the current wind justifies, so a gust speeds the light up smoothly from
- * wherever it happens to be, and there is no duration to invalidate.
+ * The light's angle, advanced every frame by however far the current wind
+ * justifies. Integrating rather than running a fixed-duration animation means a
+ * change of wind changes the speed smoothly, without restarting the lap.
  */
 @Composable
 private fun rememberBeamAngle(windSpeedMs: Double): Float {
-    // Read inside the frame callback, so the loop always sees the latest wind
-    // without being restarted by it.
+    // Read inside the frame callback so the loop sees the latest wind without restarting.
     val speed by rememberUpdatedState(windSpeedMs)
     var angle by remember { mutableFloatStateOf(0f) }
 
@@ -693,30 +579,8 @@ private fun rememberBeamAngle(windSpeedMs: Double): Float {
 }
 
 /**
- * How long one lap takes at a given wind speed, or null when the air is still
- * and the light should hold.
- *
- * The light behaves like a wind turbine. A turbine holds a roughly constant
- * tip-speed ratio, so its rotation rate rises in proportion to the wind and its
- * period is inversely proportional to it - which is all this is:
- *
- *     laps per minute = 3 x wind speed in m/s
- *
- * So 2 m/s turns at 6 rpm, 4 m/s at 12, 8 m/s at 24. Doubling the wind doubles
- * the rate, and the number above is worth checking against if this is ever
- * retuned.
- *
- * The two clamps are the turbine's cut-in and rated speeds. Below [STILL_AIR_MS]
- * nothing turns, because a turbine in dead air does not either and a light
- * creeping round in still conditions would be claiming wind that is not there.
- * Above about 13 m/s it holds at its fastest, because past that the eye cannot
- * tell one blur from another anyway. Between them - which is very nearly every
- * wind anyone ever stands in - it is honestly proportional.
- *
- * An earlier version interpolated linearly between a slowest and a fastest lap
- * against a 20 m/s ceiling. That is not proportionality and it did not look like
- * anything: a light breeze and a moderate one came out four seconds apart on a
- * forty-second lap.
+ * Seconds per lap at [windSpeedMs], or null in still air. The rate rises with
+ * the wind (exaggerated by [DRAMA]) between [SLOWEST_LAP_S] and [FASTEST_LAP_S].
  */
 private fun lapSecondsFor(windSpeedMs: Double): Float? {
     if (windSpeedMs < STILL_AIR_MS) return null
@@ -727,36 +591,14 @@ private fun lapSecondsFor(windSpeedMs: Double): Float? {
 }
 
 /**
- * The body of the plate: glazed ceramic, lit from above.
- *
- * The gradient's centre sits above the disc's centre rather than on it, which is
- * the difference between glazed ceramic and a moulded plastic button — real
- * objects are lit from somewhere.
+ * The body of the dial: a shallow porcelain well lit from above, shadowed under
+ * the near lip and catching light on the far wall.
  */
 internal fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color, occlusion: Color) {
     val radius = ringRadius()
 
-    // A well, not a button.
-    //
-    // The shading of a recess is the inverse of a raised one, and that inversion
-    // is the whole of the effect: the near lip overhangs and shadows the top of
-    // the interior, while the far wall at the bottom is turned towards the light
-    // and catches it. Get the sign wrong and the same gradient makes a dome.
-    //
-    // It is also a diffuse ramp rather than the offset radial glaze this used to
-    // be. A radial highlight is a reflection of the light source, so it belongs
-    // to a glossy surface; a matte one has no reflection to place and is lit
-    // only by how far each part of it is turned towards the light.
-    //
-    // The recess is shallow, so the face sits at the page's own tone and the far
-    // wall goes a step above it. That is not a contradiction: the floor of a
-    // shallow bowl faces the light more squarely than the flat surface around
-    // it does, so it genuinely catches more. The cue that says "hollow" is the
-    // shadow under the near lip, and that is the one thing here that must not
-    // move.
-    //
-    // An earlier version put the whole face below the page. It read as a recess
-    // and also as a dim one - correct, and a shade too careful.
+    // A recess, not a dome: darker at the top under the lip, lighter at the bottom.
+    // A diffuse ramp, because the surface is matte.
     drawCircle(
         brush = Brush.verticalGradient(
             colorStops = arrayOf(
@@ -770,18 +612,8 @@ internal fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color,
         radius = radius,
     )
 
-    // The occlusion under the lip: a narrow band of shadow inside the rim,
-    // gathered at the top by pushing the gradient's centre down.
-    //
-    // Drawn in the edge's own ink, not in a surface tone. The first version used
-    // the shade tone and measured invisible - a shadow is an absence of light,
-    // so a surface a step darker than another surface has nothing in it to cast
-    // one. A shadow and a drawn edge are the same darkness at different
-    // strengths, which is why they share a tone here.
-    //
-    // Kept to the rim on purpose. Spread wider it stops being contact shadow and
-    // becomes a vignette, which is an artefact of a lens rather than a property
-    // of a material - and there is no lens in this app.
+    // Contact shadow under the lip, in the edge's ink and kept to the rim so it
+    // never becomes a vignette.
     drawCircle(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
@@ -796,21 +628,7 @@ internal fun DrawScope.drawPorcelain(face: Color, lip: Color, floorCatch: Color,
     )
 }
 
-/**
- * The glass rim the light runs along.
- *
- * Two strokes: the edge itself, and an inset highlight catching a little more
- * light at the top. Without the second the ring is a drawn circle rather than
- * something with thickness.
- */
-/**
- * The fired edge: one hairline, and nothing else.
- *
- * There used to be a second stroke over the top of it, a bright arc fading to
- * nothing by the equator - a specular catch, which is the single clearest signal
- * a surface is glossy. Porcelain has none. What it has is a clean edge, so that
- * is all this draws.
- */
+/** The fired edge: one hairline. */
 internal fun DrawScope.drawFiredEdge(edge: Color) {
     drawCircle(color = edge, radius = ringRadius(), style = Stroke(EDGE_WIDTH.toPx()))
 }
@@ -833,20 +651,9 @@ internal fun DrawScope.drawHourTicks(colour: Color) {
 }
 
 /**
- * Where we are in the day: a pointer aimed at the hour scale.
- *
- * A *shape*, not a longer line. It used to be a radial stroke starting at the
- * same radius as the hour ticks and only a few points longer than the ones at
- * twelve, three, six and nine - which made the one mark on this face that says
- * something about right now indistinguishable from the twelve that are just a
- * scale. Any amount of making it longer or brighter would still have been a
- * tick among ticks; a triangle is read as pointing at something, and that is
- * the whole job.
- *
- * It sits inside the rim and aims outward at the scale rather than running from
- * the centre like a clock hand, because the middle of this face is occupied by
- * the temperature - which is what people open the app for, and which a hand
- * sweeping across it would cross twice an hour.
+ * The pointer for now: a small triangle inside the rim aimed at the hour scale,
+ * so it reads as pointing rather than as another tick, and never crosses the
+ * temperature.
  */
 private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
     val tip = ringRadius() - EDGE_WIDTH.toPx() / 2f - TICK_GAP.toPx()
@@ -865,12 +672,8 @@ private fun DrawScope.drawTimeMark(now: Instant, zone: ZoneId, colour: Color) {
 }
 
 /**
- * The travelling light: one sweep gradient, rotated whole.
- *
- * Deliberately not the accent. Precipitation owns the only saturated hue in this
- * app, and a blue arc travelling the rim above a blue rain chart read as rain
- * rather than wind. Drawn in ink instead it read as a scuff, so it is the face's
- * own tone brought up — the ring brightening as the light passes.
+ * The travelling light: one sweep gradient rotated whole, in the face's own tone
+ * rather than the rain colour, so it is never read as rain.
  */
 private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
     val radius = ringRadius()
@@ -894,32 +697,17 @@ private fun DrawScope.drawWindLight(angle: Float, colour: Color) {
 }
 
 /**
- * The one circle everything is measured from.
- *
- * The stroke straddles this radius, so half its width falls outside it and the
- * ring's outer face lands flush with the bounds. The porcelain is drawn to the
- * same radius, which makes the ring the plate's edge rather than a second circle
- * inside it.
+ * The circle everything is measured from: the edge's stroke straddles it, so
+ * the ring sits flush with the bounds.
  */
 private fun DrawScope.ringRadius(): Float = size.minDimension / 2f - EDGE_WIDTH.toPx() / 2f
 
 /**
- * Where an instant sits on the face, in `drawArc` degrees - which measure from
- * three o'clock, so twelve at the top is minus ninety.
- *
- * Twelve hours to a turn, not twenty-four. A full day around the face put the
- * mark at a quarter of a degree a minute, which is about half a point on this
- * dial and simply cannot be seen moving; people reasonably read a hand that
- * never visibly moves as a broken one. Half a day doubles that, and matches the
- * clock face everyone already knows how to read.
+ * Where an instant sits on the face, in drawArc degrees (from three o'clock).
+ * Twelve hours to a turn, like a clock, so the pointer visibly moves.
  */
 private fun angleOf(instant: Instant, zone: ZoneId): Float {
     val local = instant.atZone(zone)
-    // Seconds included so the pointer sits where the instant actually is rather
-    // than snapping to the last whole minute. The clock driving this only ticks
-    // once a minute today, so this changes nothing on screen - but it means the
-    // function answers the question it claims to, and a finer tick would simply
-    // work.
     val minutes = (local.hour % HOURS_ON_FACE) * 60 +
         local.minute +
         local.second / SECONDS_PER_MINUTE
@@ -933,23 +721,16 @@ private val MARK_SIZE = 26.dp
 /** Clear air between the glass and the marks, so they are beside it, not on it. */
 private val MARK_GAP = 10.dp
 
-/**
- * The marks sit on the line tangent to the bottom of the dial, and travel out
- * along it. Hence exactly the radius: any less and they are floating somewhere
- * around the base rather than standing on it.
- */
+/** The marks stand on the line tangent to the bottom of the dial. */
 private val MARK_BASE_OF_CIRCLE = 1f
 
-/**
- * Where the face's own tone sits in the fall of light: a little above centre,
- * because the shadowed half of a recess is the shallower of the two.
- */
+/** Where the face's own tone sits in the fall of light: a little above centre. */
 private const val FORM_MIDPOINT = 0.46f
 
-/** How far out the edge begins turning away. Rim only, never a vignette. */
+/** How far out the edge begins turning away: rim only. */
 private const val RIM_CONTACT = 0.90f
 
-/** How far the occlusion is pushed towards the far wall, so it gathers up top. */
+/** How far the occlusion is pushed toward the far wall, so it gathers at the top. */
 private const val OCCLUSION_BIAS = 0.30f
 
 private const val OCCLUSION_SPREAD = 1.24f
@@ -959,17 +740,16 @@ private val TICK_GAP = 6.dp
 private val TICK_LONG = 7.dp
 private val TICK_SHORT = 3.5.dp
 
-/** Long enough to read as a pointer at arm's length, short enough not to crowd. */
 private val MARK_LENGTH = 11.dp
 
-/** Half the pointer's base. Slim, so it aims rather than blocks. */
+/** Half the pointer's base. */
 private val MARK_WIDTH = 3.dp
 
 private const val HOURS_ON_FACE = 12
 private const val DEGREES_PER_HOUR = 360f / HOURS_ON_FACE
 private const val MINUTES_ON_FACE = HOURS_ON_FACE * 60f
 
-/** Long ticks at twelve, three, six and nine, as a clock face has. */
+/** Long ticks at twelve, three, six and nine. */
 private const val QUARTERS = 3
 private const val QUARTER_TURN = 90f
 private const val FULL_TURN = 360f
@@ -988,90 +768,42 @@ private const val BEAM_ALPHA = Emphasis.MUTED
 private const val WIND_LINES = 3
 private const val WAVE_CYCLES = 1f
 
-/** As a fraction of the gap between lines, so deeper waves cannot collide. */
+/** As a fraction of the gap between lines, so neighbouring waves cannot touch. */
 private const val WAVE_AMPLITUDE = 0.42f
 private const val WAVE_RESOLUTION = 1f
 private val WAVE_STROKE = 2.dp
 
 /**
- * The Beaufort 4 and 6 boundaries, rounded to whole numbers.
- *
- * The scale in the explanation card is written from these constants and speeds
- * are displayed as whole numbers, so 5.5 and 10.8 were printed as 6 and 11 while
- * the indicator still switched at the unrounded values - which put a reading of
- * 6 m/s under a line saying light wind is "under 6". Moving the thresholds a few
- * tenths costs nothing meteorologically and makes what is shown and what is done
- * the same thing.
- *
- * Below 5.5 is up to a gentle breeze - present, not worth remarking on. From
- * there to 10.8 is moderate and fresh: dust and paper lift, small trees sway.
- * At 10.8 the scale calls it a strong breeze and describes umbrellas becoming
- * difficult to use, which is the same wind that takes a hat off. That is the
- * level worth a third line, and it is reachable on a coast several times a
- * month - not a once-a-decade storm nobody would ever see the indicator fill
- * for.
- *
- * The previous values claimed to be these boundaries and were not; they were 3
- * and 5, which put "strong" at a fresh breeze.
+ * Near the Beaufort 4 and 6 boundaries (5.5 and 10.8 m/s), rounded to whole
+ * numbers so the scale the card prints and the levels the indicator switches at
+ * are the same numbers.
  */
 
 private const val MODERATE_WIND_MS = 6.0
 private const val STRONG_WIND_MS = 11.0
 
-/** Below this the air is still, the light holds, and the animation stops. */
+/** Below this the air is still and the light holds. */
 private const val STILL_AIR_MS = 0.5
 
-/**
- * The anchor for the rotation: an ordinary 5 m/s breeze takes four seconds to go
- * round. Everything else falls out of that inversely, so 2 m/s is ten seconds,
- * 8 m/s is two and a half, and a gale is at the floor.
- *
- * The first calibration of this was anchored at twelve seconds and floored at
- * forty-five, which was arithmetically adaptive and useless to look at: a light
- * breeze crawled round in half a minute, which does not read as movement at all,
- * so nothing below a gale looked different from anything else. The speed only
- * carries information if the difference between two ordinary winds is visible,
- * which means the whole usable range has to sit where the eye can tell laps
- * apart - a few seconds, not tens of them.
- */
+/** The anchor for the rotation: a 5 m/s breeze takes four seconds a lap. */
 private const val REFERENCE_MS = 5.0
 private const val REFERENCE_LAP_S = 4.0
 
 /**
- * How much the speed exaggerates a difference in wind.
- *
- * A turbine holds its rate proportional to the wind, and that was the first
- * version. It was faithful and it was not worth looking at: real wind over a day
- * here runs 3.4 to 7.0 m/s, so a proportional light varied by barely twice, and
- * two laps that differ by a factor of two look the same unless you can see them
- * side by side - which nobody can, because the hourly figure only moves once an
- * hour.
- *
- * Squaring it turns that same day into a fourfold spread, which is legible at a
- * glance. This is deliberately not physics: the dial is an indicator, and the
- * job of an indicator is to make a difference visible, not to model a rotor.
+ * How much the lap time exaggerates a difference in wind, so that ordinary days
+ * look different at a glance. An indicator, not a model of a rotor.
  */
 private const val DRAMA = 2.0
 
-/**
- * One lap a second. Fast enough to read as urgent, and reached at about 10 m/s
- * - which is where the level indicator beside it turns to strong. The two say
- * the same thing at the same moment, one continuously and one in steps.
- */
+/** One lap a second, reached near 10 m/s, where the level indicator turns strong. */
 private const val FASTEST_LAP_S = 1.0
 
-/** A slow crawl. Still air stops the light entirely, so this is a light breeze. */
+/** A light breeze: a slow crawl. */
 private const val SLOWEST_LAP_S = 22.0
 
 /**
- * The mark for a night worth looking up at.
- *
- * Drawn rather than dropped in as an image, like the wind levels beside it: one
- * bright four-pointed star and two lesser ones, which reads as sky at 26dp where
- * a five-pointed star reads as a rating and a dot reads as nothing.
- *
- * The points are concave-sided on purpose - straight edges make a compass rose,
- * and the pinched waist is what the eye recognises as a star's flare.
+ * The mark for a night worth looking up at: one bright four-pointed star and two
+ * lesser ones, concave-sided so they read as flares.
  */
 @Composable
 private fun StarsMark(modifier: Modifier = Modifier) {
@@ -1099,10 +831,9 @@ private fun DrawScope.drawStar(centre: Offset, radius: Float, colour: Color) {
     val waist = radius * STAR_WAIST
     repeat(STAR_POINTS * 2) { step ->
         val reach = if (step % 2 == 0) radius else waist
-        // Starting a quarter turn round so a point aims straight up.
         val angle = step * (TAU / (STAR_POINTS * 2)) - TAU / 4
-        val x = centre.x + reach * cos(angle).toFloat()
-        val y = centre.y + reach * sin(angle).toFloat()
+        val x = centre.x + reach * cos(angle)
+        val y = centre.y + reach * sin(angle)
         if (step == 0) path.moveTo(x, y) else path.lineTo(x, y)
     }
     path.close()
@@ -1114,10 +845,7 @@ private const val LESSER_STAR = Emphasis.MUTED
 
 private const val STAR_POINTS = 4
 
-/**
- * How far the star pinches in between its points. Small, because a wide waist
- * makes a diamond and the flare is the whole of the shape.
- */
+/** How far the star pinches between its points. */
 private const val STAR_WAIST = 0.2f
 
 private const val PERCENT = 100
@@ -1133,16 +861,9 @@ private const val EXCELLENT_SKY = 0.85f
 private const val GOOD_SKY = 0.6f
 
 /**
- * The mark for weather that can hurt somebody.
- *
- * A triangle, because that shape means exactly one thing everywhere and needs no
- * key. It is drawn in the palette's warning colour and it is the only other
- * coloured object on this face besides the umbrella - which is the whole reason
- * the palette holds the rule that it does. Two loud colours are a hierarchy;
- * five are wallpaper.
- *
- * The bar for putting it up is set high in [lv.bolwarra.wetter.domain.hazard.Hazards]
- * rather than here. A mark that is up most of the week is furniture.
+ * The mark for weather that can hurt somebody: a warning triangle in the
+ * palette's warning colour. The threshold for raising it is set in
+ * [lv.bolwarra.wetter.domain.hazard.Hazards].
  */
 @Composable
 private fun HazardMark(severity: HazardSeverity, modifier: Modifier = Modifier) {
@@ -1155,10 +876,7 @@ private fun HazardMark(severity: HazardSeverity, modifier: Modifier = Modifier) 
     }
 }
 
-/**
- * A warning still to come is drawn back, one already happening is not. The
- * difference between "later" and "now" is worth a glance's worth of weight.
- */
+/** A warning still to come is drawn fainter than one in force. */
 internal fun hazardInk(severity: HazardSeverity, warning: Color): Color =
     if (severity == HazardSeverity.DANGER) warning else warning.copy(alpha = WARNING_AHEAD)
 
@@ -1178,8 +896,7 @@ internal fun DrawScope.drawHazardTriangle(colour: Color) {
     }
     drawPath(path, colour, style = Stroke(width = corner, join = StrokeJoin.Round))
 
-    // The bang: a bar and a dot, both inset from the edges so the triangle
-    // reads first and the mark inside it second.
+    // The bang: a bar and a dot, inset so the triangle reads first.
     val barTop = top + height * BANG_TOP
     val barBottom = top + height * BANG_BOTTOM
     drawLine(

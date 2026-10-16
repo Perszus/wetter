@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import android.Manifest
@@ -71,9 +74,8 @@ import lv.bolwarra.wetter.ui.theme.Atmosphere
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * Connects the weather screen to its view model. Kept separate from
- * [WeatherScreen] so the screen itself takes only a state and callbacks, and can
- * be previewed and tested without a view model.
+ * Connects the weather screen to its view model, so [WeatherScreen] itself takes
+ * only a state and callbacks and can be previewed without one.
  */
 @Composable
 fun WeatherRoute(
@@ -85,11 +87,10 @@ fun WeatherRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    // Hungry for the newest, for as long as somebody is looking: every return
-    // asks at once, and while the screen stays up the model is re-checked every
-    // minute against its ten-minute window. What is held stays on screen
-    // throughout; this only ever swaps it for newer (see refreshOnReturn). The
-    // radar keeps its own minute clock in the view model.
+    // While somebody is looking: every return asks at once, and the model is
+    // re-checked every minute against its freshness window. What is held stays on
+    // screen throughout; this only swaps it for newer. Radar keeps its own clock in
+    // the view model.
     LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             viewModel.refreshOnReturn()
@@ -100,17 +101,15 @@ fun WeatherRoute(
         }
     }
 
-    // Which page you are on survives a rotation but not a relaunch: it is where
-    // you are looking right now, not a preference.
+    // The page survives a rotation but not a relaunch: it is not a preference.
     var domain by rememberSaveable { mutableStateOf(WeatherDomain.Today) }
 
-    // Over the forecast rather than a destination, for the reason Settings is:
-    // it is opened to look at one thing and shut again, and back returns to
-    // exactly the chart it was opened from.
+    // Over the forecast rather than a destination: it is opened to look at one thing,
+    // and back returns to the chart it was opened from.
     var mapOpen by rememberSaveable { mutableStateOf(false) }
 
-    // The forecast behind an open map, softened so the panel reads as on top
-    // of it. Blur needs Android 12; below that the scrim alone does the job.
+    // The forecast behind an open map, softened. Blur needs Android 12; below that
+    // the scrim alone does the job.
     val blur by animateDpAsState(if (mapOpen) BACKDROP_BLUR else 0.dp, label = "backdrop")
 
     Box(modifier) {
@@ -131,14 +130,9 @@ fun WeatherRoute(
 }
 
 /**
- * The home screen.
- *
- * Three fixed things down the top - where you are, what it is like now, and
- * which horizon you are looking at - and then the page for that horizon.
- *
- * The location and the current reading sit ABOVE the switcher on purpose: they
- * are true whichever page you pick, so switching pages must not move them.
- * Nothing above the switcher changes when you use it.
+ * The home screen: where you are, what it is like now, which horizon you are
+ * looking at, then the page for that horizon. The first two sit above the switcher
+ * because they are true on every page, so switching never moves them.
  */
 @Composable
 fun WeatherScreen(
@@ -155,15 +149,9 @@ fun WeatherScreen(
 
     AskAboutWarningsOnce(hasForecast = state.forecast != null)
 
-    // The whole screen is read against this instant - the mark on the dial, the
-    // rolling rain window, which day "tomorrow" means - so it has to keep up
-    // with the clock rather than with when the screen happened to open.
-    //
-    // Aligned to the minute rather than every sixty seconds from launch, because
-    // this drives a clock face and a clock face should move when the minute
-    // does. Tied to RESUMED for the same reason it is re-read on arrival: a
-    // frozen process resumes mid-delay, and the first thing shown would
-    // otherwise be the time it was put down.
+    // The whole screen is read against this instant, so it ticks with the wall
+    // clock's minute. Tied to RESUMED, so a process resumed mid-delay does not first
+    // show the time it was put down.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(lifecycle) {
@@ -175,15 +163,12 @@ fun WeatherScreen(
         }
     }
 
-    // Which mark beside the dial is explaining itself. Held here rather than in
-    // the dial because putting it away is a screen-wide gesture - a tap on the
-    // chart, the switcher or bare background should dismiss it, and none of
-    // those are things the dial can see.
+    // Which mark beside the dial is explaining itself. Held here because a tap
+    // anywhere else on the screen dismisses it.
     var explaining by remember { mutableStateOf<PlateMark?>(null) }
 
-    // The sky this screen is read under. Only this screen: the locations list
-    // and settings are not showing weather, and tinting them to a city's
-    // overcast would be decoration rather than information.
+    // The sky this screen is read under. Only this screen: places and settings are
+    // not showing weather.
     val current = state.forecast?.conditionsAt(now)
     val sky = remember(current?.condition, current?.precipitation) {
         current?.let {
@@ -213,49 +198,13 @@ fun WeatherScreen(
 }
 
 /**
- * Ask about severe-weather notifications, once, and not before there is weather.
+ * Ask about severe-weather notifications once, and only over a screen already
+ * showing a forecast, never over an empty one.
  *
- * The rule this is here to keep is that the dialog lands over a screen already
- * showing a forecast: the difference between being asked about storm warnings
- * for a place you can see the weather for, and being asked for the notification
- * permission by an app that has so far shown you nothing.
- *
- * That used to be a comment rather than a condition. The request fired from the
- * activity as soon as the composition ran, and on a warm cache and a quick
- * network the forecast beat it by a frame or two, so it looked right. Offline it
- * was not: a first run in aeroplane mode put the system dialog over an empty
- * black screen, which is the exact prompt-about-nothing the comment claimed to
- * avoid.
- *
- * Gated on the forecast rather than on a timer, so it is the state that decides.
- *
- * ### Once, and once means once
- *
- * The in-composition flag below only stops it firing twice on one screen; it
- * does not survive the app being closed, so on its own this would ask again on
- * every cold launch until the reader gave in. That is the behaviour of an app
- * that has decided it knows better, and it is worth being precise about why the
- * usual excuse - "Android stops showing it after two refusals" - is not good
- * enough: two is still one more than nobody asked for.
- *
- * So the platform is asked whether the reader has already said no.
- * `shouldShowRequestPermissionRationale` is true exactly once a permission has
- * been refused and not yet refused for good, which is the state this must never
- * ask in. It needs nothing stored and cannot drift out of step with the system's
- * own record:
- *
- * - never asked -> false, and this asks.
- * - refused once -> true, and this stays quiet from then on.
- * - refused for good -> false again, but the system shows nothing and returns a
- *   refusal immediately, so nothing is put in front of anybody.
- *
- * The reader therefore sees this dialog once in the life of the install. If they
- * change their mind, the switch in Settings and the system's own app settings
- * are both still there.
- *
- * There is no callback because there is nothing to do with the answer: a phone
- * that says no simply never gets a warning, and the switch stays on meaning
- * "yes, warn me" for the day the permission is granted somewhere else.
+ * Asked at most once per install: `shouldShowRequestPermissionRationale` is true
+ * exactly when the permission has been refused but not for good, which is when
+ * this stays quiet. A permanent refusal shows nothing anyway. The Settings switch
+ * and the system's app settings remain for a change of mind.
  */
 @Composable
 private fun AskAboutWarningsOnce(hasForecast: Boolean) {
@@ -311,8 +260,8 @@ private fun WeatherScreenBody(
     Column(
         modifier = modifier
             .fillMaxSize()
-            // The screen paints its own ground, because the sky has moved it and
-            // the shell above this was themed before the weather was known.
+            // The screen paints its own ground: the sky has moved it since the shell was
+            // themed.
             .background(WetterTheme.colors.surface)
             .padding(horizontal = spacing.screen)
             .dismissOnOutsideTap(active = explaining != null) { onExplain(null) },
@@ -325,14 +274,12 @@ private fun WeatherScreenBody(
 
         val forecast = state.forecast
         if (forecast == null && !state.loaded) {
-            // The store has not answered yet. Saying anything here would be
-            // guessing, and the guess that used to be made - that there is no
-            // location - was both alarming and usually wrong.
+            // The store has not answered yet; anything said here would be a guess.
             return@Column
         }
         if (forecast == null) {
-            // With no forecast and no error there is simply nowhere selected, so
-            // the useful action is to choose one; with an error, it is to retry.
+            // No forecast and no error means nowhere is selected, so the action is to choose
+            // one; with an error, it is to retry.
             val failed = state.error != null
             val action = if (failed) R.string.action_retry else R.string.state_choose_location
             EmptyState(
@@ -363,10 +310,7 @@ private fun WeatherScreenBody(
             AnimatedContent(
                 targetState = domain,
                 transitionSpec = {
-                    // The pages sit in a row, so moving between them should look
-                    // like moving along that row: pick Week from Today and the
-                    // new page arrives from the right, because it is to the
-                    // right. A cut gives no sense of where you have gone.
+                    // The pages sit in a row, so a page to the right arrives from the right.
                     val forward = targetState.ordinal > initialState.ordinal
                     val enter = slideInHorizontally { width ->
                         if (forward) width else -width
@@ -374,9 +318,9 @@ private fun WeatherScreenBody(
                     val exit = slideOutHorizontally { width ->
                         if (forward) -width else width
                     } + fadeOut()
-                    // Height is not animated: the pages differ a lot in length
-                    // and watching the page below stretch is worse than having
-                    // it settle at once.
+                    // Height is not animated: watching the page below stretch is worse than having
+                    // it
+                    // settle at once.
                     enter togetherWith exit using SizeTransform(clip = false)
                 },
                 label = "domain",
@@ -402,20 +346,10 @@ private fun WeatherScreenBody(
 }
 
 /**
- * What to say when there is nothing to show.
- *
- * Only two of these are the reader's business. Being offline is, because it is
- * their network and they may want to do something about it; having no location
- * yet is, because the app is waiting on them. Everything else is Wetter failing
- * to do its job, and the reader gets one sentence saying so.
- *
- * In particular there is no message for [WeatherError.NoProviderAvailable].
- * There used to be - "No source covers this location", with a detail line naming
- * the services Wetter uses - and it was wrong twice over. Wrong as a fact, since
- * every provider here is global and none of them has ever declined a place on
- * geography. And wrong as a thing to say at all: which supplier let us down is
- * not the reader's problem. They did not buy a forecast from a model in Oslo,
- * they opened Wetter (docs/design-principles.md, rule 8).
+ * What to say when there is nothing to show. Being offline and having no place
+ * yet are the reader's business; anything else is Wetter failing, and gets one
+ * sentence. Which supplier failed is not the reader's problem
+ * (docs/design-principles.md, rule 8).
  */
 private fun emptyTitleFor(error: WeatherError?) = when (error) {
     null -> R.string.state_no_forecast
@@ -505,22 +439,10 @@ private fun EmptyPreview() {
 /**
  * Puts an open panel away when a press lands anywhere it does not own.
  *
- * Only unconsumed presses count, and that is the whole mechanism: the card and
- * the marks beside the dial take their own taps, so a press that is still
- * unclaimed by the time it reaches here is by definition a press on something
- * else. That covers the chart, the switcher, the header and bare background
- * without any of them having to know a panel exists.
- *
- * It watches the *final* pass, after children have taken what is theirs, which
- * is the whole trick. Watching the initial pass sees every press including the
- * ones landing on the card and the marks, so tapping a mark would dismiss the
- * card and then immediately reopen it - the marks would never close. By the
- * final pass a press on anything that handles presses is already consumed.
- *
- * It never consumes anything itself: dismissing must not also swallow the tap a
- * scroll or a button was about to receive.
- *
- * Inert while nothing is open, so the common case adds no gesture handling at all.
+ * Watches the final pass for unconsumed presses: the card and the dial's marks
+ * consume their own, so whatever is left landed somewhere else. Never consumes
+ * anything itself, so the tap still reaches a scroll or a button. Inert while
+ * nothing is open.
  */
 private fun Modifier.dismissOnOutsideTap(active: Boolean, onDismiss: () -> Unit): Modifier =
     if (!active) {

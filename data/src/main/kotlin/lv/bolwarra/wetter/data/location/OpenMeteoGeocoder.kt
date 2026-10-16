@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.location
 
 import io.ktor.client.HttpClient
@@ -16,12 +19,9 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.WeatherFailure
 
 /**
- * What the forecast service says about a bare point: its zone and its height.
- *
- * The gazetteer cannot answer for a coordinate - it matches names - but the
- * forecast endpoint resolves both for any point on the earth, including open
- * ocean. Measured: 56.9496,24.1052 comes back Europe/Riga at 17 m, and
- * 0,-160 comes back Etc/GMT+11 at 0 m.
+ * What the forecast service says about a bare point: its zone and its height. The
+ * gazetteer matches names only; the forecast endpoint resolves any point on earth,
+ * open ocean included.
  */
 @Serializable
 internal data class PointResponse(val timezone: String? = null, val elevation: Double? = null)
@@ -48,17 +48,10 @@ internal data class GeocodedPlace(
 )
 
 /**
- * Finding places by name, through Open-Meteo's gazetteer.
- *
- * Chosen for two reasons beyond being keyless and already attributed here. It
- * returns an **IANA time zone**, which the app needs and cannot safely guess -
- * a forecast's "18:00" means 18:00 *there*, so a wrong zone silently shifts
- * every hour on the timeline. And it returns **elevation**, which the
- * observation layer needs to correct a nearby station's temperature to the
- * height of the place being asked about.
- *
- * A general-purpose geocoder would give coordinates and leave both of those to
- * be inferred.
+ * Finding places by name, through Open-Meteo's gazetteer. It returns an IANA time
+ * zone, which the app cannot safely guess ("18:00" on a forecast means 18:00
+ * there), and an elevation, which the observation layer uses to correct station
+ * temperatures to the place's height.
  */
 internal class OpenMeteoGeocoder(
     private val client: HttpClient,
@@ -69,14 +62,11 @@ internal class OpenMeteoGeocoder(
 
     override suspend fun search(query: String, limit: Int): Result<List<WeatherLocation>> {
         val trimmed = query.trim()
-        // Short of this the service matches half the world, so the request is
-        // not worth making and the empty answer is not worth showing as one.
+        // Shorter queries match half the world, so the request is not worth making.
         if (trimmed.length < PlaceSearch.MINIMUM_QUERY) return Result.success(emptyList())
 
-        // A coordinate pair is answered directly. The gazetteer matches names
-        // and returns nothing at all for one, which is the correct answer to the
-        // wrong question - somebody who typed a point has already told us where
-        // they mean, and asking a place-name service about it can only fail.
+        // A coordinate pair is answered directly: the gazetteer returns nothing for one,
+        // and the point already says where.
         CoordinateQuery.parse(trimmed)?.let { return resolve(it) }
 
         return try {
@@ -96,14 +86,8 @@ internal class OpenMeteoGeocoder(
     }
 
     /**
-     * A typed point, turned into somewhere the app can actually show.
-     *
-     * The zone is fetched rather than assumed, for exactly the reason a
-     * name-matched place with no zone is dropped below: a forecast in the wrong
-     * zone shifts every hour on the timeline while every reading still looks
-     * perfectly plausible. Defaulting to the phone's zone would be wrong for any
-     * point the phone is not standing in, which is most of the reasons to type
-     * one.
+     * A typed point, turned into somewhere the app can show. The zone is fetched, not
+     * assumed: the phone's zone is wrong for any point the phone is not at.
      */
     private suspend fun resolve(point: Coordinates): Result<List<WeatherLocation>> = try {
         val answer: PointResponse = client.get(POINT_URL) {
@@ -120,10 +104,9 @@ internal class OpenMeteoGeocoder(
             } else {
                 listOf(
                     WeatherLocation(
-                        // Named by the point itself. Anything else would be
-                        // invented - the nearest settlement is a different place
-                        // with a different forecast, and saying its name here
-                        // would quietly answer a question nobody asked.
+                        // Named by the point itself: the nearest settlement is a different place
+                        // with a
+                        // different forecast.
                         name = formatPoint(point),
                         latitude = point.latitude,
                         longitude = point.longitude,
@@ -150,12 +133,9 @@ internal class OpenMeteoGeocoder(
     )
 
     /**
-     * Null for a result the app cannot actually use.
-     *
-     * A place with no usable zone is dropped rather than defaulted to the
-     * phone's, because a forecast shown in the wrong zone is wrong in a way
-     * nobody can see: every hour on the timeline is shifted and every reading
-     * still looks perfectly plausible.
+     * Null for a result the app cannot use. A place with no usable zone is dropped
+     * rather than given the phone's: a wrong zone shifts every hour while every
+     * reading still looks plausible.
      */
     private fun GeocodedPlace.toLocation(): WeatherLocation? {
         if (name.isBlank()) return null
@@ -176,7 +156,7 @@ internal class OpenMeteoGeocoder(
     internal companion object {
         const val DEFAULT_BASE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
-        /** Same licence and credit as the forecast service it belongs to. */
+        /** The same licence and credit as the forecast service it belongs to. */
         const val ATTRIBUTION = "Place search by Open-Meteo.com, licensed CC BY 4.0"
 
         /** The service's own ceiling. */

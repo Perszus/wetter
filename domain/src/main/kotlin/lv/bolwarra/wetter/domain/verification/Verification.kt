@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.verification
 
 import java.time.Duration
@@ -9,11 +12,8 @@ import kotlin.math.sqrt
 enum class VerifiedVariable { TEMPERATURE, PRECIPITATION }
 
 /**
- * One prediction, kept so it can be marked later.
- *
- * The point of storing a forecast is that at the time it is made there is no way
- * to know whether it is any good. Only the hour it describes can settle that,
- * and by then the forecast is gone unless something wrote it down.
+ * One prediction, kept so it can be marked once the hour it describes has
+ * passed.
  */
 data class ForecastRecord(
     val id: Long = 0,
@@ -48,28 +48,23 @@ data class SkillScore(
     /** Root mean square error. Larger than the MAE when misses are occasionally big. */
     val rootMeanSquareError: Double,
     /**
-     * Mean signed error. Positive means it runs high.
-     *
-     * The one worth acting on: a bias is a systematic offset that can simply be
-     * subtracted, where scatter cannot.
+     * Mean signed error. Positive means it runs high. The one worth acting on: a
+     * systematic offset can be subtracted, scatter cannot.
      */
     val bias: Double,
 )
 
 /**
- * How a forecast of a yes-or-no event turned out.
- *
- * Precipitation is verified this way because the observations are categorical -
- * a report says light rain, never 0.4 mm - and because it is the honest question
- * anyway. "Did the rain arrive when you said it would" is what somebody is
- * actually relying on.
+ * How a forecast of a yes-or-no event turned out. Precipitation is verified this
+ * way because reports are categorical (light rain, never 0.4 mm), and whether the
+ * rain came when forecast is what people rely on.
  */
 data class ContingencyTable(
     /** Forecast and observed. */
     val hits: Int,
     /** Observed but not forecast. The failure people remember. */
     val misses: Int,
-    /** Forecast but not observed. The failure that makes people stop believing you. */
+    /** Forecast but not observed. The failure that costs belief. */
     val falseAlarms: Int,
     /** Neither forecast nor observed. */
     val correctNegatives: Int,
@@ -91,24 +86,16 @@ data class ContingencyTable(
         get() = (hits + falseAlarms).takeIf { it > 0 }?.let { falseAlarms.toDouble() / it }
 
     /**
-     * Critical success index, which is the single number worth quoting.
-     *
-     * Accuracy is useless here: in a climate where it rains a tenth of the time,
-     * forecasting "dry" for ever scores 90% and is worthless. This ignores the
-     * correct negatives entirely, so a forecast is only credited for the rain it
-     * called - and is charged for both kinds of mistake.
+     * Critical success index, the single number worth quoting. It ignores correct
+     * negatives, so forecasting "dry" forever in a mostly dry climate scores nothing.
      */
     val criticalSuccessIndex: Double?
         get() = (hits + misses + falseAlarms).takeIf { it > 0 }?.let { hits.toDouble() / it }
 }
 
 /**
- * Scoring what was predicted against what happened.
- *
- * This is the piece that turns the app from a thing with opinions into a thing
- * that can find out whether its opinions were right. Nothing here decides
- * anything on its own - it produces the numbers that [BiasCorrection] and, in
- * time, the source weighting are derived from.
+ * Scoring what was predicted against what happened: the numbers [BiasCorrection]
+ * is derived from.
  */
 object Verification {
 
@@ -116,10 +103,8 @@ object Verification {
     const val WET_MM = 0.1
 
     /**
-     * Score one source on one variable.
-     *
-     * Unverified records are ignored rather than counted as successes, which is
-     * the difference between "we were right" and "we have not checked".
+     * Score one source on one variable. Unverified records are ignored, not counted
+     * as successes.
      */
     fun score(
         records: List<ForecastRecord>,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.ui.unit.dp
@@ -6,17 +9,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * The chart's horizontal scale, which is the one thing about it that must never
- * move.
- *
- * The vertical scale has its own rule and its own reasons — height is intensity,
- * fixed, so a shape means the same thing every morning. Width is now exactly the
- * same argument turned on its side. A chart that fitted its content to the
- * screen would draw an hour at one width today and another tomorrow, and the
- * reader would have to re-measure it before they could read it.
- *
- * So: pixels per hour is set by the window and by nothing else, and the track
- * grows to fit rather than the content shrinking to fit.
+ * The chart's horizontal scale, which must never move: pixels per hour is set by
+ * the window alone, and the track grows to fit rather than the content shrinking,
+ * so an hour is the same width every day.
  */
 class RainCurveTest {
 

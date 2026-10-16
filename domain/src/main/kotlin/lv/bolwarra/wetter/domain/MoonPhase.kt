@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import java.time.Duration
@@ -6,21 +9,12 @@ import kotlin.math.PI
 import kotlin.math.cos
 
 /**
- * Where the moon is in its cycle.
+ * Where the moon is in its cycle, computed from the date alone, as sunrise is
+ * ([SolarTime]).
  *
- * Computed, not fetched, for the same reason sunrise is ([SolarTime]): it is a
- * function of the date alone, so asking a weather service for it would mean a
- * network round trip, an API key somewhere, and a value that goes missing when
- * the network does - for a number that a few lines of arithmetic settle exactly.
- *
- * ### The accuracy this does and does not have
- *
- * This uses the mean synodic month. The real one varies by up to about six hours
- * either side, because the moon's orbit is elliptical and the sun tugs on it, so
- * the phase here can be out by roughly half a day at worst and the illumination
- * by a couple of percent. That is invisible in a phase name and irrelevant in a
- * percentage rounded to whole numbers, which is all this feeds. It would not be
- * good enough to predict an eclipse, and nothing here should start trying.
+ * The mean synodic month is used, so the phase can be out by about half a day and
+ * the illumination by a couple of percent: invisible in a phase name or a whole
+ * percentage.
  */
 object MoonPhase {
 
@@ -53,11 +47,8 @@ object MoonPhase {
     fun illuminationAt(instant: Instant): Double = (1.0 - cos(2.0 * PI * fractionAt(instant))) / 2.0
 
     /**
-     * The name for the phase.
-     *
-     * Eight equal bins centred on the named points, so "full" covers the day or
-     * so either side that anybody would call full rather than a single instant
-     * nobody would ever see.
+     * The name for the phase: eight equal bins centred on the named points, so "full"
+     * covers the day or so either side.
      */
     fun nameAt(instant: Instant): MoonPhaseName {
         val eighths = ((fractionAt(instant) * BINS) + 0.5).toInt() % BINS
@@ -68,13 +59,9 @@ object MoonPhase {
 }
 
 /**
- * Ordered from new through full and back, one eighth of the cycle each.
- *
- * The constant names keep the astronomical vocabulary because that is what the
- * cycle positions are called, but what is *shown* describes the shape in the
- * sky. "Last quarter" tells you where the moon is in its orbit and nothing about
- * what you would see if you looked up - and it is a half moon, which is the one
- * thing the phrase does not say.
+ * Ordered from new through full and back, one eighth of the cycle each. The
+ * constants keep the astronomical names; what is shown describes the shape in the
+ * sky.
  */
 enum class MoonPhaseName {
     NEW,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Duration
@@ -109,9 +112,8 @@ class UmbrellaDayTest {
 
     @Test
     fun `rain that finished this morning still counts for the rest of the day`() {
-        // The behaviour this replaced: the mark used to run from now, so by noon
-        // a wet morning had vanished from it. Whoever took a coat at six was
-        // right, and the app should not later imply they were not.
+        // The mark covers the whole day, so a wet morning still counts at noon: whoever
+        // took a coat at six was right.
         assertTrue(UmbrellaDay.isUmbrellaDay(wetMorning, emptyList(), at(14)))
         assertTrue(UmbrellaDay.isUmbrellaDay(wetMorning, emptyList(), at(23)))
     }

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.foundation.Canvas
@@ -25,43 +28,16 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * One day's sky, as a mark rather than a picture.
+ * One day's sky, as a mark rather than a picture: small, quiet, at the weight of
+ * the type beside it (docs/design-principles.md rules out illustrations).
  *
- * docs/design-principles.md rules out weather illustrations and oversized icons,
- * and that rules out the obvious answer — a set of drawn scenes with rays and
- * highlights, which is what most weather apps put here. What is wanted instead
- * is the same thing the rest of this app draws: an instrument mark, small,
- * quiet, at the weight of the type beside it.
+ * Drawn from the theme's own colours rather than shipped as drawables, so no
+ * theme can be missing a variant. The cloud is a union of filled shapes, which
+ * merge without a seam; what falls from it is stroked. The sky is drawn in ink
+ * and only what is falling takes the precipitation colour, so down a column of
+ * days the blue marks are the wet ones.
  *
- * ### Drawn, not shipped
- *
- * Fourteen conditions is fourteen vector drawables to keep in step with the
- * palette, or one file that draws them from the theme's own colours. Drawn also
- * means they cannot fall out of step across themes: there is no light-mode asset
- * to forget to make a dark-mode twin of.
- *
- * ### Filled cloud, stroked weather
- *
- * The cloud is a union of filled shapes — a slab with three discs sitting on it
- * — because filled shapes merge without a seam. A stroked outline of the same
- * cloud has to be one continuous path through three circle intersections, and
- * every attempt at it either shows the joins or needs the intersection points
- * solved for at four sizes. What falls out of the cloud is stroked, so the
- * glyph has the same mix of weights as the rest of the app.
- *
- * ### One saturated hue, still
- *
- * The sky is drawn in ink and only what is *falling* takes the precipitation
- * colour. That is the palette rule, and here it does a second job: down a column
- * of seven days, the blue marks are the wet ones and nothing else competes for
- * the eye. A yellow sun would have made a clear week the loudest thing on the
- * page.
- *
- * ### The sky after dark
- *
- * [isDay] swaps the sun for a crescent wherever the sky is drawn. A day in the
- * week is a day and keeps the sun; an hour at eleven at night with a sun on it
- * is simply wrong, and the hour strip and the widgets both show hours.
+ * [isDay] swaps the sun for a crescent, for the hour strip and the widgets.
  */
 @Composable
 fun ConditionGlyph(
@@ -82,16 +58,12 @@ fun ConditionGlyph(
 }
 
 /**
- * The set, mapped.
+ * The set, mapped. Grouped rather than one-to-one: what must stay
+ * distinguishable is what changes a decision (whether anything falls, whether it
+ * is frozen, whether it is violent), and the freezing pair keep a mark of their
+ * own.
  *
- * Grouped rather than one-to-one: sixteen conditions do not need sixteen
- * drawings, and two marks a reader cannot tell apart are worse than one mark
- * used twice. What must stay distinguishable is what changes a decision —
- * whether anything falls, whether it is frozen, whether it is violent — and the
- * freezing pair keep a mark of their own because ice underfoot is the one thing
- * on this list that a coat does not solve.
- *
- * Internal so the widgets draw the very same marks into their pictures.
+ * Internal so the widgets draw the same marks into their pictures.
  */
 internal fun DrawScope.drawCondition(
     condition: WeatherCondition,
@@ -104,9 +76,8 @@ internal fun DrawScope.drawCondition(
         if (isDay) sun(centre, radius, ink) else moon(centre, radius, ink)
 
     val s = size.minDimension
-    // Everything below is written against a square, then centred in whatever box
-    // it was given. Two glyphs in a column must sit on the same baseline however
-    // wide their row is.
+    // Drawn against a square, centred in whatever box it was given, so glyphs in a
+    // column share a baseline.
     translate(left = (size.width - s) / 2f, top = (size.height - s) / 2f) {
         when (condition) {
             WeatherCondition.CLEAR ->
@@ -125,17 +96,14 @@ internal fun DrawScope.drawCondition(
             WeatherCondition.OVERCAST ->
                 cloud(s * 0.5f, s * 0.68f, s * 0.78f, ink)
 
-            // Not a cloud with rain missing: fog is the one condition you are
-            // standing inside, so it is drawn as bands across the whole glyph
-            // with the sky only suggested above them.
+            // Fog is the condition you stand inside, so it is drawn as bands across the
+            // whole glyph.
             WeatherCondition.FOG -> {
                 cloud(s * 0.5f, s * 0.48f, s * 0.66f, ink)
                 bands(s, ink)
             }
 
-            // Droplets, not short streaks. See [droplets]: this and RAIN were
-            // the same drawing at two lengths, which is not a difference at the
-            // size a week row gives a glyph.
+            // Droplets, not short streaks: see [droplets].
             WeatherCondition.DRIZZLE -> {
                 cloud(s * 0.5f, s * 0.56f, s * 0.72f, ink)
                 droplets(s, at = spread(3), colour = wet)
@@ -149,8 +117,7 @@ internal fun DrawScope.drawCondition(
             WeatherCondition.FREEZING_DRIZZLE, WeatherCondition.FREEZING_RAIN -> {
                 cloud(s * 0.5f, s * 0.50f, s * 0.72f, ink)
                 drops(s, count = 3, length = s * 0.16f, colour = wet)
-                // The ground the rain freezes onto. Without it this is rain, and
-                // the difference between the two is the whole warning.
+                // The ground the rain freezes onto: without it this is rain.
                 ground(s, ink)
             }
 
@@ -165,8 +132,7 @@ internal fun DrawScope.drawCondition(
                 flakes(s, at = floatArrayOf(0.24f, 0.5f, 0.76f), colour = wet)
             }
 
-            // Grains are the small dry pellets, so: the shape of snow at a
-            // fraction of the size, which is what they are.
+            // Grains: the shape of snow at a fraction of the size.
             WeatherCondition.SNOW_GRAINS -> {
                 cloud(s * 0.5f, s * 0.56f, s * 0.72f, ink)
                 grains(s, at = floatArrayOf(0.26f, 0.5f, 0.74f), colour = wet)
@@ -195,8 +161,8 @@ internal fun DrawScope.drawCondition(
                 grains(s, at = floatArrayOf(0.22f, 0.78f), colour = wet)
             }
 
-            // The same dash the week uses for a dry day. A guessed picture would
-            // be the app pretending to know something it was not told.
+            // The same dash the week uses for a dry day: a guessed picture would claim
+            // knowledge the app was not given.
             WeatherCondition.UNKNOWN -> drawLine(
                 color = ink,
                 start = Offset(s * 0.32f, s * 0.5f),
@@ -209,11 +175,8 @@ internal fun DrawScope.drawCondition(
 }
 
 /**
- * A slab with three discs on it.
- *
- * [baseY] is the flat underside, which is what the falling marks hang from and
- * what makes two clouds of different widths look like they are at the same
- * height.
+ * A slab with three discs on it. [baseY] is the flat underside the falling marks
+ * hang from, so clouds of different widths sit at the same height.
  */
 private fun DrawScope.cloud(centreX: Float, baseY: Float, width: Float, colour: Color) {
     val body = width * 0.30f
@@ -226,8 +189,7 @@ private fun DrawScope.cloud(centreX: Float, baseY: Float, width: Float, colour: 
         size = Size(width, body),
         cornerRadius = CornerRadius(body / 2f),
     )
-    // Off-centre on purpose: a cloud with its big bump exactly in the middle
-    // reads as a symbol of a cloud, and every real one is lopsided.
+    // Off-centre: a cloud with its big bump in the middle reads as a symbol.
     drawCircle(colour, width * 0.24f, Offset(left + width * 0.26f, slabTop + body * 0.35f))
     drawCircle(colour, width * 0.30f, Offset(left + width * 0.52f, slabTop + body * 0.10f))
     drawCircle(colour, width * 0.20f, Offset(left + width * 0.80f, slabTop + body * 0.40f))
@@ -254,11 +216,8 @@ private fun DrawScope.sun(centre: Offset, radius: Float, colour: Color) {
 }
 
 /**
- * The night's stand-in for [sun]: a crescent, the disc with a bite out of it.
- *
- * Larger than the sun's disc because it has no rays - the rays are what give
- * the sun its size, and a bare disc at the same radius reads as a smaller,
- * lesser thing. At this scale the crescent sits in the same footprint.
+ * The night's stand-in for [sun]: a crescent. Larger than the sun's disc, since
+ * the sun's rays give it its size.
  */
 private fun DrawScope.moon(centre: Offset, radius: Float, colour: Color) {
     val outer = radius * MOON_SCALE
@@ -275,11 +234,8 @@ private fun DrawScope.moon(centre: Offset, radius: Float, colour: Color) {
 }
 
 /**
- * Rain, as strokes leaning the way rain leans.
- *
- * [at] gives the positions across the glyph when the default spread is wrong for
- * a particular sky — a shower's cloud sits off to one side, and its rain has to
- * fall out of that cloud rather than out of the middle of the box.
+ * Rain, as strokes leaning the way rain leans. [at] places them under a cloud
+ * that sits off to one side, such as a shower's.
  */
 private fun DrawScope.drops(
     s: Float,
@@ -301,27 +257,10 @@ private fun DrawScope.drops(
 }
 
 /**
- * Drizzle, as suspended droplets rather than falling streaks.
- *
- * This and rain used to be one drawing at two lengths - the same cloud, the same
- * three marks in the same places, one set half as long as the other. Side by
- * side the difference is visible; alone in a week row at a couple of dozen
- * device-independent pixels it is not, and a reader seeing a cloud with marks
- * under it reads rain.
- *
- * That was reported from use, and it mattered more than a drawing usually would:
- * the app had just been taught to reserve the *word* rain for rain worth naming,
- * so the bar would say rain starts on Wednesday while Sunday's drizzle still
- * looked like rain. The vocabulary was right and the picture was not.
- *
- * Round marks rather than long ones, because the difference is then one of kind
- * and survives being small. It is also what drizzle is: droplets fine enough to
- * hang in the air rather than fall through it. The same distinction the snow
- * pair already makes, where grains are dots and snow is crystals - this only
- * brings the rain pair up to it.
- *
- * Slightly larger than a snow grain, and set a little higher, so a drizzle glyph
- * is not mistaken for a snow-grain one either.
+ * Drizzle, as suspended droplets rather than falling streaks: shorter strokes do
+ * not read as anything but rain at week-row size, while a difference in kind
+ * survives being small. Slightly larger than a snow grain and set higher, so the
+ * two are not confused.
  */
 private fun DrawScope.droplets(s: Float, at: FloatArray, colour: Color) {
     at.forEach { x ->
@@ -404,8 +343,8 @@ private fun spread(count: Int): FloatArray = when (count) {
 }
 
 /**
- * Stroke weight as a fraction of the glyph, so it is the same optical weight at
- * every size it is drawn at. A fixed dp would make a large one look spindly.
+ * Stroke weight as a fraction of the glyph, so the optical weight is the same at
+ * every size.
  */
 private const val STROKE = 0.075f
 
@@ -420,10 +359,8 @@ private const val MOON_BITE_SIZE = 0.82f
 val GLYPH = 22.dp
 
 /**
- * A folded map: three panels, alternately tilted, in one stroke.
- *
- * Drawn rather than taken from an icon set, for the reason every other mark in
- * the app is - it is drawn at the weight and in the ink of the text beside it.
+ * A folded map: three panels, alternately tilted, in one stroke, at the weight
+ * and in the ink of the text beside it.
  */
 fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFoldedMap(ink: Color) {
     val w = size.width

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     // The fake provider is needed by this module's tests and by :data's. A

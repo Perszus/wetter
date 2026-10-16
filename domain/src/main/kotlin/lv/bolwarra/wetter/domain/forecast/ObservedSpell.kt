@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Duration
@@ -10,33 +13,12 @@ import lv.bolwarra.wetter.domain.nextPrecipitation
 import lv.bolwarra.wetter.domain.precipitationAt
 
 /**
- * When it next rains, read from the same timeline the chart draws.
+ * When it next rains, read from the same fused timeline the chart draws, so the
+ * sentence cannot disagree with the curve above it. That puts radar evidence
+ * behind the words too (docs/design-principles.md, rule 7), and ten-minute steps
+ * catch a short shower an hourly average would hide.
  *
- * The screen said two different things at once. The curve is drawn from the
- * fused timeline - radar-led, ten minutes to a step - and showed rain arriving
- * at one o'clock. The line beneath it was computed from the provider's hourly
- * rows and said three, because that is where the *model* first crosses the trace
- * threshold. Both were faithfully reporting their own source, and the reader had
- * a chart disagreeing with the sentence directly under it and no way to tell
- * which to believe.
- *
- * Two things caused it and both had to go.
- *
- * **Different evidence.** The chart had moved to radar and the sentence had not.
- * Most evidence, least speculation (docs/design-principles.md, rule 7) applies
- * to the words as much as to the picture: where the two disagree about the next
- * few hours, the one that looked wins.
- *
- * **Different resolution.** Even fed identical data these two disagree, because
- * an hourly average and a ten-minute sample are not the same measurement. A
- * sharp twenty-minute shower is a third of a millimetre spread across its hour -
- * under the threshold, invisible to an hourly scan, and plainly there on a
- * ten-minute curve. Reading both from one series removes that too.
- *
- * The model still answers beyond the timeline's horizon, which is a day out.
- * Radar has nothing to say about the day after tomorrow and the hourly rows run
- * for days, so past the end of the fused series the provider's own spells are
- * the only evidence there is.
+ * Past the timeline's day, the provider's own hourly spells answer.
  */
 object ObservedSpell {
 
@@ -108,13 +90,8 @@ object ObservedSpell {
     }
 
     /**
-     * Wet enough to put into a sentence.
-     *
-     * This is the bar for the words - "Rain starts at 21:00" - and it is higher
-     * than the bar for the curve on purpose. See
-     * [PrecipitationIntensity.isWorthNaming]: an hour in the trace band is
-     * actually raining about half the time, so a sentence built on it is a coin
-     * flip stated as a fact.
+     * Wet enough to put into a sentence: higher than the curve's bar, see
+     * [PrecipitationIntensity.isWorthNaming].
      */
     private val FusedPrecipitation.isWet: Boolean
         get() = PrecipitationIntensity.ofRate(millimetresPerHour).isWorthNaming

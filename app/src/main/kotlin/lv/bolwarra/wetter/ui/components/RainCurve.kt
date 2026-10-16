@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.foundation.Canvas
@@ -53,44 +56,16 @@ import lv.bolwarra.wetter.ui.theme.Emphasis
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * The precipitation curve: how hard it will be raining over the next few hours,
- * scrubbable to read off any moment of it.
+ * The precipitation curve: how hard it will be raining over the coming hours,
+ * scrubbable to read off any moment.
  *
- * The one place in this app where `Canvas` is the right answer, and it is
- * confined here rather than becoming the foundation everything else is drawn on.
+ * It plots a rate (mm/h) at instants, which is legitimate to interpolate; values
+ * between real samples carry a `≈`. The monotone spline cannot overshoot, so it
+ * never draws rain nobody forecast ([MonotoneCurve]).
  *
- * ### It is a rate curve, and that is what makes the fine reading honest
- *
- * A provider reports millimetres accumulated across an hour. Reading a value off
- * a smooth line through those totals and calling it "the rain at 01:20" would be
- * inventing a measurement. Reading it as a *rate* — millimetres per hour, at
- * that moment — is a legitimate thing to interpolate, which is why the readout
- * is `mm/h` and why the curve is plotted at instants rather than as blocks
- * sitting over intervals.
- *
- * Points between the forecast's own samples are still interpolated, so they wear
- * a `≈`. The monotone spline guarantees such a point lies between the two real
- * samples either side of it, so the mark is a statement about provenance rather
- * than a warning about the number.
- *
- * ### The curve cannot overshoot
- *
- * Ordinary smoothing dips below zero approaching a shower and bulges above the
- * peak inside it, drawing rainfall nobody forecast. See [MonotoneCurve].
- *
- * ### It holds more than it shows
- *
- * [span] is what the chart contains and [window] is what fits on the screen at
- * once; the rest is pushed into view sideways. Those being two different things
- * is the whole design. A day drawn across a phone gives each hour a fingertip of
- * width, which flattens the next two hours — the part anybody is going to act on
- * — into a smear; a day drawn at the six-hour scale keeps every hour the size it
- * was and simply runs off the edge, where it can be fetched by a thumb.
- *
- * So the scale is fixed in both directions now. Height is intensity and never
- * adapts; width is pixels per hour and never adapts either. The chart opens at
- * the left edge, which is now, and that is the only position it is ever put into
- * on the reader's behalf.
+ * [span] is what the chart holds and [window] is what fits on screen; the rest
+ * scrolls sideways. Both scales are fixed: height is intensity and width is pixels
+ * per hour, so the next two hours are never squeezed to fit a day.
  */
 @Composable
 fun RainCurve(
@@ -98,13 +73,12 @@ fun RainCurve(
     zone: ZoneId,
     from: Instant,
     span: Duration,
-    /** How much of [span] is on screen at once. The rest is scrolled to. */
+    /** How much of [span] is on screen at once; the rest is scrolled to. */
     window: Duration,
     modifier: Modifier = Modifier,
     /**
      * The fused radar-and-model timeline, when there is one. It supersedes the
-     * hourly rows entirely: it already carries them, blended with whatever the
-     * radar could add, at the ten-minute spacing this chart draws at.
+     * hourly rows, which it already includes.
      */
     fused: List<FusedPrecipitation> = emptyList(),
 ) {
@@ -120,10 +94,7 @@ fun RainCurve(
                 CurvePoint(
                     at = it.at,
                     millimetresPerHour = it.millimetresPerHour.toFloat().coerceAtLeast(0f),
-                    // Here the mark means "modelled rather than observed", which
-                    // is a more useful thing for it to say than "between two
-                    // samples": within radar range the near hours are read off
-                    // rain that exists, and past that they are a prediction.
+                    // Here `≈` means modelled rather than observed by radar.
                     interpolated = it.radarShare < RADAR_BACKED,
                 )
             }.smoothed()
@@ -135,17 +106,14 @@ fun RainCurve(
     if (points.size < 2) return
 
     var scrubbed by remember { mutableStateOf<Int?>(null) }
-    // Deliberately not keyed on anything. The window rolls forward by the minute
-    // and the points are rebuilt with it, and a scroll position that reset every
-    // time that happened would drag the reader back to now once a minute while
-    // they were looking at tonight.
+    // Not keyed on anything: the points rebuild every minute, and the reader's
+    // scroll position must survive that.
     val scroll = rememberScrollState()
 
     val axisStyle = WetterTheme.type.axis.copy(color = colors.textTertiary)
 
-    // Resolved here rather than in the draw scope, which has no way to reach a
-    // string resource. The chart speaks in three levels; each entry is the
-    // bottom of its band, so light's is the floor and needs no rule of its own.
+    // Resolved here because the draw scope cannot reach string resources. Each entry
+    // is the bottom of its band.
     val guides = listOf(
         0f to stringResource(PrecipitationIntensity.LIGHT.labelRes()),
         heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat()) to
@@ -155,8 +123,6 @@ fun RainCurve(
     )
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        // Held in a local because the scope it comes from is out of reach from
-        // inside a draw lambda three receivers down.
         val viewport = maxWidth
         val track = trackWidth(
             viewport = viewport,
@@ -164,36 +130,18 @@ fun RainCurve(
             window = window,
         )
 
-        // Everything that is measured in hours travels together. The track, the
-        // rule and the axis are all as wide as the whole day and are scrolled as
-        // one, so a tick can never drift away from the point it labels.
+        // The track, rule and axis span the whole day and scroll as one, so a tick
+        // never drifts from the point it labels.
         Column(Modifier.horizontalScroll(scroll).width(track)) {
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(TRACK_HEIGHT)
-                    // Keyed on the count rather than on the series. The series
-                    // is rebuilt every minute as the window rolls, and keying on
-                    // it would tear down a gesture in progress - which mattered
-                    // little when a reading was a tap and matters now that it is
-                    // a hold somebody has waited half a second for. The count is
-                    // all this block uses, so a stale list cannot mislead it.
+                    // Keyed on the count, not the series: the series rebuilds every minute and a
+                    // hold in progress must survive it.
                     .pointerInput(points.size) {
-                        // Hold to read, drag to travel.
-                        //
-                        // A horizontal drag can only mean one thing, and now it
-                        // means moving through the day - so reading a value had
-                        // to move off the gesture it used to share. Holding
-                        // still is the only input left that a scroller ignores,
-                        // and it is the right one anyway: taking a reading is a
-                        // deliberate act, and travelling is not.
-                        //
-                        // What is lost is the tap that used to flash a value
-                        // instantly. What is kept is the reading itself, which
-                        // still follows a finger once it has been claimed - and
-                        // the vertical page scroll, which never had to be
-                        // negotiated for, because this gesture starts from
-                        // stillness rather than from a direction.
+                        // Hold to read, drag to travel. A drag scrolls the day, so reading a value
+                        // starts from a long press, which a scroller ignores.
                         detectDragGesturesAfterLongPress(
                             onDragStart = { scrubbed = indexAt(it.x, size.width, points.size) },
                             onDragEnd = { scrubbed = null },
@@ -208,10 +156,7 @@ fun RainCurve(
                 Canvas(Modifier.fillMaxWidth().height(TRACK_HEIGHT)) {
                     drawIntensityRules(guides, colors.gridline)
                     drawDayBreaks(points, zone, colors.gridline)
-                    // Read here rather than in composition on purpose: the
-                    // labels are the one thing on this canvas that moves with
-                    // the scroll, and taking the offset inside the draw means
-                    // dragging the chart redraws it instead of rebuilding it.
+                    // Read inside the draw, so scrolling redraws the labels instead of recomposing.
                     drawIntensityLabels(
                         guides = guides,
                         measurer = measurer,
@@ -259,20 +204,8 @@ fun RainCurve(
             }
         }
 
-        // Inside the track, not above it.
-        //
-        // This used to be its own 24 dp row with an 8 dp spacer under it,
-        // held blank so the layout would not jump when a finger landed. Held
-        // blank is exactly the problem: 32 dp of nothing sat directly on top
-        // of the chart with no rule between, so it read as part of the heavy
-        // lane and made heavy look 1.65 times the height of the other two
-        // when all three are equal thirds.
-        //
-        // Overlaid, it costs no height at all and still cannot make the
-        // layout jump. It sits in the top of the heavy lane, which is the
-        // one part of the chart that is empty in almost every forecast -
-        // and necessarily empty in any forecast light enough to be worth
-        // scrubbing for a number.
+        // Overlaid in the top of the heavy lane, which is empty in almost every forecast,
+        // so it costs no height and the layout never jumps.
         Readout(
             point = scrubbed?.let(points::getOrNull),
             zone = zone,
@@ -282,17 +215,8 @@ fun RainCurve(
 }
 
 /**
- * How wide the whole chart is, given how much of it fits on screen.
- *
- * Pixels per hour is set by the window and then held: the track is as wide as
- * the data it has to carry at that scale, which is four screens for a day at six
- * hours a screen. Deriving it from what the series actually covers rather than
- * from the nominal span is what keeps the scale honest when a provider stops
- * short - eighteen hours of forecast then occupies three screens rather than
- * being stretched across four and quietly redrawn at a different resolution.
- *
- * Never narrower than the screen, so a short series is a full chart with nothing
- * to scroll rather than a chart with a gap beside it.
+ * How wide the whole chart is: the scale set by the window, times what the
+ * series actually covers, and never narrower than the screen.
  */
 internal fun trackWidth(viewport: Dp, covered: Duration, window: Duration): Dp {
     if (window.isZero || window.isNegative) return viewport
@@ -301,31 +225,15 @@ internal fun trackWidth(viewport: Dp, covered: Duration, window: Duration): Dp {
 }
 
 /**
- * The stretch actually being asked about.
- *
- * The spline is fitted over whole hours because that is what it has to fit; the
- * window shown is then cut out of it. Cutting first would fit the curve to a
- * truncated first hour and bend its left end.
- *
- * The cut lands on the existing ten-minute grid rather than exactly on [from],
- * which keeps the half-hour rules underneath on the half hour. Ten minutes of
- * slack at the left edge is the price, against the hour it replaces.
+ * The window cut out of the spline after fitting, on the existing ten-minute
+ * grid so the half-hour rules stay on the half hour.
  */
 private fun List<CurvePoint>.clipTo(from: Instant, to: Instant): List<CurvePoint> =
     filter { !it.at.isBefore(from) && !it.at.isAfter(to) }
 
 /**
- * Rounds the corners off a series that is already at its final spacing.
- *
- * The hourly path gets its smoothness from [resample], which walks a spline
- * between the forecast's own samples. The fused timeline arrives already spaced
- * at ten minutes and so skipped that entirely - and was then drawn as straight
- * segments between those points, which put a visible corner at every one of
- * them. Rain does not start and stop on a corner, and a chart that says it does
- * reads as a series of cuts rather than as weather.
- *
- * Same monotone spline as the hourly path, so it still cannot overshoot below
- * zero approaching a shower or bulge above the peak inside one.
+ * Rounds the corners of an already-spaced series with the same monotone spline,
+ * so the fused timeline is drawn as a curve rather than a polyline.
  */
 private fun List<CurvePoint>.smoothed(): List<CurvePoint> {
     if (size < 2) return this
@@ -358,11 +266,8 @@ private data class CurvePoint(
 )
 
 /**
- * Fills in the gaps between the forecast's samples at [STEP_MINUTES].
- *
- * The spline is already continuous; this walks it at a fixed step so the chart
- * has something to scrub to and so the drawn line is dense enough to read as a
- * curve rather than a set of joined corners.
+ * Walks the spline between the forecast's samples at [STEP_MINUTES], so there is
+ * something to scrub to and the line reads as a curve.
  */
 private fun resample(hours: List<HourlyWeather>): List<CurvePoint> {
     val values = hours.map { (it.precipitation ?: 0.0).toFloat().coerceAtLeast(0f) }
@@ -376,8 +281,7 @@ private fun resample(hours: List<HourlyWeather>): List<CurvePoint> {
             val t = step.toFloat() / perInterval
             points += CurvePoint(
                 at = hours[i].timestamp.plusSeconds(sourceStep.seconds * step / perInterval),
-                // Clamped at zero: the spline cannot overshoot, but floating point
-                // can still land a hair below it.
+                // Clamped at zero against floating-point undershoot.
                 millimetresPerHour = MonotoneCurve.valueAt(values, tangents, i, t)
                     .coerceAtLeast(0f),
                 interpolated = step != 0,
@@ -389,11 +293,8 @@ private fun resample(hours: List<HourlyWeather>): List<CurvePoint> {
 }
 
 /**
- * The value under the finger, or the scale when nothing is being pointed at.
- *
- * A fixed row rather than a floating tooltip: a bubble over the curve covers the
- * thing being read, and its arrival and departure are two more animations to get
- * wrong.
+ * The value under the finger, or the scale when nothing is pointed at: a fixed
+ * row, so nothing covers the curve being read.
  */
 @Composable
 private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modifier) {
@@ -404,13 +305,11 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
         modifier.fillMaxWidth().height(READOUT_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Blank while nothing is selected, rather than absent: the row holds its
-        // height so the layout does not jump the moment a finger lands.
+        // Blank but present while nothing is selected, so the layout holds its height.
         if (point == null) return@Row
 
         Text(
-            // The time, and what it will actually feel like. The word is the
-            // part anybody can act on.
+            // The time, and the word for what it will feel like.
             text = stringResource(
                 R.string.curve_reading,
                 clockOf(point.at, zone),
@@ -421,9 +320,7 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
         )
         Spacer(Modifier.weight(1f))
         Text(
-            // A tilde on anything between the forecast's own samples. The spline
-            // guarantees it sits between the two real values either side, so this
-            // marks where the number came from rather than warning about it.
+            // A tilde on values between the forecast's own samples.
             text = stringResource(
                 if (point.interpolated) R.string.curve_rate_about else R.string.curve_rate,
                 formatMillimetres(point.millimetresPerHour.toDouble(), units.precipitation),
@@ -436,69 +333,23 @@ private fun Readout(point: CurvePoint?, zone: ZoneId, modifier: Modifier = Modif
 }
 
 /**
- * The time axis: a label on the hour, a tick on the half hour.
- *
- * Eleven labels reading "1:30" do not fit across a phone - they collided at both
- * ends, and clamping the outermost ones inside the bounds only pushed them into
- * their neighbours. A tick carries the half hour perfectly well: its position is
- * the information, and the hour either side of it says what it is.
- */
-/**
- * The line's colour, deepening as it climbs into heavier rain.
- *
- * A vertical gradient rather than a path cut into coloured segments, and that
- * falls out of what the chart already is: height *is* intensity here, so a
- * colour that varies with height varies with intensity by construction. Cutting
- * the path at each threshold would do the same job with hard joins, an
- * off-by-one at every boundary, and a seam wherever the line grazes a level
- * without settling in it.
- *
- * It runs in ink, from the tone of a quiet label up to the tone of a headline.
- * It used to run through the precipitation blue, which was the obvious choice and
- * the wrong one: the one saturated hue in this app means *rain is falling*, and a
- * chart of when it might is a different statement. On a true-grayscale plate the
- * line was also the only coloured thing on the page that was not a weather mark,
- * which made it read as a highlight rather than as a reading.
- *
- * The blue is not gone from the app, only from here. It belongs to the condition
- * glyphs, where it marks what is actually falling.
- *
- * Stops are given as one minus the height, because a vertical gradient measures
- * from the top of the canvas downwards while intensity is measured up from the
- * floor.
- *
- * ### Why the steps are hard
- *
- * The first version ramped smoothly from one tone to the other, on the reasoning
- * that a blend has no off-by-one at a boundary and no seam where the line grazes
- * a level without settling in it. Measured on a real curve it ran from
- * rgb(21,129,185) at the peak to rgb(110,178,214) at the floor - a real
- * difference, and an invisible one: with the change spread over the whole track
- * there is nothing to notice at the moment it matters, and the line reads as one
- * blue that happens to be paler at the bottom.
- *
- * So each band now holds one flat tone and changes at its edge, which is the
- * only place the change carries any information. A stroke takes its colour from
- * where its pixels are, so a line climbing through a boundary changes colour
- * exactly where it crosses - the part in moderate is the moderate tone, and the
- * part below it is not.
- *
- * The seam that worried the first version is real and turns out to be the point:
- * a line grazing a level should show it.
+ * The line's colour, deepening as it climbs into heavier rain: a vertical gradient
+ * with a hard step at each band edge, so a line crossing a boundary changes tone
+ * exactly there. It runs in ink rather than the rain colour, which is reserved for
+ * precipitation that is actually falling.
  */
 private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
     fun step(mix: Float) = lerp(muted, full, mix)
 
-    // Gradient space runs down from the top, so a band's ceiling in intensity is
-    // its lower bound here.
+    // Gradient space runs down from the top, so a band's ceiling is its lower stop here.
     val heavyEdge = 1f - heightFraction(PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat())
     val moderateEdge = 1f - heightFraction(PrecipitationIntensity.MODERATE_MM_PER_HOUR.toFloat())
 
     return Brush.verticalGradient(
         0f to step(HEAVY_MIX),
         heavyEdge to step(HEAVY_MIX),
-        // A hair further down, because stops have to keep increasing and two at
-        // the same offset are not guaranteed to be drawn as an edge.
+        // A hair apart: stops must increase, and equal offsets are not guaranteed to draw as an
+        // edge.
         (heavyEdge + SEAM) to step(MODERATE_MIX),
         moderateEdge to step(MODERATE_MIX),
         (moderateEdge + SEAM) to step(LIGHT_MIX),
@@ -512,43 +363,21 @@ private fun DrawScope.intensityBrush(muted: Color, full: Color): Brush {
 private const val SEAM = 0.001f
 
 /**
- * How far along the ramp each level sits.
- *
- * The bottom sits a touch above the palette's light-precipitation tone rather
- * than on it. That colour was chosen to fill an area and, drawn as a two-point
- * line, is thin enough to lose - but only just, so the correction needed is
- * small. An earlier attempt lifted it a third of the way toward the loud colour,
- * which was over-corrected: light rain came out a confident mid-blue and the
- * ramp had nowhere left to go by the time it reached moderate.
+ * How far along the ink ramp each band sits; light a touch above the faintest
+ * tone so a thin line stays visible.
  */
 private const val LIGHT_MIX = 0.06f
 private const val MODERATE_MIX = 0.5f
 private const val HEAVY_MIX = 1f
 
 /**
- * Faint marks saying what the height means.
- *
- * The line's height carries the whole reading and, without this, says nothing on
- * its own - the only way to find out whether a rise was drizzle or a downpour
- * was to press and hold it, which nobody does at a glance. A rule and a word at
- * each threshold turn the track back into a scale.
- *
- * Drawn first, so everything here sits behind the curve, and drawn faintly. It
- * is a nudge, not a grid: the shape of the line is still the thing being read
- * and a chart ruled into slabs would fight it.
- *
- * The whole scale is drawn, every time. An earlier version showed only the
- * bands the weather reached, to keep a dry afternoon clean, and that was the
- * wrong trade: a chart whose gridlines move with the data is a different chart
- * each time you open it, and the reader has to re-learn where they are before
- * they can read anything. Fixed rules cost a little ink on a quiet day and buy
- * a scale that means the same thing every morning.
+ * Faint rules and words at each band threshold, so the line's height reads as a
+ * scale. The whole scale is always drawn, so the chart means the same thing every
+ * day, and it sits behind the curve.
  */
 private fun DrawScope.drawIntensityRules(guides: List<Pair<Float, String>>, rule: Color) {
     guides.forEach { (fraction, _) ->
-        // The lowest band's boundary is the floor of the chart, which is already
-        // drawn by the axis beneath it. A second rule on top of it would only
-        // thicken the frame.
+        // The lowest band's boundary is the chart's floor, already drawn by the axis.
         if (fraction <= 0f) return@forEach
         val y = size.height * (1f - fraction)
         drawLine(
@@ -561,25 +390,8 @@ private fun DrawScope.drawIntensityRules(guides: List<Pair<Float, String>>, rule
 }
 
 /**
- * The words on the scale, held to the screen while the chart moves under them.
- *
- * They and the rules they belong to used to be one pass, which stopped working
- * the moment the track grew wider than the screen: a label at the right-hand end
- * of the *content* is a label a day out, and the reader would have had to travel
- * to tomorrow evening to find out what the height means.
- *
- * The fix is not to lift them onto an overlay, which is the obvious move and the
- * wrong one — everything here is drawn before the curve so that the line, which
- * carries the whole reading, passes over it. A faint word laid on top of that
- * line reads as a smudge on it. So they stay on the chart's own canvas and are
- * placed against [rightEdge], which is where the screen's right-hand edge
- * currently falls in the chart's coordinates. They sit still while the weather
- * slides past, and the line still covers them.
- *
- * Right rather than left, and the original reason survives the move intact. On
- * the left they would sit over the leftmost minutes of what is on screen, and
- * the left of this chart is *now* on first sight and the thing being approached
- * for the rest of it.
+ * The band words, held to the right edge of the screen while the chart scrolls
+ * under them, and drawn on the chart's canvas so the line still passes over them.
  */
 private fun DrawScope.drawIntensityLabels(
     guides: List<Pair<Float, String>>,
@@ -593,8 +405,7 @@ private fun DrawScope.drawIntensityLabels(
         drawText(
             textLayoutResult = measured,
             topLeft = Offset(
-                // Clamped to the content, so an overscroll bounce cannot carry
-                // the words off the end of the chart they belong to.
+                // Clamped to the content, so an overscroll cannot carry the words off the chart.
                 (rightEdge - measured.size.width - GUIDE_LABEL_INSET.toPx())
                     .coerceIn(0f, size.width - measured.size.width),
                 y - measured.size.height - GUIDE_LABEL_GAP.toPx(),
@@ -604,17 +415,8 @@ private fun DrawScope.drawIntensityLabels(
 }
 
 /**
- * Where one day ends, drawn full height.
- *
- * Six hours never crossed midnight from more than one side, so a clock face was
- * enough to say when a point was. A day always crosses it, and "3:00" alone is
- * then genuinely ambiguous — it is the hour you are least sure about and the one
- * most likely to be the answer to *when does this stop*. The rule marks the seam
- * and the axis names the day that starts at it.
- *
- * The same weight as an intensity guide, because it is the same kind of mark: a
- * faint statement about the grid, sitting behind the line that carries the
- * reading.
+ * Where one day ends, drawn full height and as faint as a band rule; the axis
+ * names the day that starts there.
  */
 private fun DrawScope.drawDayBreaks(points: List<CurvePoint>, zone: ZoneId, colour: Color) {
     forEachDayBreak(points, zone) { x ->
@@ -627,13 +429,7 @@ private fun DrawScope.drawDayBreaks(points: List<CurvePoint>, zone: ZoneId, colo
     }
 }
 
-/**
- * Every local midnight inside the drawn window, as a position along it.
- *
- * Positioned from the clock rather than from the samples, for the same reason
- * the hour marks are: a series anchored at whatever minute it was built at lands
- * on midnight only by accident.
- */
+/** Every local midnight inside the drawn window, positioned from the clock. */
 private inline fun DrawScope.forEachDayBreak(
     points: List<CurvePoint>,
     zone: ZoneId,
@@ -655,20 +451,9 @@ private inline fun DrawScope.forEachDayBreak(
 }
 
 /**
- * The hour marks under the chart.
- *
- * Positioned from the clock, not from the samples. The obvious version walks the
- * points and marks the ones whose minute is zero, and it only works when a
- * sample happens to land exactly on the hour - which the fused timeline never
- * reliably does, because it is anchored at whatever moment it was built and
- * re-anchored every minute. The result was an axis whose labels blinked in and
- * out depending on what minute it currently was, looking for all the world like
- * something slow to load.
- *
- * Walking the boundaries themselves and placing each one by where it falls in
- * the window is correct however the samples are spaced, and cannot drift out of
- * alignment with them either: the points are evenly spaced in time, so position
- * along the track means the same thing to both.
+ * The hour marks under the chart, a label on the hour and a tick on the half
+ * hour, positioned from the clock rather than from the samples so they never
+ * depend on which minute the series was built at.
  */
 private fun DrawScope.drawTimeAxis(
     points: List<CurvePoint>,
@@ -684,8 +469,7 @@ private fun DrawScope.drawTimeAxis(
     if (span <= 0f) return
 
     val step = Duration.ofMinutes(LABEL_EVERY_MINUTES.toLong())
-    // The first boundary at or after the window opens, found from the hour
-    // containing it rather than by rounding the window's own ragged start.
+    // The first boundary at or after the window opens.
     var mark = start.atZone(zone).truncatedTo(ChronoUnit.HOURS).toInstant()
     while (mark.isBefore(start)) mark = mark.plus(step)
 
@@ -702,18 +486,14 @@ private fun DrawScope.drawTimeAxis(
         )
 
         if (onTheHour) {
-            // Midnight is labelled with the day it opens rather than with
-            // "0:00", which is the one hour on this axis that says nothing a
-            // reader did not already know. The clock resuming at 1:00 says the
-            // rest.
+            // Midnight is labelled with the day it opens rather than "0:00".
             val label = if (local.hour == 0) {
                 formatWeekdayShort(local.toLocalDate())
             } else {
                 clockOf(mark, zone)
             }
             val measured = measurer.measure(label, style)
-            // Nudged inside the bounds so the first and last labels are not
-            // clipped by the edge of the tile.
+            // Nudged inside the bounds so the first and last labels are not clipped.
             val left = (x - measured.size.width / 2f)
                 .coerceIn(0f, size.width - measured.size.width)
             drawText(measured, topLeft = Offset(left, LABEL_TOP.toPx()))
@@ -738,8 +518,7 @@ private fun DrawScope.drawCursor(
         end = Offset(x, size.height),
         strokeWidth = CURSOR_WIDTH.toPx(),
     )
-    // A ring in the tile's own ground, so the dot reads as sitting on the curve
-    // rather than as a bead lost in the fill.
+    // A ring in the tile's ground, so the dot sits on the curve rather than in the fill.
     drawCircle(ringColour, radius = DOT_RADIUS.toPx() + DOT_RING.toPx(), center = Offset(x, y))
     drawCircle(dotColour, radius = DOT_RADIUS.toPx(), center = Offset(x, y))
 }
@@ -754,13 +533,7 @@ private fun DrawScope.curvePath(points: List<CurvePoint>): Path {
     return path
 }
 
-/**
- * Points sit at their own instant, edge to edge.
- *
- * A rate has a value at a moment, so it belongs on the axis at that moment —
- * unlike an accumulation, which describes a span and would belong at the centre
- * of one.
- */
+/** Points sit at their own instant, edge to edge: a rate has a value at a moment. */
 private fun DrawScope.xOf(index: Int, count: Int): Float =
     if (count <= 1) 0f else size.width * index / (count - 1)
 
@@ -773,41 +546,16 @@ private fun indexAt(x: Float, width: Int, count: Int): Int {
     return ((x + step / 2f) / step).toInt().coerceIn(0, count - 1)
 }
 
-/** "1:30" — no leading zero, because thirteen labels have to fit across a phone. */
+/** "1:30", without a leading zero, so the labels fit across a phone. */
 private fun clockOf(instant: Instant, zone: ZoneId): String {
     val time = instant.atZone(zone)
     return "%d:%02d".format(time.hour, time.minute)
 }
 
 /**
- * Height is intensity, and the scale is fixed.
- *
- * This is the most important decision in the chart, and it took getting wrong
- * twice to find. Millimetres per hour is a unit almost nobody has a feel for -
- * told there is 3 mm of rain outside, most people, including people who work
- * near meteorology, cannot picture it. So nobody reads a value off this chart.
- * They read a shape: high means pouring, low means drizzle.
- *
- * For that reading to be true the scale cannot move. An adaptive ceiling - which
- * this had, and which seemed reasonable while the axis carried a number - draws
- * a drizzly morning at full height, which under the only mental model anybody
- * actually uses says "downpour". It was worse than the problem it solved.
- *
- * A fixed *linear* scale is no good either: against a ceiling high enough for a
- * real downpour, drizzle is two percent of the height and reads as nothing at
- * all, when it is precisely the difference between nothing and take a coat.
- *
- * So the axis is anchored to the conventional intensity bands, with each band
- * given a slice of the height wide enough to see. It is not linear in
- * millimetres, and it does not pretend to be - there is no number on it. What it
- * is linear in is how wet you get, which is what the chart is for.
- */
-/**
- * The band geometry, which lives in `:domain` because the widget draws it too.
- *
- * These two are thin wrappers rather than direct calls at every use site, so the
- * chart reads the same as it did when it owned the arithmetic - and so there is
- * exactly one place to look when the app and the widget disagree about a peak.
+ * The band geometry, shared with the widget through `:domain`. Height is
+ * intensity on a fixed scale anchored to the conventional bands, each given an
+ * equal slice, so a drizzle never looks like a downpour and still shows.
  */
 private fun curveLevel(millimetresPerHour: Double): PrecipitationIntensity =
     RainCurveBands.levelOf(millimetresPerHour)
@@ -816,7 +564,6 @@ private fun curveLevel(millimetresPerHour: Double): PrecipitationIntensity =
 private fun heightFraction(millimetresPerHour: Float): Float =
     RainCurveBands.heightFraction(millimetresPerHour)
 
-/** How finely the curve is walked between the forecast's own samples. */
 /** Above this share, the point is carried by radar rather than by the model. */
 private const val RADAR_BACKED = 0.5
 
@@ -832,13 +579,7 @@ private const val STEP_MINUTES = 10L
 /** How often the axis is labelled. */
 private const val LABEL_EVERY_MINUTES = 30
 
-/**
- * Tall enough for five equal bands to each hold a word.
- *
- * At the old height a band was under twenty points and the lowest labels had
- * nowhere to sit, so the scale could only be shown in part. This is the height
- * at which the whole of it fits.
- */
+/** Tall enough for every band to hold its word. */
 private val TRACK_HEIGHT = 148.dp
 private val READOUT_HEIGHT = 24.dp
 private val AXIS_HEIGHT = 26.dp

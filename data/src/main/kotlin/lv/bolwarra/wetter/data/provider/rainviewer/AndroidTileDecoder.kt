@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.rainviewer
 
 import android.graphics.Bitmap
@@ -5,17 +8,9 @@ import android.graphics.BitmapFactory
 import lv.bolwarra.wetter.domain.radar.RadarGeometry
 
 /**
- * Decodes a radar tile with the platform's own PNG decoder.
- *
- * Kept behind [TileDecoder] so everything that reads meaning out of the pixels
- * can be tested on a plain JVM. The Android graphics classes are stubs in unit
- * tests and return null for everything, which would otherwise make the palette -
- * the part most worth testing - untestable without a device.
- *
- * [Bitmap.Config.ARGB_8888] is requested explicitly because the tiles carry
- * meaning in their alpha channel: the faint end of the intensity scale *is*
- * transparency, so a decode that discarded it would silently throw away every
- * light shower.
+ * Decodes a radar tile with the platform's PNG decoder, behind [TileDecoder] so
+ * the palette can be tested on a plain JVM. [Bitmap.Config.ARGB_8888] keeps the
+ * alpha channel, which carries the faint end of the scale.
  */
 internal class AndroidTileDecoder : TileDecoder {
 

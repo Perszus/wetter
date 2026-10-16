@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.work
 
 import android.content.Context
@@ -14,17 +17,9 @@ import java.util.concurrent.TimeUnit
 import lv.bolwarra.wetter.WetterApplication
 
 /**
- * The net under the [Heartbeat].
- *
- * The heartbeat is an alarm timed to the radar, and it is what keeps the app
- * fresh. This job exists for the ways an alarm can be lost - an OEM battery
- * manager clearing them, a force-stop - and for catching up the moment the
- * network returns after a wake that found none. It runs the same [Refresh] pass,
- * so there is still one path for data to travel, and it re-arms the heartbeat
- * every time, so a lost clock costs one interval at worst.
- *
- * It lives in `:app` rather than `:data` because it needs the object graph, and
- * `:data` cannot see the application.
+ * The net under the [Heartbeat], for the ways an alarm can be lost (an OEM battery
+ * manager, a force-stop) and for catching up when the network returns. It runs the
+ * same [Refresh] pass and re-arms the heartbeat every time.
  */
 class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
@@ -33,8 +28,7 @@ class ForecastRefreshWorker(context: Context, parameters: WorkerParameters) :
         val outcome = Refresh.run(applicationContext)
         runCatching { Heartbeat.ensure(applicationContext) }
         // The scoring reach-back, here because a job has minutes and nothing is
-        // waiting on it - it used to sit inside every radar refresh and hold up
-        // the projection people were waiting to see.
+        // waiting on it.
         runCatching {
             val container = (applicationContext as WetterApplication).container
             container.nowcasts.settleOutstanding(container.selectedLocation.current())

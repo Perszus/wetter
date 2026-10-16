@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.map
 
 import androidx.activity.compose.BackHandler
@@ -75,46 +78,22 @@ import lv.bolwarra.wetter.ui.theme.WetterColors
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * The rain around you, and where it is going.
+ * The rain around you, and where it is going. Opened from the rain chart: the
+ * chart answers "here", this answers "what is coming, and from where".
  *
- * Opened from the rain chart. The chart answers "here"; this answers "what is
- * coming, and from where" - the question a curve cannot, because a curve has
- * already collapsed the sky to one point.
+ * The hour behind is the sweeps the radar took; the two hours ahead are the
+ * chart's projection run over a wider, coarser grid. No further, because past
+ * that the models say it better (docs/providers.md).
  *
- * ### What it plays
+ * Time is the axis, not the frame: frames are unevenly spaced, so playback
+ * advances a clock at a fixed rate and the scrubber is laid out in minutes.
  *
- * The hour behind is the sweeps the radar took. The two hours ahead are the
- * same engine's projection the rain chart uses, run over a wider and coarser
- * grid: the chart needs your street, the map needs the next country. Two hours
- * and no further, because past that the projection is not carrying anything
- * the models would not say better (docs/providers.md); a map that kept playing
- * would be drawing a guess as if it had been seen.
+ * The view is the middle of the block the radar reads, about a thousand
+ * kilometres across, and does not pan. The block is a tile wider on every side, so
+ * rain crossing into view in the projection was seen before it arrived.
  *
- * ### Time is the axis, not the frame
- *
- * The frames are not evenly spaced: ten minutes apart behind, five for the
- * first half hour ahead, ten after. Playing one frame per beat would put the
- * near half hour in slow motion. So playback advances a clock at a fixed rate
- * and shows whichever frame that clock has reached, and the scrubber is laid
- * out in minutes rather than in frames.
- *
- * ### The extent is the radar's
- *
- * The map shows the middle of the block of sky it reads - about a thousand
- * kilometres across at Baltic latitudes: from Rīga, Stockholm to the west and
- * Vilnius to the south - and does not pan. The block itself is a tile wider,
- * so every edge on screen has observed sky upwind of it: rain crossing into
- * view in the projection was seen before it arrived, rather than conjured from
- * beyond the data or left as a blank that eats in from the side as the loop
- * plays.
- *
- * ### A panel over the forecast, not a place
- *
- * It opens as a rounded panel over the screen it came from, with that screen
- * blurred behind it, and a tap anywhere outside the panel puts it away. The
- * forecast staying visible - vaguely - is the point: the map is a closer look
- * at the chart, not somewhere else, and the way back is simply to touch what
- * you came from.
+ * A panel over the forecast, which stays visible behind it, blurred; a tap
+ * outside puts it away.
  */
 @Composable
 fun RadarMapRoute(
@@ -164,9 +143,8 @@ fun RadarMapScreen(
         Header(title = state.location?.name.orEmpty(), onClose = onClose)
 
         if (frames.isEmpty()) {
-            // Opened before the radar has landed - the mark is offered at once,
-            // so this is the ordinary first second, not an error. Once the
-            // fetch has answered with nothing, say that plainly and no more.
+            // Opened before the radar has landed is the ordinary first second, not an error.
+            // Once the fetch has answered with nothing, say so plainly.
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -198,16 +176,13 @@ fun RadarMapScreen(
         val start = frames.first().at
         // The newest thing actually seen. The map opens on it.
         val present = frames.lastOrNull { it.observed }?.at ?: start
-        // What can be shown now, and how far the axis reaches. While the
-        // projection is still being worked out the axis is already laid out to
-        // its end, so the thumb opens at "now" and stays there when the rest
-        // lands, instead of opening at the far end of a one-hour scale and
-        // jumping.
+        // While the projection is still being worked out the axis is already laid out to
+        // its end, so the thumb opens at now and does not jump when the rest lands.
         val end = frames.last().at
         val axisEnd = if (state.projecting) present.plus(state.horizon) else end
 
-        // Keyed on the present, not on the frames: the projection arriving is
-        // more of the same loop, and must not move the thumb.
+        // Keyed on the present, not on the frames, so the projection arriving does not
+        // move the thumb.
         var position by remember(present) { mutableStateOf(present) }
         var playing by remember { mutableStateOf(false) }
 
@@ -221,8 +196,8 @@ fun RadarMapScreen(
                 last = tick
                 val next = position.plusMillis((elapsedMs * PLAYBACK_RATE).toLong())
                 if (next.isAfter(end)) {
-                    // Rest on the last frame, then go round from the oldest -
-                    // so a loop shows the rain arriving as well as leaving.
+                    // Rest on the last frame, then go round from the oldest, so a loop shows rain
+                    // arriving as well as leaving.
                     position = end
                     delay(END_HOLD_MS)
                     position = start
@@ -291,9 +266,8 @@ fun RadarMapScreen(
 }
 
 /**
- * The shape of the controls with nothing in them, so the panel is the same
- * height while it fetches as once it has something - it does not jump when the
- * radar lands under a finger that was reaching for play.
+ * The controls with nothing in them, so the panel keeps its height when the
+ * radar lands under a finger reaching for play.
  */
 @Composable
 private fun ControlsPlaceholder() {
@@ -348,11 +322,8 @@ private fun Header(title: String, onClose: () -> Unit) {
 }
 
 /**
- * The basemap, the rain over it, and the reader's place.
- *
- * Each field is painted to a bitmap once, the present first and then outwards
- * from it, so the frame somebody opened on is there immediately and playback
- * has the rest by the time it reaches them.
+ * The basemap, the rain over it, and the reader's place. Each field is painted to
+ * a bitmap once, the present first, then outwards from it.
  */
 @Composable
 private fun RadarCanvas(
@@ -365,17 +336,15 @@ private fun RadarCanvas(
     colors: WetterColors,
     attribution: String,
 ) {
-    // The grid the radar was read over, and the part of it that is shown. The
-    // difference is margin: observed sky upwind of every edge on screen, so a
-    // projection has something to carry in rather than a blank to fill.
+    // The grid the radar was read over, and the part of it shown. The difference is
+    // observed sky upwind of every edge.
     val geometry = frames.first().field.geometry
     val view = remember(geometry) { viewOf(geometry) }
     val density = LocalDensity.current.density
     var size by remember { mutableStateOf(IntSize.Zero) }
 
-    // Keyed on the frame itself, so the projection arriving after the observed
-    // sweeps paints only what is new rather than everything again. Frames no
-    // longer in play are dropped, so an open map does not accumulate pictures.
+    // Keyed on the frame, so the projection arriving paints only what is new. Frames
+    // no longer in play are dropped.
     val painted = remember(geometry) { mutableStateMapOf<RadarMapFrame, ImageBitmap>() }
     LaunchedEffect(frames) {
         painted.keys.retainAll(frames.toSet())
@@ -387,9 +356,8 @@ private fun RadarCanvas(
         }
     }
 
-    // Basemap tiles as close to one tile pixel per screen pixel as the grid
-    // allows, so place names stay legible rather than being a zoom-7 picture
-    // stretched to fit a phone.
+    // Basemap tiles as close to one tile pixel per screen pixel as the grid allows,
+    // so place names stay legible.
     val basemapZoom = remember(size.width, view) { basemapZoomFor(view, size.width) }
     val basemap = remember(basemapZoom, view) { basemapKeys(view, basemapZoom) }
     val loaded = remember(basemap) { mutableStateMapOf<TileKey, ImageBitmap>() }
@@ -436,8 +404,8 @@ private fun RadarCanvas(
 }
 
 /**
- * While a frame is still being painted, the one nearest it in time stands in,
- * rather than the rain vanishing for a beat.
+ * While a frame is still being painted, the nearest in time stands in rather than
+ * the rain vanishing for a beat.
  */
 private fun nearestPainted(painted: Map<RadarMapFrame, ImageBitmap>, at: Instant): ImageBitmap? =
     painted.minByOrNull { Duration.between(it.key.at, at).abs() }?.value
@@ -453,8 +421,8 @@ private fun DrawScope.drawBasemap(
     val factor = 1 shl (zoom - geometry.zoom)
     val tileInGrid = TILE.toFloat() / factor
     val side = tileInGrid * scale
-    // Tile keys are wrapped for the request; placement needs the unwrapped
-    // column, which is the one nearest the grid.
+    // Tile keys are wrapped for the request; placement needs the unwrapped column
+    // nearest the grid.
     val firstX = Math.floorDiv(geometry.originX * factor, TILE)
     val span = 1 shl zoom
     keys.forEach { key ->
@@ -465,8 +433,8 @@ private fun DrawScope.drawBasemap(
         drawImage(
             image = image,
             dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
-            // Rounded from both edges rather than from the width, so adjacent
-            // tiles meet exactly instead of leaving a hairline between them.
+            // Rounded from both edges rather than from the width, so adjacent tiles meet
+            // without a hairline.
             dstSize = IntSize(
                 (left + side).roundToInt() - left.roundToInt(),
                 (top + side).roundToInt() - top.roundToInt(),
@@ -479,8 +447,8 @@ private fun DrawScope.drawBasemap(
 
 /**
  * The basemap zoom whose tiles land nearest one pixel to one pixel, capped two
- * levels above the radar's own - past that the tile count grows fourfold a step
- * for detail the rain cannot use.
+ * levels above the radar's own: past that the tile count grows fourfold a step for
+ * detail the rain cannot use.
  */
 internal fun basemapZoomFor(geometry: RadarGeometry, widthPx: Int): Int {
     if (widthPx <= 0) return geometry.zoom
@@ -489,11 +457,13 @@ internal fun basemapZoomFor(geometry: RadarGeometry, widthPx: Int): Int {
     return geometry.zoom + steps
 }
 
-/** Exactly the basemap tiles under the radar block - nothing around it (see MapTileSource). */
+/**
+ * Exactly the basemap tiles under the radar block, nothing around it (see
+ * MapTileSource).
+ */
 internal fun basemapKeys(geometry: RadarGeometry, zoom: Int): List<TileKey> {
     val factor = 1 shl (zoom - geometry.zoom)
-    // The view need not sit on the basemap's tile boundaries, so the range is
-    // every tile it touches: floor of the first edge to the tile holding the last.
+    // Every tile the view touches: the view need not sit on tile boundaries.
     val firstX = Math.floorDiv(geometry.originX * factor, TILE)
     val firstY = Math.floorDiv(geometry.originY * factor, TILE)
     val lastX = Math.floorDiv((geometry.originX + geometry.width) * factor - 1, TILE)
@@ -522,18 +492,13 @@ internal fun viewOf(geometry: RadarGeometry): RadarGeometry {
     )
 }
 
-/** Three tiles across: about a thousand kilometres at zoom 6 over the Baltic. */
+/** Three tiles across: about a thousand kilometres at zoom 6 in the mid-latitudes. */
 private const val VIEW_PX = 3 * TILE
 
 /**
- * The basemap in greys, and inverted on the dark plate.
- *
- * The street map arrives in its own greens, blues and pinks, and rain is meant
- * to be the only saturated colour on any screen of this app
- * (docs/design-principles.md). Grey keeps the geography - coast, borders,
- * cities - and gives the colour back to the weather. Contrast is pulled in as
- * well, so the ground reads as ground and not as a second picture competing
- * with the first.
+ * The basemap in greys, inverted on the dark plate, with contrast pulled in: rain
+ * stays the only saturated colour (docs/design-principles.md) and the ground reads
+ * as ground.
  */
 private fun basemapFilter(isLight: Boolean): ColorFilter {
     val gain = if (isLight) LIGHT_GAIN else -DARK_GAIN
@@ -578,8 +543,7 @@ private fun PlayButton(playing: Boolean, onToggle: () -> Unit) {
             }
         } else {
             val half = unit * 0.2f
-            // Nudged right: a triangle centred on its box looks left of centre,
-            // because most of its area is at the flat end.
+            // Nudged right: a triangle centred on its box looks left of centre.
             val nudge = unit * 0.035f
             val path = Path().apply {
                 moveTo(center.x - half * 0.8f + nudge, center.y - half)
@@ -594,9 +558,7 @@ private fun PlayButton(playing: Boolean, onToggle: () -> Unit) {
 
 /**
  * Time, laid out in minutes, with every frame marked and the present set apart.
- *
- * Drag or tap anywhere along it; either stops playback, because the reader has
- * just said which moment they want to look at.
+ * Dragging or tapping stops playback.
  */
 @Composable
 private fun Scrubber(
@@ -634,12 +596,11 @@ private fun Scrubber(
             val midY = size.height / 2f
             val stroke = 2.dp.toPx()
             val nowX = fractionOf(present) * size.width
-            // Behind: what was seen, on the quiet line. Ahead: the projection,
-            // in the rain colour, since that is the part this map is opened for.
+            // Behind, what was seen, on the quiet line; ahead, the projection, in the rain
+            // colour.
             drawLine(colors.hairline, Offset(0f, midY), Offset(nowX, midY), stroke)
             drawLine(
-                // Grey until there is a projection to play: the axis is laid
-                // out, the part ahead is not there yet.
+                // Grey until there is a projection to play.
                 if (projecting) {
                     colors.hairline
                 } else {

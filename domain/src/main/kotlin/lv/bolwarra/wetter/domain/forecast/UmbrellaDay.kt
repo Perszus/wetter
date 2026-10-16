@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Instant
@@ -8,59 +11,32 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 /**
  * Whether today is a day to take something with you.
  *
- * Moderate, not merely wet. The mark used to appear for anything at all, which
- * meant it was up on most days in a maritime climate and stopped being read: a
- * warning that is always on is furniture. Moderate is where rain stops being
- * something you walk through and starts being something you take a coat for.
+ * At moderate, not merely wet: a mark that is up on most days in a maritime
+ * climate stops being read.
  *
- * ### The whole day, from midnight, and it does not go out again
+ * Asked of the whole calendar day, from midnight, so the mark is stable: somebody
+ * decides once, on the way out, and it should not quietly go out at eleven. It
+ * moves only when the forecast does.
  *
- * This used to run from *now* to the end of the day, on the reasoning that a
- * shower which finished this morning is not a reason to carry an umbrella this
- * afternoon. That is the right reasoning about a readout and this is not a
- * readout — it is a thing somebody decides once, on the way out of the door,
- * and cannot revisit at three in the afternoon from the other side of town.
- *
- * A property of the day is stable; a live answer is not. Somebody who looks at
- * seven, sees the mark and takes a coat is well served whatever the sky does
- * afterwards. Somebody who looks at eleven and finds it has quietly gone out has
- * been told the day changed its mind, which is not something the day did.
- *
- * So the question is asked about the calendar day rather than the hours left in
- * it. If any part of today reaches moderate, the mark is up from midnight to
- * midnight, and it moves only when the forecast itself moves.
- *
- * ### It is an offer, not an instruction
- *
- * Which is also why the bar is moderate rather than the higher one the rain
- * *claims* use. Saying "it is raining" when it is not is a wrong reading and
- * costs the app its credit. Suggesting an umbrella on a day that stays dry costs
- * somebody carrying one, and the reverse — leaving it at home before a storm —
- * costs a great deal more. The asymmetry is the whole argument, and it runs the
- * other way from every other threshold in this app.
+ * The bar is lower than the one rain claims use, because the costs run the other
+ * way: an umbrella on a dry day costs little, none before a storm costs a lot.
  */
 object UmbrellaDay {
 
     /**
-     * Consecutive projected steps that must be moderate before the mark goes up.
-     *
-     * Two, not one. The threshold is a rate; the model applies it to a whole
-     * hour and the radar projection applies it to ten minutes, so taking a
-     * single radar step at face value raises the mark for a burst the model
-     * would have averaged away — and puts it back to being up most days. Twenty
-     * minutes of moderate rain is a shower either way.
+     * Consecutive projected steps that must be moderate before the mark goes up. The
+     * model applies the rate to an hour and the radar projection to ten minutes, so a
+     * single radar step would raise the mark for a burst the model averages away.
      */
     const val SUSTAINED_STEPS = 2
 
-    /** The bar. Where rain stops being something you would walk through. */
+    /** The bar: where rain stops being something you would walk through. */
     val WORTH_CARRYING: PrecipitationIntensity = PrecipitationIntensity.MODERATE
 
     /**
-     * @param timeline the fused projection. Radar counts and has to: the model
-     *   publishes one figure for a whole hour, so a ten-minute downpour arrives
-     *   as a mild average and never reaches moderate — which once left the curve
-     *   drawn plainly above the moderate guide with no umbrella beside it, the
-     *   chart and the mark disagreeing about the same rain.
+     * @param timeline the fused projection. Radar counts: the model's hourly figure
+     * averages a short downpour below moderate, and the mark must agree with the
+     * curve drawn above the moderate guide.
      */
     fun isUmbrellaDay(
         forecast: WeatherForecast,

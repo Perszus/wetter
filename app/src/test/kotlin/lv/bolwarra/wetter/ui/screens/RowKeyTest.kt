@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import java.time.ZoneId
@@ -9,12 +12,9 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
- * The identity a row in the locations list is keyed by.
- *
- * This exists because the list crashed. It was keyed on coordinates, which are
- * not an identity: the geocoder answers "Singapore" with both Singapore and
- * Singapore Island at exactly 1.36667, 103.8, and a `LazyColumn` given the same
- * key twice throws rather than degrading.
+ * The identity a row in the locations list is keyed by. Coordinates are not one:
+ * the geocoder answers "Singapore" with both Singapore and Singapore Island at
+ * exactly 1.36667, 103.8, and a `LazyColumn` given the same key twice throws.
  */
 class RowKeyTest {
 
@@ -42,7 +42,7 @@ class RowKeyTest {
 
     @Test
     fun `two places at one point are two rows`() {
-        // The exact pair that crashed it, measured from the live geocoder.
+        // The pair as the live geocoder returns it.
         assertNotEquals(place("Singapore").rowKey(), place("Singapore Island").rowKey())
     }
 

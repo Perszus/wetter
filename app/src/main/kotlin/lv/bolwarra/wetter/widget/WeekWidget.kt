@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.widget
 
 import android.content.Context
@@ -48,7 +51,6 @@ internal class WeekWidget : PictureWidget() {
     }
 }
 
-/** Days as columns in any rectangle: the week widget and the overview's last band. */
 /** Days as columns in any rectangle: the week widget and the overview's last band. */
 internal object DayColumns {
 

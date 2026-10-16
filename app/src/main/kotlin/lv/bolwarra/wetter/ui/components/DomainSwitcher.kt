@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.animateColorAsState
@@ -40,49 +43,15 @@ import lv.bolwarra.wetter.ui.screens.WeatherDomain
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * Which page you are on: Today, Week, Month.
+ * Which page you are on: Today, Week, Month. A pill, centred, sized to its words.
  *
- * A pill, centred, sized to its words rather than stretched across the screen —
- * a control this small has no business being as wide as the content it switches.
+ * Only the selected segment is filled, with a raised ground rather than the
+ * accent, which belongs to precipitation. A single fill travels between segments
+ * on the same spring as the pages, so the control and the content move as one
+ * gesture, in the same direction. No ripple: the arriving fill is the feedback.
  *
- * Only the selected segment is filled, because the one thing this is here to say
- * is which page you are looking at; lighting all three would say nothing. The
- * fill is a raised ground rather than the accent, and that is deliberate:
- * precipitation owns the only saturated hue in this app, and a permanent
- * coloured block sitting directly above the rain chart would compete with the
- * thing it is there to make you look at.
- *
- * ### One fill that travels, rather than three that switch
- *
- * There used to be a background on every segment, lit for the selected one. That
- * made changing page a cut: one pill went out, another came on, and nothing said
- * the two were related. Meanwhile the page underneath slid sideways, so the
- * control and the content were describing the same movement in two different
- * languages.
- *
- * Now there is a single fill, and it moves. It is the same object arriving
- * somewhere else, which is what actually happened. It travels on the same spring
- * the pages do, so the pill and the page are one gesture rather than two events
- * that happen to coincide.
- *
- * It also carries the direction for free. Picking Week from Today sends the fill
- * right because Week is to the right, and the page arrives from the right for
- * the same reason.
- *
- * Nothing else lights up. The segments carry no ripple, because a flash under
- * the finger is a second animation arguing with the first — and it fires on a
- * tap whether or not the selection changed, which says something happened when
- * nothing did. The fill arriving is the feedback, and the label brightening
- * under it is the confirmation.
- *
- * ### It has to be measured, because the words are not the same length
- *
- * "Today", "Week" and "Month" are three different widths, so the fill cannot be
- * a third of the track. Each segment reports where it landed and how wide it is,
- * and the fill animates to that. The consequence is that the fill cannot be
- * drawn until the first measurement has happened — which is why it is composed
- * only once its target is known, so it starts in the right place instead of
- * flying in from the left edge on the first frame.
+ * The words differ in width, so each segment reports where it landed and the fill
+ * animates to that; it is composed only once its first target is known.
  */
 @Composable
 fun DomainSwitcher(
@@ -138,14 +107,9 @@ fun DomainSwitcher(
                             .clip(pill)
                             .selectable(
                                 selected = isSelected,
-                                // No ripple. The default indication flashes the
-                                // segment under the finger, which is a second
-                                // thing lighting up at the exact moment the fill
-                                // is trying to be the only thing that moved - and
-                                // it fires on the tapped segment whether or not
-                                // the selection changed. The fill arriving is the
-                                // feedback; a flash competing with it says the
-                                // control has two ideas about what just happened.
+                                // No ripple: the fill arriving is the feedback, and a flash would
+                                // fire even when
+                                // the selection did not change.
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 role = Role.Tab,
@@ -169,12 +133,8 @@ fun DomainSwitcher(
 }
 
 /**
- * The fill, on its way to wherever it now belongs.
- *
- * Composed only once a target exists, so the first frame is a placement rather
- * than an animation. Both the position and the width are animated: the words are
- * different lengths, so a fill that only slid would be the wrong size for most
- * of every journey.
+ * The fill, on its way to wherever it now belongs. Position and width both animate,
+ * since the words differ in length.
  */
 @Composable
 private fun TravellingFill(target: Segment, shape: RoundedCornerShape) {

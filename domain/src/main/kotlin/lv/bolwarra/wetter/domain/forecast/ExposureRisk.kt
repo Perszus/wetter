@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Duration
@@ -24,41 +27,24 @@ data class ExposureWindow(
 }
 
 /**
- * Whether you will get wet.
+ * Whether you will get wet, read across the particular stretch of time you will
+ * be outside.
  *
- * This is the question the app exists to answer, and it is not the same question
- * as "what is the weather". A weather icon for the afternoon cannot tell you
- * whether to leave now or in twenty minutes; that needs the precipitation field
- * read across the particular stretch of time you will be outside in.
- *
- * ### Why the chance is the worst moment, not the sum of the moments
- *
- * Treating each step as an independent trial and multiplying the dry
- * probabilities together is the obvious approach and it is badly wrong.
- * Precipitation is strongly correlated in time - if it is raining at ten past,
- * it is very probably raining at quarter past - so independence compounds one
- * shower into near-certainty. Over a half-hour walk through a steady drizzle it
- * would report 99% where the honest answer is the chance that the drizzle is
- * there at all.
- *
- * So the chance is taken from the wettest moment in the window. Being outside
- * longer still raises it, because a longer window has more chances to catch
- * something, but through the extra moments it covers rather than by compounding
- * the same shower against itself.
+ * The chance is taken from the wettest moment in the window, not by multiplying
+ * each step's dry probability: precipitation is strongly correlated in time, and
+ * independence would compound one drizzle into near-certainty. A longer window
+ * still raises the chance through the extra moments it covers.
  */
 object ExposureRisk {
 
     /**
-     * The rate at which rain is as good as certain to be noticed.
-     *
-     * A rate of one of these gives about a 63% chance of the walk being a wet
-     * one; two, 86%. Set near the boundary between a trace and light rain,
-     * because the question is whether you get wet, not whether a gauge would
-     * register it.
+     * The rate at which rain is as good as certain to be noticed: one of these gives
+     * about a 63% chance of a wet walk, two 86%. Near the boundary between a trace and
+     * light rain, since the question is getting wet, not what a gauge registers.
      */
     const val NOTICEABLE_MM_PER_HOUR = 0.5
 
-    /** Confidence below this and the honest answer is that we do not know. */
+    /** Confidence below this and the honest answer is that nobody knows. */
     const val USABLE_CONFIDENCE = 0.15
 
     /**
@@ -87,8 +73,8 @@ object ExposureRisk {
             leaveAt = leaveAt,
             outdoorFor = outdoorFor,
             chanceOfRain = chance,
-            // The weakest link: a window is only as trustworthy as its least
-            // trustworthy moment, because that is where a surprise comes from.
+            // The weakest link: a window is only as trustworthy as its least trustworthy
+            // moment.
             confidence = window.minOf { it.confidence },
             peakRate = worst.millimetresPerHour,
             peakAt = worst.at.takeIf {
@@ -100,8 +86,8 @@ object ExposureRisk {
     }
 
     /**
-     * The same question asked of every departure in the next stretch of time -
-     * the table that answers "should I go now, or wait".
+     * The same question asked of every departure in the next stretch: should I go
+     * now, or wait.
      */
     fun departures(
         timeline: List<FusedPrecipitation>,
@@ -118,10 +104,8 @@ object ExposureRisk {
     }
 
     /**
-     * The driest departure in the next stretch, if waiting actually helps.
-     *
-     * Returns null when leaving now is as good as anything - there is no point
-     * telling somebody to wait forty minutes to save four percent.
+     * The driest departure in the next stretch, or null when waiting does not
+     * meaningfully help.
      */
     fun bestDeparture(
         timeline: List<FusedPrecipitation>,
@@ -141,14 +125,9 @@ object ExposureRisk {
     }
 
     /**
-     * How much falls across the window, in millimetres.
-     *
-     * The trapezoid rule over the actual timestamps, which is not fussiness. The
-     * obvious version - multiply every sample by the step and add them up -
-     * counts one interval too many, because n samples bound n-1 intervals. Seven
-     * ten-minute samples of a steady 6 mm/h came out as 7 mm of rain in an hour.
-     * Reading the gaps rather than the samples also survives a timeline whose
-     * spacing is not uniform, which a stitched one is not.
+     * How much falls across the window, in millimetres, by the trapezoid rule over the
+     * actual timestamps: n samples bound n-1 intervals, and a stitched timeline is not
+     * evenly spaced.
      */
     private fun accumulation(window: List<FusedPrecipitation>, outdoorFor: Duration): Double {
         if (window.size < 2) {
@@ -163,11 +142,8 @@ object ExposureRisk {
     }
 
     /**
-     * The chance of noticing rain at a given rate.
-     *
-     * Saturating rather than linear: the difference between nothing and a light
-     * shower is nearly all of the answer, and the difference between heavy and
-     * torrential is none of it - you are equally wet either way.
+     * The chance of noticing rain at a given rate. Saturating: nothing against a light
+     * shower is nearly all of the answer, heavy against torrential none of it.
      */
     fun chanceOf(millimetresPerHour: Double): Double {
         if (millimetresPerHour <= 0.0) return 0.0

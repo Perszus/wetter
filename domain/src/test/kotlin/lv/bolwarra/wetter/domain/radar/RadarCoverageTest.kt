@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.radar
 
 import java.time.Duration
@@ -8,15 +11,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Telling "the radar saw nothing" from "there is no radar here".
- *
- * The tile source draws an empty pixel for both, and the app now leans 95% of
- * its near-term answer on that pixel. Measured on one afternoon, a nine-tile
- * block around Lagos and one over the mid-Atlantic carried 0.00% echo, against
- * 14% over Riga and 11% over London - so for most of the world the empty pixel
- * is the only pixel there is, and reading it as "dry" would have the app
- * confidently contradict a model forecasting rain in precisely the places with
- * no radar to correct it.
+ * Telling "the radar saw nothing" from "there is no radar here". The tile source
+ * draws an empty pixel for both. Measured on one afternoon, blocks around Lagos
+ * and over the mid-Atlantic carried no echo at all, against 14% over Riga, so for
+ * most of the world reading the empty pixel as dry would contradict the models
+ * exactly where no radar can correct them.
  */
 class RadarCoverageTest {
 
@@ -95,9 +94,8 @@ class RadarCoverageTest {
 
     @Test
     fun `rain arriving from beyond the neighbourhood still gets through`() {
-        // The failure the first version of this had: checking only the nearest
-        // frame would silence a shower that has not reached the neighbourhood
-        // yet, which is the single thing a nowcast exists to say.
+        // Every frame is checked, not only the nearest, so a shower that has not yet
+        // reached the neighbourhood still counts.
         val approaching = RadarNowcaster.nowcast(
             listOf(
                 blobAt(start, offset = FAR),

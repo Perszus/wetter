@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.lifecycle.ViewModel
@@ -36,11 +39,8 @@ import lv.bolwarra.wetter.domain.verification.LearnedBias
 import lv.bolwarra.wetter.domain.verification.withLocalCorrection
 
 /**
- * Holds the weather screen's state.
- *
- * It knows nothing about providers. It asks the repository for a place and gets
- * a forecast; which service answered is visible in the forecast's metadata and
- * is never a decision made here (docs/providers.md).
+ * Holds the weather screen's state. It knows nothing about providers: which
+ * service answered is in the forecast's metadata (docs/providers.md).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WeatherViewModel(
@@ -55,22 +55,15 @@ class WeatherViewModel(
     private val refreshing = MutableStateFlow(false)
 
     /**
-     * Whether the near-term chart is being re-collected right now.
-     *
-     * Separate from [refreshing], which is about the model. These are different
-     * fetches on different cadences, and the reader only ever sees one mark - so
-     * the mark has to mean "numbers are on their way" rather than "one
-     * particular request is outstanding". The model is usually still fresh when
-     * the app is opened; the thing that actually redraws the grid is the radar.
+     * Whether the near-term chart is being re-collected right now. Separate from
+     * [refreshing], which is about the model; the reader sees one mark for both.
      */
     private val collecting = MutableStateFlow(false)
     private val error = MutableStateFlow<WeatherError?>(null)
 
     /**
-     * The things derived from a forecast after it lands: radar, and whatever has
-     * been learned about this place. Held together because they are produced by
-     * the same background pass, and because five is as many flows as combine
-     * takes before it starts handing back untyped arrays.
+     * What is derived from a forecast after it lands: radar, and what has been
+     * learned about this place. Grouped to keep [combine] to five typed flows.
      */
     private data class Derived(
         val timeline: List<FusedPrecipitation> = emptyList(),
@@ -80,8 +73,8 @@ class WeatherViewModel(
     )
 
     /**
-     * The forecast for the selected place, shared so the three things derived
-     * from it do not each open their own query.
+     * The forecast for the selected place, shared so what is derived from it does
+     * not open its own queries.
      */
     private val forecasts: StateFlow<Loaded<WeatherForecast?>> = selectedLocation.selected
         .flatMapLatest { repository.observe(it) }
@@ -96,29 +89,9 @@ class WeatherViewModel(
     private data class Loaded<T>(val value: T, val loaded: Boolean)
 
     /**
-     * The fused timeline, rebuilt on a clock rather than only when a new
-     * forecast lands.
-     *
-     * This is the whole point of carrying radar. A model hands over a value for
-     * the next hour and that value does not improve as the hour approaches - it
-     * is simply what was sent. Radar re-observes every ten minutes, so a shower
-     * that was a vague possibility half an hour ago is a measured object with a
-     * measured heading by the time it is close, and the answer should sharpen
-     * accordingly. Recomputing only when the model refreshes threw that away and
-     * left the near term as stale as the thing it was supposed to improve on.
-     *
-     * It also has to be rebuilt simply to stay honest: the steps are anchored at
-     * the instant they were built, so a timeline left alone has its leading edge
-     * drift into the past and the chart quietly loses the minutes nearest now -
-     * which are the ones worth having.
-     *
-     * The loop is a cold flow, so it stops with the last subscriber rather than
-     * ticking away behind a screen nobody is looking at. Network is rate-limited
-     * by the repository's own cache, not by this cadence: most of these ticks
-     * only re-anchor what is already held.
-     *
-     * It also listens to the store, so a sweep collected by the background
-     * worker reaches an open screen when it lands rather than at the next tick.
+     * The fused timeline, rebuilt as radar arrives rather than only when a new
+     * forecast lands: radar re-observes every few minutes, so the near term should
+     * sharpen as rain approaches.
      */
     private val timelines: Flow<List<FusedPrecipitation>> = forecasts
         .map { it.value }
@@ -126,19 +99,9 @@ class WeatherViewModel(
             if (forecast == null) {
                 flowOf(emptyList())
             } else {
-                // Rebuilt when a new sweep lands, and on a slow clock besides.
-                //
-                // Those are two different reasons and only one of them is a
-                // timer. New radar is an event the database knows about the
-                // instant it is stored, so the screen is told rather than left
-                // to ask - it used to ask once a minute, which put the chart on
-                // average half a minute behind data the app was already
-                // holding, and that is exactly as slow as it sounds.
-                //
-                // The clock stays for the other reason: the steps are anchored
-                // at the instant they were built, so a timeline nobody has
-                // refreshed has its leading edge drift into the past and loses
-                // the minutes nearest now. That is a re-anchor, not a fetch.
+                // Rebuilt when the store receives a new sweep, and on a slow clock that keeps
+                // the steps anchored to now so the chart's leading edge does not drift into the
+                // past. Most ticks only re-anchor what is already held.
                 merge(
                     nowcasts.sweeps(forecast.location),
                     flow {
@@ -161,30 +124,21 @@ class WeatherViewModel(
         }
 
     /**
-     * What has been learned about this place. Re-read when the forecast changes
-     * rather than on the timeline's cadence: it is a database query whose answer
+     * What has been learned about this place, re-read when the forecast changes: it
      * moves over weeks, not minutes.
      */
     private val biases: Flow<LearnedBias?> = forecasts.map { held ->
         held.value?.let { runCatching { verification.learnedBias(it.location) }.getOrNull() }
     }
 
-    /**
-     * What is in the air. Re-read when the forecast changes rather than on
-     * the timeline's cadence: the source publishes hourly values, and the
-     * repository would answer from its own cache either way.
-     */
+    /** What is in the air, re-read when the forecast changes; published hourly. */
     private val air: Flow<AirQuality?> = forecasts.map { held ->
         held.value?.let { runCatching { airQuality.airQuality(it.location) }.getOrNull() }
     }
 
     /**
-     * What this place usually does at this time of year.
-     *
-     * Re-read when the forecast changes, which is far more often than it needs
-     * to be: the repository answers from disk for a month at a time and only
-     * goes to the archive when the decade behind it has rolled far enough to be
-     * worth rebuilding.
+     * What this place usually does at this time of year. The repository answers
+     * from disk for a month at a time.
      */
     private val normals: Flow<Climatology> = forecasts.map { held ->
         held.value?.let { runCatching { climate.normals(it.location) }.getOrNull() }
@@ -192,19 +146,8 @@ class WeatherViewModel(
     }
 
     /**
-     * The derived things, each arriving on its own.
-     *
-     * `combine` waits for every source to emit once before it emits at all, so
-     * these three were gated on the slowest of them - and one of them is an air
-     * quality request over the network. On a cold start that held the rain
-     * timeline off the screen for twenty to thirty seconds while the chart drew
-     * the provider's raw hourly rows instead: a flat, dry evening, on the night
-     * six of seven models forecast rain.
-     *
-     * Nothing here needs any of the others. Starting each with the value that
-     * means "not yet" lets the combine emit immediately and again as each part
-     * lands, so the timeline appears the moment it exists rather than when the
-     * air quality does.
+     * The derived things, each arriving on its own. Each starts with a "not yet"
+     * value, so the timeline is not held back by a slow air quality request.
      */
     private val derived: Flow<Derived> = combine(
         timelines.onStart { emit(emptyList()) },
@@ -216,11 +159,8 @@ class WeatherViewModel(
     }
 
     /**
-     * One mark for "asking again", whichever request is out.
-     *
-     * Combined here rather than shown as two, because a reader does not have a
-     * mental model of "the model" and "the radar" and should not be given one -
-     * design rule 8. Either way the answer on screen is about to change.
+     * One mark for "asking again", whichever request is out: the reader should not
+     * need to know there is a model and a radar.
      */
     private val busy: Flow<Boolean> =
         combine(refreshing, collecting) { model, radar -> model || radar }
@@ -236,23 +176,19 @@ class WeatherViewModel(
         WeatherUiState(
             loaded = held.loaded,
             location = location,
-            // Corrected here, once, rather than at each place a temperature is
-            // drawn. A corrected dial above an uncorrected week would contradict
-            // itself, and invisibly.
+            // Corrected once, here, so the dial and the week cannot disagree about the same
+            // temperature.
             forecast = forecast?.withLocalCorrection(extra.bias),
             isRefreshing = isRefreshing,
             error = failure,
-            // Only offer the timeline while it still belongs to the forecast on
-            // screen. Changing place clears it rather than briefly drawing the
-            // last city's rain over the new one's name.
+            // Only while the timeline belongs to the forecast on screen, so a change of place
+            // never draws the last city's rain under the new one's name.
             timeline = if (forecast != null) extra.timeline else emptyList(),
             airQuality = if (forecast != null) extra.air else null,
             climatology = if (forecast != null) extra.climatology else Climatology(emptyMap()),
-            // Read off the forecast on screen and the air beside it, so a
-            // warning cannot outlive the forecast that raised it. The normals
-            // go in too: the thresholds for heat, cold and wind are what this
-            // place does rather than one number for the planet, and the mark on
-            // the dial has to be the same judgement the notification made.
+            // Read off the forecast on screen, so a warning cannot outlive the forecast that
+            // raised it. The normals set the thresholds, matching what the notification
+            // judged.
             hazards = if (forecast != null) {
                 Hazards.scan(forecast, extra.air, Instant.now(), extra.climatology)
             } else {
@@ -261,19 +197,17 @@ class WeatherViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        // Survives a rotation without a refetch, and lets go shortly after the
-        // screen does.
+        // Survives a rotation without a refetch.
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
         initialValue = WeatherUiState(location = selectedLocation.selected.value),
     )
 
     init {
-        // Changing place is what triggers a fetch, not the screen appearing. An
-        // already-fresh cached forecast is shown as it is.
+        // Changing place triggers a fetch; an already-fresh cached forecast is shown as
+        // it is.
         viewModelScope.launch {
             selectedLocation.selected.collect { location ->
-                // A failure belongs to the place it happened in. Carrying it to
-                // the next one would tell somebody their new location is broken.
+                // A failure belongs to the place it happened in.
                 error.value = null
                 if (repository.needsRefresh(repository.cached(location))) refresh()
             }
@@ -281,15 +215,8 @@ class WeatherViewModel(
     }
 
     /**
-     * Fetches only if the cache has aged out.
-     *
-     * Called when the screen comes back to the foreground. Freshness was
-     * otherwise settled once, when this view model was built, and never asked
-     * again: an app left in the background for an afternoon came back to
-     * whatever it was showing when it left. The periodic worker usually covers
-     * that, but "usually" is doing real work in that sentence - Doze and battery
-     * saver defer it freely, and those are exactly the conditions of a phone
-     * that has been in a pocket for three hours.
+     * Fetches only if the cache has aged out. The periodic worker usually covers
+     * this, but Doze and battery saver defer it freely.
      */
     fun refreshIfStale() {
         viewModelScope.launch {
@@ -299,18 +226,10 @@ class WeatherViewModel(
     }
 
     /**
-     * Coming back to the app: ask for the newest at once.
-     *
-     * Not "if stale". Somebody opening a weather app is asking what it is doing
-     * now, and the answer on disk is whatever the last wake found - so the app
-     * goes and looks rather than deciding the copy it holds is good enough. The
-     * cost is small by construction: the HTTP cache answers MET Norway from disk
-     * inside its own `Expires` and revalidates it to a "not modified" after, and
-     * the radar only troubles its source when a sweep is actually due. What is
-     * held is on screen the whole time; this only ever replaces it with newer.
-     *
-     * Once a minute at most, so flicking between apps does not become a request
-     * per flick.
+     * Coming back to the app: ask for the newest at once, not only if stale. The
+     * HTTP cache and the radar's sweep schedule keep this cheap, and what is held
+     * stays on screen until something newer replaces it. At most once a minute
+     * ([RETURN_DEBOUNCE]).
      */
     fun refreshOnReturn() {
         val now = Instant.now()
@@ -324,11 +243,7 @@ class WeatherViewModel(
 
     private var lastReturn: Instant = Instant.EPOCH
 
-    /**
-     * Fetches regardless of freshness. A person who asks for a refresh has a
-     * reason, and telling them the data is recent enough would be arguing with
-     * them about their own window.
-     */
+    /** Fetches regardless of freshness: the reader asked. */
     fun refresh() {
         if (refreshing.value) return
         viewModelScope.launch {
@@ -343,16 +258,11 @@ class WeatherViewModel(
         const val STOP_TIMEOUT_MS = 5_000L
 
         /**
-         * How often the near term is rebuilt.
-         *
-         * A minute, which is finer than the radar publishes at. That is
-         * deliberate: most ticks fetch nothing and exist to keep the leading
-         * edge of the chart anchored to now, and the one that lands after a new
-         * sweep picks it up within a minute of it existing.
+         * How often the near term is rebuilt: finer than radar publishes, so a new sweep
+         * is picked up within a minute; most ticks only re-anchor.
          */
         const val TIMELINE_TICK_MS = 60_000L
 
-        /** See [refreshOnReturn]. */
         val RETURN_DEBOUNCE: Duration = Duration.ofMinutes(1)
     }
 }

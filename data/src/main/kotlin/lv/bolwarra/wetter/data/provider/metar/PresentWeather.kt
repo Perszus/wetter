@@ -1,34 +1,18 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metar
 
 import lv.bolwarra.wetter.domain.observation.ObservedIntensity
 
 /**
- * Reads a routine report's present-weather group.
+ * Reads a routine report's present-weather group: `-RA BR` is light rain with
+ * mist, observed rather than modelled.
  *
- * A report says `-RA BR` rather than giving a number: light rain, with mist.
- * That is less than a rain gauge would give and it is the right kind of truth
- * for verification - whether it was raining is exactly the question a
- * precipitation forecast is judged on, and it is answered by a human or an
- * instrument at the airport rather than by another model.
- *
- * ### Absent is dry, but only when a report actually arrived
- *
- * An empty present-weather group means nothing significant is happening, which
- * for a station that filed a report is a genuine observation of no
- * precipitation. Treating the same absence as dry when nothing was received
- * would manufacture clear-weather observations nobody made, and credit
- * forecasts for correctly predicting a dry hour that was never confirmed.
- *
- * The two are told apart by the raw report. A METAR is a complete statement of
- * the weather at one place at one time: if the text is there and carries no
- * weather group, the observer looked and saw nothing falling. So
- * [precipitationFrom] takes the report alongside the group, and returns null
- * only when there is no report behind the silence.
- *
- * This is not a nicety. Without it the model's precipitation is scored on wet
- * hours and no others - the record has no dry hours in it at all, because a
- * clear METAR produces no observation - and a verification set with no
- * negatives says every forecast missed every rain it ever called correctly dry.
+ * An empty group in a report that arrived is an observation of nothing falling;
+ * with no report at all it is nothing. [precipitationFrom] takes the raw report
+ * alongside the group to tell them apart, so verification has dry hours as well as
+ * wet ones.
  */
 internal object PresentWeather {
 

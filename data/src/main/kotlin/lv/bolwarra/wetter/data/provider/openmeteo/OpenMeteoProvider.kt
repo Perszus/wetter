@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.openmeteo
 
 import io.ktor.client.HttpClient
@@ -18,15 +21,8 @@ import lv.bolwarra.wetter.domain.provider.WeatherProvider
 import lv.bolwarra.wetter.domain.provider.WeatherVariable
 
 /**
- * Open-Meteo: Wetter's global baseline.
- *
- * It is the provider that answers anywhere, supplies every variable the screen
- * can use, and needs no API key — which is what makes it the right fallback
- * rather than the right specialist (docs/providers.md).
- *
- * [baseUrl] is a constructor parameter so that Wetter can be pointed at a
- * self-hosted Open-Meteo instance. Nothing else about the provider changes in
- * that case.
+ * Open-Meteo: Wetter's global baseline, answering anywhere with every variable and
+ * no API key (docs/providers.md). [baseUrl] can point at a self-hosted instance.
  */
 internal class OpenMeteoProvider(
     private val client: HttpClient,
@@ -106,18 +102,9 @@ internal class OpenMeteoProvider(
         const val ATTRIBUTION = "Weather data by Open-Meteo.com, licensed CC BY 4.0"
 
         /**
-         * Everything this service will give, which is sixteen days.
-         *
-         * It asked for seven for as long as the Week page was the furthest
-         * anything looked. The Month page looks as far as there is, so the
-         * request now matches what [capabilities] has always claimed — and a
-         * capability the request quietly contradicts is worse than a modest one,
-         * because the router ranks on it.
-         *
-         * Measured cost of the other nine days: 14 KB to 31 KB per fetch,
-         * hourly rows included, once or twice an hour. Small enough that
-         * fetching the daily rows separately would cost more in a second
-         * request than it saved in bytes.
+         * Everything this service gives, sixteen days, matching what [capabilities]
+         * claims for the router's ranking and what the Month page reads. The extra days
+         * add 14 to 31 KB per fetch.
          */
         private const val FORECAST_DAYS = 16
 

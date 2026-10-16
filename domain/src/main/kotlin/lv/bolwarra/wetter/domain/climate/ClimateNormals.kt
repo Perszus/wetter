@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.climate
 
 import java.time.LocalDate
@@ -7,11 +10,11 @@ import kotlin.math.ceil
 /** One past day at a place, as the archive records it. */
 data class ArchivedDay(
     val date: LocalDate,
-    /** °C */
+    /** °C. */
     val high: Double?,
-    /** °C */
+    /** °C. */
     val low: Double?,
-    /** mm over the whole day */
+    /** mm over the whole day. */
     val precipitation: Double?,
     /** °C, what the warmest part of the day felt like. */
     val apparentHigh: Double? = null,
@@ -24,11 +27,9 @@ data class ArchivedDay(
 /**
  * What a date at this place usually does.
  *
- * Deliberately not shaped like [lv.bolwarra.wetter.domain.model.DailyWeather].
- * It is a different kind of statement and must not be substitutable for one: no
- * condition, because there is no sky that a decade of Septembers agrees on, and
- * a share of years rather than a probability of rain, because that is the thing
- * actually counted.
+ * Deliberately not shaped like [lv.bolwarra.wetter.domain.model.DailyWeather], so
+ * it cannot stand in for a forecast: no condition, and a share of wet years rather
+ * than a probability of rain.
  */
 data class DayNormal(
     val monthDay: MonthDay,
@@ -41,23 +42,17 @@ data class DayNormal(
     /** How many past days the medians were taken over. */
     val samples: Int,
     /**
-     * The upper and lower tails of what this date does here, and how often it
-     * thunders. Null where the archive did not carry the variable.
-     *
-     * These are what make a warning mean something. A threshold that is right
-     * for a place is not a number anybody can write down once: thirty-two
-     * degrees of heat index is a September night in Kolkata and a heatwave in
-     * Rīga, and an app that says the same word about both is only saying it
-     * about one of them. See `HazardAnnouncements`.
+     * The tails of what this date does here, and how often it thunders; null where
+     * the archive did not carry the variable. They give warnings a threshold that
+     * belongs to the place (see `HazardAnnouncements`).
      */
     val warmTail: Double? = null,
     val coldTail: Double? = null,
     /** m/s. */
     val gustTail: Double? = null,
     /**
-     * The same three again, further out: about the worst comparable day in a
-     * decade rather than the worst in twenty. This is what lets a place have a
-     * *danger* level of its own instead of borrowing one set for the planet.
+     * The same three further out, about the worst comparable day in a decade: a
+     * danger level of the place's own.
      */
     val warmExtreme: Double? = null,
     val coldExtreme: Double? = null,
@@ -78,79 +73,40 @@ data class Climatology(private val byDay: Map<MonthDay, DayNormal>) {
 /**
  * Turns a decade of archived days into what each date usually does.
  *
- * ### Why this exists at all
+ * The Month page reaches past where any forecast carries information, so beyond
+ * it each square shows what that date has done before. It is not a prediction
+ * and is not drawn as one.
  *
- * The Month page is thirty days long and no service forecasts thirty days. The
- * ensembles that reach that far stop carrying information well before they stop
- * producing numbers — measured at Rīga, day 33 of a 31-member GEFS run had two
- * fifths of its members wet, which is the base rate for October there, and
- * 16.8 °C between its warmest and coldest member. Dressing that up as a forecast
- * would be the app inventing weather.
- *
- * What *is* honest for a day three weeks out is what that date has actually done
- * before. It is not a prediction and it is not drawn as one; it is the only
- * truthful thing there is to put in the square.
- *
- * ### The window is the whole trick
- *
- * Ten years gives ten samples for a date, and ten samples of Baltic weather is
- * not a climate — it is noise with a seasonal trend under it. Measured at Rīga
- * the raw medians ran 16.5, 14.2, 13.9, 13.1 °C across four consecutive days of
- * late September, and none of those steps is real: September does not cool by
- * 2.3 degrees in a day and warm back up.
- *
- * Pooling [WINDOW_DAYS] either side puts about a hundred and ten samples behind
- * each date and the same four days come out 14.7, 14.4, 14.2, 14.2 — a seasonal
- * decline, which is what a normal is supposed to be. The window costs a little
- * sharpness at the turn of the seasons and buys a curve that is not an artefact
- * of how many Septembers happened to be warm.
- *
- * ### Wet is counted, not averaged
- *
- * A mean rainfall for a date is dominated by the one year a storm sat over the
- * city, and reads as though that is a normal Tuesday. The share of past days
- * that were wet at all is the figure that survives an outlier and is also the
- * one anybody actually wants: how often does this date rain.
+ * Ten years gives ten samples per date, which is noise with a seasonal trend under
+ * it, so [WINDOW_DAYS] either side are pooled into each date's normal. Wet is
+ * counted, not averaged: the share of wet days survives the one storm year a mean
+ * would be dominated by.
  */
 object ClimateNormals {
 
     /**
-     * Days either side of a date that are pooled into its normal.
-     *
-     * Five, from measurement rather than convention: three still left visible
-     * steps between neighbouring dates at ten years of history, and seven began
-     * to flatten the shoulders of the seasons without making the middle of them
-     * any steadier.
+     * Days either side of a date pooled into its normal. Three left visible steps
+     * between neighbouring dates; seven flattened the seasons' shoulders.
      */
     const val WINDOW_DAYS = 5
 
     /**
-     * A day counts as wet at a millimetre, which is the conventional "rain day".
-     *
-     * Deliberately not one of [PrecipitationIntensity]'s constants and
-     * deliberately not near them. Those are *rates* in millimetres per hour and
-     * this is an *accumulation* over a whole day; the two are only the same
-     * number for a one-hour window, and treating one as the other is exactly the
-     * mistake that once had a day of thin drizzle marked as rain. A separate
-     * name in a separate unit is the cheapest way to keep them from being
-     * confused again.
+     * A day counts as wet at a millimetre, the conventional rain day. An accumulation
+     * over a day, not a rate like [PrecipitationIntensity]'s constants.
      */
     const val WET_DAY_MM = 1.0
 
     /**
-     * Below this the medians are being taken over too little to mean anything and
-     * the date is left out, so the page draws an empty square rather than a
-     * number nobody should read.
+     * Below this many samples a date is left out, so the page draws an empty square
+     * rather than a number nobody should read.
      */
     const val LEAST_USEFUL_SAMPLE = 30
 
     fun build(days: List<ArchivedDay>, window: Int = WINDOW_DAYS): Climatology {
         if (days.isEmpty()) return Climatology(emptyMap())
 
-        // Grouped by calendar date rather than by day-of-year: the 60th day of
-        // the year is 1 March in three years out of four and 29 February in the
-        // fourth, and pooling those together shifts every spring normal by a day
-        // in leap years.
+        // Grouped by calendar date rather than day-of-year, which would shift every
+        // spring normal by a day in leap years.
         val byMonthDay = HashMap<MonthDay, MutableList<ArchivedDay>>()
         days.forEach { day ->
             val key = MonthDay.of(day.date.month, day.date.dayOfMonth)
@@ -159,8 +115,7 @@ object ClimateNormals {
 
         val normals = HashMap<MonthDay, DayNormal>()
         byMonthDay.keys.forEach { monthDay ->
-            // A leap year, so 29 February is a real date to walk through and
-            // gets a window like every other day.
+            // A leap year, so 29 February gets a window like every other day.
             val anchor = monthDay.atYear(LEAP_YEAR)
             val pooled = (-window..window).flatMap { offset ->
                 val at = anchor.plusDays(offset.toLong())
@@ -195,37 +150,22 @@ object ClimateNormals {
     }
 
     /**
-     * Where "unusual for this place at this time of year" is drawn.
-     *
-     * The 95th percentile, which with about a hundred and ten samples behind a
-     * date is roughly the warmest — or windiest — one day in twenty: something
-     * like a day a month at this point in the year. Rare enough that saying so
-     * is news, common enough that the figure is actually estimable from ten
-     * years rather than being the single worst day on record.
-     *
-     * Deliberately not the median plus some number of degrees. A place with
-     * steady weather and a place with wild weather can share a median and have
-     * nothing else in common, and the whole point of this is to ask how far out
-     * of the ordinary a day is *here*.
+     * Where "unusual for this place at this time of year" is drawn: the 95th
+     * percentile, roughly one day in twenty. A percentile rather than the median plus
+     * some degrees, because places with the same median can differ in everything
+     * else.
      */
     const val UNUSUAL_HERE = 0.95
 
     /**
-     * Where "about as bad as this place gets at this time of year" is drawn.
-     *
-     * The 99th percentile, which over a decade and an eleven-day window is
-     * around the second-worst comparable day in ten years. Coarse, and
-     * deliberately so: it is being asked to stand in for a danger level, and a
-     * danger level that fires more than about once a decade is not one.
+     * Where "about as bad as this place gets at this time of year" is drawn: the 99th
+     * percentile, around the second-worst comparable day in ten years.
      */
     const val EXCEPTIONAL_HERE = 0.99
 
     /**
-     * The value at a rank, by nearest-rank rather than by interpolation.
-     *
-     * The same reasoning as the median below it: an interpolated percentile is a
-     * number that never happened, and the entire use of this is to say what an
-     * unusual day at this place actually looks like.
+     * The value at a rank, by nearest rank: an interpolated percentile is a number
+     * that never happened.
      */
     private fun List<Double>.percentile(fraction: Double): Double? {
         if (size < LEAST_USEFUL_SAMPLE) return null
@@ -235,11 +175,8 @@ object ClimateNormals {
     }
 
     /**
-     * The middle value, taking the lower of the two in an even-sized set.
-     *
-     * Not the mean of the middle pair. A median is chosen here precisely because
-     * it is a value that actually happened, and averaging two of them puts back
-     * the invented number the median was avoiding.
+     * The middle value, taking the lower of an even-sized pair rather than averaging
+     * them, so it is a value that actually happened.
      */
     private fun List<Double>.median(): Double? {
         if (isEmpty()) return null

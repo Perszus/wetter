@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data
 
 import android.content.Context
@@ -38,28 +41,19 @@ import lv.bolwarra.wetter.domain.provider.ProviderHealthRegistry
 import lv.bolwarra.wetter.domain.provider.WeatherProvider
 
 /**
- * Everything `:data` assembles for itself.
- *
- * The database, the HTTP client, the provider implementations and the router are
- * all details of how weather is obtained and kept, and none of them is any of
- * the application's business. What comes back out is a [WeatherRepository], a
+ * Everything `:data` assembles for itself. The database, HTTP client, providers
+ * and router stay inside; what comes out is a [WeatherRepository], a
  * [SelectedLocationStore] and a list of attributions.
  *
- * This is what the module split is for. Before it, the application held a Ktor
- * client it had no reason to know about; now it cannot, because it cannot see
- * the type.
- *
  * @param applicationVersion goes into the User-Agent, which MET Norway's terms
- *   require to identify the application. `:data` cannot read it for itself and
- *   should not try.
+ * require to identify the application.
  */
 class WeatherData(
     context: Context,
     applicationVersion: String,
     /**
-     * Outlives any one screen, because the location store writes to disk and a
-     * write must not be cancelled by whoever happened to trigger it navigating
-     * away. Owned by the process, like the container that holds it.
+     * Outlives any one screen, so a write to disk is not cancelled by whoever
+     * triggered it navigating away.
      */
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
@@ -76,10 +70,8 @@ class WeatherData(
     }
 
     /**
-     * The registered providers. The order here means nothing to the router,
-     * which ranks them per location.
-     *
-     * Adding a provider is this line and nothing else.
+     * The registered providers, in no meaningful order: the router ranks them per
+     * location.
      */
     val providers: List<WeatherProvider> by lazy {
         listOf(
@@ -89,25 +81,22 @@ class WeatherData(
     }
 
     /**
-     * Radar observations, which answer a different question from the forecast
-     * providers and so are registered separately (docs/providers.md). A model
-     * says what should happen; radar says what is happening.
+     * Radar observations, registered apart from the forecast providers
+     * (docs/providers.md): a model says what should happen, radar what is happening.
      */
     private val radarSource by lazy {
         RainViewerRadarSource(httpClient, AndroidTileDecoder())
     }
 
     /**
-     * Aerodrome reports: the only measurements of what the weather actually was
-     * that this app can reach. Not shown anywhere - they exist so predictions
-     * can be checked against something that was not itself a prediction.
+     * Aerodrome reports, never shown: they exist so predictions can be checked
+     * against something that was not itself a prediction.
      */
     private val observationSource by lazy { MetarObservationSource(httpClient) }
 
     /**
-     * The record of what was forecast and what happened. The one part of this
-     * app that gets better on its own, and the one thing in the database that
-     * cannot be fetched again if it is lost.
+     * The record of what was forecast and what happened: the one thing in the
+     * database that cannot be fetched again.
      */
     val verification: VerificationRepository by lazy {
         VerificationRepository(database.forecastRecords(), observationSource)
@@ -121,23 +110,15 @@ class WeatherData(
             ensembleStore = EnsembleStore(database.ensembles(), WetterHttpClient.json),
             // So every projection is scored against the sweep that answers it.
             verification = verification,
-            // So a screen answered from disk still goes and fetches a fresher
-            // one behind itself.
+            // So a screen answered from disk still fetches a fresher one behind itself.
             scope = scope,
         )
     }
 
     /**
-     * A scope that outlives any one screen.
-     *
-     * Offered rather than hidden, for the small number of jobs that must finish
-     * whether or not the screen that started them is still there. Keeping a
-     * place somebody just chose is one: the screen closes itself the moment they
-     * press the button, and work left on its view model dies with it.
-     *
-     * Not a general-purpose escape hatch. Anything that only matters while
-     * somebody is looking at it belongs on a view model, where cancelling it
-     * when they leave is the correct behaviour rather than a bug.
+     * A scope that outlives any one screen, for the few jobs that must finish after it
+     * closes, such as keeping a place somebody just chose. Anything that only matters
+     * while somebody is looking belongs on a view model.
      */
     val applicationScope: CoroutineScope get() = scope
 
@@ -153,10 +134,8 @@ class WeatherData(
     }
 
     /**
-     * What each date usually does here, for the far end of the Month page.
-     *
-     * Separate from the providers on purpose - it answers what has happened, not
-     * what will, and has nothing to be ranked against. See ClimatologyRepository.
+     * What each date usually does here. Separate from the providers: it answers what
+     * has happened, not what will.
      */
     val climatology: ClimatologyRepository by lazy {
         ClimatologyRepository(
@@ -166,10 +145,7 @@ class WeatherData(
         )
     }
 
-    /**
-     * What is in the air, which is not weather and is not fetched with it.
-     * Its own host, its own models, its own cadence.
-     */
+    /** What is in the air: its own host, models and cadence. */
     private val airQualitySource by lazy { OpenMeteoAirQuality(httpClient) }
 
     val airQuality: AirQualityRepository by lazy { AirQualityRepository(airQualitySource) }
@@ -181,10 +157,11 @@ class WeatherData(
                 radarSource.attribution +
                 observationSource.attribution +
                 placeSearch.attribution +
-                airQualitySource.attribution
+                PhotonReverseGeocoder.ATTRIBUTION +
+                airQualitySource.attribution +
+                "Map tiles ${MapTileSource.ATTRIBUTION}"
             )
-            // Open-Meteo answers for the forecast, the geocoder and the air.
-            // One service should be credited once.
+            // One service is credited once.
             .distinct()
     }
 
@@ -194,8 +171,7 @@ class WeatherData(
     private val healthStore by lazy { ProviderHealthStore(database.providerHealth()) }
 
     private val router by lazy {
-        // Restored in the background: a cold start must not wait on a disk read
-        // to answer, and anything learned before it lands wins anyway.
+        // Restored in the background: a cold start must not wait on a disk read.
         scope.launch { runCatching { healthStore.restoreInto(healthRegistry) } }
         WeatherProviderRouter(
             providers = providers,
@@ -215,13 +191,13 @@ class WeatherData(
         SelectedLocationStore(database.selectedLocation(), scope)
     }
 
-    /** Finding a place by name. */
     /** What is at a dropped pin, when anything is. */
     val reverseGeocoder: PhotonReverseGeocoder by lazy { PhotonReverseGeocoder(httpClient) }
 
     /** Tiles for the map a pin is dropped on. Not weather; see MapTileSource. */
     val basemap: MapTileSource by lazy { MapTileSource(httpClient) }
 
+    /** Finding a place by name. */
     val placeSearch: PlaceSearch by lazy { OpenMeteoGeocoder(httpClient) }
 
     /** The places somebody has kept, so search is used once rather than daily. */

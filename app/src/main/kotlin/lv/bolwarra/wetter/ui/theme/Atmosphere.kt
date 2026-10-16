@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.theme
 
 import androidx.compose.runtime.Immutable
@@ -5,36 +8,22 @@ import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.WeatherCondition
 
 /**
- * The weather, as a change in the light rather than as a picture of itself.
+ * The weather, as a change in the light rather than a picture of itself: the same
+ * paper and ink, seen under a different sky.
  *
- * A weather app that colours a rain screen blue and a sun screen yellow has two
- * screens. The intent here is one object - the same paper, the same ink, the
- * same instrument - seen under a different sky. What a sky changes is not the
- * object's colours but the conditions it is being read in: how much light there
- * is, how far apart light and dark sit, how much colour survives, and how much
- * of the air between you and it is doing something.
- *
- * So an atmosphere is four numbers and no palette. It is applied to the plate's
- * specification before any tone is generated, which means every role moves
- * together and none can drift out of relation with the others - and it means a
- * condition added later is a row in a table, not a new set of colours.
- *
- * ### Restraint
- *
- * The whole range of [ground] is about six lightness steps, and of [contrast]
- * about a fifth. That is deliberately near the threshold of noticing. The test
- * of this system is not that somebody sees the screen change when it starts
- * raining; it is that the screen feels different and they could not say why.
+ * Four numbers and no palette, applied to the plate's specification before any
+ * tone is generated, so every role moves together. The ranges are kept near the
+ * threshold of noticing: the screen should feel different without anybody being
+ * able to say why.
  *
  * @param ground L* added to the page. Overcast weighs it down, snow lifts it.
  * @param contrast multiplier on every ink contrast target. Haze compresses the
- *   range between ink and ground, exactly as it does outdoors.
+ * range between ink and ground, as it does outdoors.
  * @param chroma multiplier on every accent's colourfulness. Fog drains colour;
- *   a storm concentrates it.
+ * a storm concentrates it.
  * @param veil how much of the page is drawn back over the content as haze, 0..1.
- *   The only additive effect in the system, and the only one that can hide
- *   anything, so it is capped low and reserved for conditions that genuinely
- *   obscure.
+ * The only effect that can hide anything, so it is capped low and kept for
+ * conditions that obscure.
  */
 @Immutable
 data class Atmosphere(
@@ -48,11 +37,8 @@ data class Atmosphere(
         val Neutral = Atmosphere()
 
         /**
-         * The sky, read from what the app actually knows.
-         *
-         * Intensity is taken separately from condition because a provider's code
-         * says "rain" for both a drizzle you would not remark on and a downpour
-         * that empties a street, and those are not the same light.
+         * The sky, from the condition and the intensity separately: a provider's "rain"
+         * covers drizzle and downpour alike, which are not the same light.
          */
         fun of(
             condition: WeatherCondition,
@@ -79,16 +65,15 @@ data class Atmosphere(
                 WeatherCondition.UNKNOWN -> Neutral
             }
 
-            // Heavier precipitation deepens whatever the condition established,
-            // rather than switching to a state of its own. One axis, not two.
+            // Heavier precipitation deepens whatever the condition established, rather than
+            // switching to a state of its own.
             val weight = when (intensity) {
                 PrecipitationIntensity.HEAVY, PrecipitationIntensity.VIOLENT -> DOWNPOUR
                 else -> 1.0
             }
 
-            // Night is not a separate design. It is the same modulation with
-            // less of it, because after dark the plate is already dark and a
-            // sky that darkened it further would only take away contrast.
+            // Night is the same modulation with less of it: the plate is already dark, and
+            // darkening it further would only take away contrast.
             val nightward = if (isDay) 1.0 else NIGHT_DAMPING
 
             return Atmosphere(
@@ -99,10 +84,7 @@ data class Atmosphere(
             )
         }
 
-        /**
-         * Sun on paper: a shade brighter, a touch more separation, colour intact.
-         * Nothing is added - the page is simply better lit.
-         */
+        /** Sun on paper: a shade brighter, a touch more separation, colour intact. */
         private val CLEAR = Atmosphere(ground = 1.4, contrast = 1.06)
 
         private val MAINLY_CLEAR = Atmosphere(ground = 0.7, contrast = 1.03)
@@ -111,9 +93,8 @@ data class Atmosphere(
         private val OVERCAST = Atmosphere(ground = -2.0, contrast = 0.95, chroma = 0.90)
 
         /**
-         * The one condition that genuinely takes information away, and the only
-         * one allowed a veil. Contrast collapses, colour drains, and the page
-         * itself is drawn back over its own content.
+         * The one condition that takes information away, and the only one allowed a
+         * veil.
          */
         private val FOG = Atmosphere(ground = -0.8, contrast = 0.82, chroma = 0.55, veil = 0.10f)
 
@@ -128,9 +109,8 @@ data class Atmosphere(
         private val SLEET = Atmosphere(ground = -1.6, contrast = 0.94, chroma = 0.80)
 
         /**
-         * Snow is the one weather that makes the world *brighter* and flatter at
-         * once - everything reflects, and everything loses its edges. The only
-         * entry in this table with a positive ground and a reduced contrast.
+         * Snow makes the world brighter and flatter at once: the only entry with a
+         * positive ground and reduced contrast.
          */
         private val SNOW = Atmosphere(ground = 2.0, contrast = 0.90, chroma = 0.70)
 

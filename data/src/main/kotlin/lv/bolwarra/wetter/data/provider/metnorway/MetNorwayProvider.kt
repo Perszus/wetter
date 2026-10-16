@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metnorway
 
 import io.ktor.client.HttpClient
@@ -22,20 +25,12 @@ import lv.bolwarra.wetter.domain.provider.WeatherProvider
 import lv.bolwarra.wetter.domain.provider.WeatherVariable
 
 /**
- * MET Norway: Wetter's regional specialist.
+ * MET Norway: Wetter's regional specialist, a 2.5 km model over the Nordics and a
+ * global one elsewhere (docs/providers.md).
  *
- * It runs a 2.5 km model over the Nordic area and falls back to a global model
- * elsewhere, which is exactly the shape the selector is built to reward — a
- * strong claim where the fine grid runs, an ordinary one everywhere else. It is
- * not presented as globally better than Open-Meteo, because it is not
- * (docs/providers.md).
- *
- * Two obligations come with the free service, and both are met here rather than
- * left as documentation: an identifying User-Agent on every request (installed
- * once on the shared client), and coordinates truncated to four decimals so that
- * cache keys are shared between users rather than unique per person. The second
- * is a privacy benefit as much as a courtesy — it also caps how precisely a
- * request describes where somebody is.
+ * Its terms ask for an identifying User-Agent (on the shared client) and
+ * coordinates truncated to four decimals, which also caps how precisely a request
+ * describes where somebody is.
  */
 internal class MetNorwayProvider(
     private val client: HttpClient,

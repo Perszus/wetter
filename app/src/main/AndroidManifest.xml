@@ -1,64 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-      INTERNET is the only permission Wetter holds, and it is used for exactly one
-      thing: asking a weather provider about a place. There is no account, no
-      analytics endpoint and no backend of ours to talk to (philos.md §16).
-
-      ACCESS_COARSE_LOCATION arrives with optional current-location support and
-      will stay optional — the app is fully usable without it. See docs/decisions.md.
-    -->
+    <!-- Asking the weather services about a place. There is no backend of ours. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
-      Coarse location only, and optional.
-
-      Asked for once, at the moment somebody presses "use my current location"
-      on the map, and used for a single fix that is thrown away as soon as the
-      pin is placed. Nothing subscribes to updates and nothing runs in the
-      background: the app has no use for where you are except at the instant you
-      ask it to put a pin there.
-
-      Coarse rather than fine because the question is which town this is, not
-      which side of the street - the finest model in the app resolves about two
-      and a half kilometres, so a street-level fix would be precision the
-      forecast cannot spend. required="false" so a device without the hardware
-      can still install it; the button simply reports that it found nothing.
+      Optional, coarse location: one fix when somebody asks the map for their
+      current location, never watched and never in the background. Coarse because
+      no forecast grid resolves finer. The hardware is not required.
     -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
-      The background clock (work/Heartbeat.kt).
-
-      Alarms are wiped by a reboot and by an app update, and an app that waits to
-      be opened before it starts its clock again shows yesterday's rain on the
-      home screen all morning. RECEIVE_BOOT_COMPLETED is what restarts it.
-
-      SCHEDULE_EXACT_ALARM lets the wake land on the minute a radar sweep is
-      published rather than somewhere in the few minutes after. From Android 12
-      it is not granted by default; somebody turns it on in Settings, and the
-      app's own settings panel offers the way there. Without it the clock still
-      runs, inexactly - minutes late, never missing.
+      The background clock (work/Heartbeat.kt). A reboot or an update wipes its
+      alarm, so boot restarts it. Exact alarms land the wake on a new radar sweep;
+      from Android 12 that is granted in Settings, and without it the clock runs
+      a few minutes late.
     -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!--
-      Severe weather warnings, and nothing else.
-
-      The only thing this app says without being opened. What reaches a
-      notification has already cleared the thresholds in domain/hazard - a gale,
-      torrential rain, heavy snow, ice, a thunderstorm, or a temperature that is
-      dangerous - so this is not a channel for showers, tips or news about the
-      app. There is a switch for it in Settings and it can be turned off there
-      without the app losing anything else.
-
-      Asked for at the moment the app has a place to warn about, not on first
-      launch: a permission prompt before the app has done anything is a prompt
-      about nothing.
+      Severe weather warnings and nothing else, switchable in Settings. Asked for
+      once the app is showing a forecast, not on first launch.
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -85,16 +51,7 @@
             </intent-filter>
         </activity>
 
-        <!--
-          The home-screen widget.
-
-          Exported because two of the three actions below are implicit
-          broadcasts, and an unexported receiver never sees those. All three are
-          protected broadcasts that only the system may send. The fourth thing it
-          hears is its own redraw alarm (widget/Tick.kt), addressed to it by
-          class. Being reachable costs nothing: the worst another app can do by
-          naming this receiver explicitly is ask it to redraw itself.
-        -->
+        <!-- Where the heartbeat's alarm lands, and where boot and updates re-arm it. -->
         <receiver
             android:name=".work.HeartbeatReceiver"
             android:exported="false">
@@ -105,6 +62,11 @@
             </intent-filter>
         </receiver>
 
+        <!--
+          The widgets. Exported because the time and time-zone changes are
+          implicit broadcasts, which an unexported receiver never sees; all are
+          protected broadcasts only the system may send.
+        -->
         <receiver
             android:name=".widget.RainWidget"
             android:exported="true"

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.map
 
 import android.graphics.BitmapFactory
@@ -8,18 +11,9 @@ import kotlinx.coroutines.withContext
 import lv.bolwarra.wetter.data.map.MapTileSource
 
 /**
- * Tiles, decoded and kept for as long as the picker is open.
- *
- * Keeping what has already been seen is explicitly fine under the tile policy -
- * it is *pre-emptive* fetching that is prohibited, and a tile already on screen
- * has plainly been fetched for a viewer. So panning back to where you were costs
- * nothing, while panning somewhere new costs exactly the tiles you are now
- * looking at.
- *
- * The cache is a plain map with a cap rather than anything cleverer. It lives
- * for one visit to the picker, and the ceiling is about what a large phone
- * screen covers at two zoom levels - past that the oldest go, because somebody
- * who has panned across a continent is not about to pan back across it.
+ * Tiles, decoded and kept while the picker is open. Keeping what has been viewed
+ * is fine under the tile policy, which prohibits pre-emptive fetching. A capped
+ * map, about two zoom levels of a large screen; past that the oldest go.
  */
 class BasemapLoader(private val source: MapTileSource) : TileLoader {
 

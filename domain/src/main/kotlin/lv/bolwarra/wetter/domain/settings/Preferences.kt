@@ -1,56 +1,31 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.settings
 
 /**
- * What the reader has chosen, and nothing else.
- *
- * docs/decisions.md keeps units canonical in the domain — Celsius, metres per
- * second, millimetres — and converts only for display. Nothing in here changes
- * that: these say how a number should be *written*, and every value that reaches
- * them is still in the unit the rest of the app computes in. A preference that
- * reached into the model would mean the same forecast produced different
- * arithmetic depending on where the reader lives.
- *
- * Settings stay minimal by policy. Everything here is something a sensible
- * default genuinely cannot answer for everybody: which units somebody reads in
- * is not a matter of taste and not something the app can infer without being
- * wrong for a third of the world.
+ * What the reader has chosen. These say how a number is written; every value
+ * stays in the domain's canonical units (docs/decisions.md), so the arithmetic is
+ * the same wherever the reader lives.
  */
 data class Preferences(
     val temperature: TemperatureUnit = TemperatureUnit.CELSIUS,
     val wind: WindUnit = WindUnit.METRES_PER_SECOND,
     val precipitation: PrecipitationUnit = PrecipitationUnit.MILLIMETRES,
     /**
-     * Black by default.
-     *
-     * A weather app is opened at the two ends of the day far more than in the
-     * middle of it — before leaving, and before going to bed — and that is when
-     * a bright page is worst. It is also the plate that costs least on an OLED
-     * screen, which is most of them.
-     *
-     * Paper is two taps away, and the whole design exists on both.
+     * Black by default: a weather app is opened most at the two ends of the day, when
+     * a bright page is worst, and black costs least on an OLED screen.
      */
     val theme: ThemeChoice = ThemeChoice.PURE_BLACK,
     /**
-     * Whether severe weather is worth a notification, up to a day ahead.
-     *
-     * On by default, which is the one interruption this app is prepared to
-     * make. Everything else it has to say waits until somebody opens it; a
-     * storm, a frost or a heatwave is worth knowing about before you leave the
-     * house, and a warning that arrives after the event is not a warning.
-     *
-     * The bar is the same one the amber mark on the dial uses, and it is set
-     * deliberately high - if this ever fires often enough to be furniture, the
-     * thresholds are wrong rather than the switch.
+     * Whether severe weather is worth a notification, up to a day ahead. On by
+     * default: the one interruption this app makes. The bar is the dial's warning
+     * mark, set high on purpose.
      */
     val warnings: Boolean = true,
 )
 
-/**
- * How temperature is written.
- *
- * Two, not three. Kelvin is a real unit and nobody has ever wanted it on a
- * weather app, and an option nobody picks is a row everybody has to read past.
- */
+/** How temperature is written. Two units; nobody wants Kelvin on a weather app. */
 enum class TemperatureUnit(val suffix: String) {
     CELSIUS("C"),
     FAHRENHEIT("F"),
@@ -62,12 +37,8 @@ enum class TemperatureUnit(val suffix: String) {
     }
 
     /**
-     * A difference, converted.
-     *
-     * Not the same as converting a reading: a *gap* of one degree Celsius is
-     * 1.8 Fahrenheit, not 33.8. The learned local correction is a difference, and
-     * putting it through the reading conversion would have reported a fifth of a
-     * degree of bias as a heatwave.
+     * A difference, converted: a gap of one degree Celsius is 1.8 Fahrenheit, not
+     * 33.8. The learned local correction is a difference.
      */
     fun difference(celsius: Double): Double = when (this) {
         CELSIUS -> celsius
@@ -81,13 +52,8 @@ enum class TemperatureUnit(val suffix: String) {
 }
 
 /**
- * How wind speed is written.
- *
- * Metres per second is what both providers publish and what the domain keeps. It
- * is also, as notes.md observes, a number almost nobody has a feel for — which
- * is why the dial says the wind in words as well, and why that is a separate
- * problem from this one. Changing the unit does not make 12 m/s mean anything;
- * it lets somebody who thinks in mph read the figure at all.
+ * How wind speed is written. Metres per second is what both providers publish and
+ * the domain keeps; the dial also says the wind in words.
  */
 enum class WindUnit(val label: String) {
     METRES_PER_SECOND("m/s"),
@@ -111,13 +77,8 @@ enum class WindUnit(val label: String) {
 }
 
 /**
- * How precipitation is written.
- *
- * The unit changes; the *axis* does not. Every band boundary in `RainCurveBands`
- * stays where it is, because those are thresholds in the weather rather than in
- * the notation — light rain is light rain whichever way it is written down, and
- * a chart whose bands moved with a display preference would be a different chart
- * for no reason.
+ * How precipitation is written. The axis does not change: band boundaries in
+ * `RainCurveBands` are thresholds in the weather, not in the notation.
  */
 enum class PrecipitationUnit(val label: String) {
     MILLIMETRES("mm"),
@@ -129,11 +90,7 @@ enum class PrecipitationUnit(val label: String) {
         INCHES -> millimetres / MM_PER_INCH
     }
 
-    /**
-     * How many places to write. Inches need two where millimetres need one:
-     * a millimetre of rain is 0.04 in, and at one decimal every ordinary
-     * shower rounds to the same number.
-     */
+    /** How many places to write: a millimetre is 0.04 in, so inches need two. */
     val decimals: Int get() = if (this == INCHES) 2 else 1
 
     private companion object {
@@ -142,25 +99,14 @@ enum class PrecipitationUnit(val label: String) {
 }
 
 /**
- * The two plates, and no third.
- *
- * There is deliberately no "follow the system". A plate here is not a light
- * switch — each one is a whole design with its own ground, its own grey ladder
- * and its own idea of where light comes from, and handing the choice to the
- * phone means the app is one of two different designs depending on a setting
- * made for something else. Both are drawn to be read at any hour.
- *
- * The cost is real and worth stating: somebody whose phone flips to dark at
- * sunset will not see this app flip with it. That is the trade for the app
- * looking like itself.
+ * The two plates, and no "follow the system": each is a whole design with its own
+ * ground and grey ladder, drawn to be read at any hour.
  */
 enum class ThemeChoice {
 
     /**
-     * Kenya Hara's *White*: white as a material rather than an absence.
-     *
-     * Off-white paper, true grayscale, ink at near-black, and elevation as a
-     * subtle darkening instead of a lift.
+     * Kenya Hara's *White*: off-white paper, true grayscale, near-black ink, and
+     * elevation as a subtle darkening.
      */
     PURE_WHITE,
 

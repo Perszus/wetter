@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.observation
 
 import java.time.Duration
@@ -16,11 +19,8 @@ data class LocalObservation(
     /** Hectopascals. */
     val pressure: Double?,
     /**
-     * The share of usable stations reporting precipitation, 0..1.
-     *
-     * Not a forecast probability. It is the proportion of nearby places where
-     * something is falling right now, which is a different and more literal
-     * thing - and over a scattered-showers afternoon the two are nothing alike.
+     * The share of usable stations reporting precipitation, 0..1. Not a probability:
+     * the literal proportion of nearby places where something is falling now.
      */
     val precipitatingShare: Double?,
     /** 0..1, how much this estimate deserves to be believed. */
@@ -32,27 +32,14 @@ data class LocalObservation(
 /**
  * Turns a scatter of station reports into an estimate for one place.
  *
- * ### Why not simply the nearest station
+ * Not simply the nearest station (docs/providers.md): height is worth more than
+ * distance for temperature, and a single station has no way to be caught wrong.
+ * Every usable station contributes, weighted by closeness, similar height,
+ * freshness and quality control.
  *
- * docs/providers.md is explicit that the nearest station is the wrong answer,
- * and the reason is visible in the data: the stations around Riga sit between 1
- * and 180 metres above sea level, and height is worth more than distance for
- * temperature. A station 15 km away and 130 m higher is a worse guide to the
- * city than one 80 km away at the same height. Nor does the nearest station have
- * any way to be wrong - if its sensor sticks, so does the app.
- *
- * So every usable station contributes, weighted by how much it deserves to:
- * closeness, similar height, freshness, and having passed quality control.
- *
- * ### The lapse rate, and where it stops being true
- *
- * Temperature is corrected to the target's height at [LAPSE_RATE_C_PER_KM],
- * roughly the free-atmosphere rate. It is a real improvement across a few
- * hundred metres and it is *wrong on clear calm nights*, when cold air pools in
- * valleys and the profile inverts - the correction then has the sign backwards.
- * It is applied anyway because it is right far more often than not, but that is
- * a known limit rather than a solved problem, and it is one of the things a
- * verification history could eventually learn per location.
+ * Temperature is corrected to the target's height at [LAPSE_RATE_C_PER_KM]. That
+ * is wrong on clear calm nights when cold air pools and the profile inverts; it is
+ * applied anyway because it is right far more often.
  */
 object LocalEstimate {
 
@@ -79,9 +66,8 @@ object LocalEstimate {
      *
      * @param observations the latest report from each nearby station.
      * @param at the moment being asked about, for judging staleness.
-     * @param elevationMetres the target's height, when known. Without it no
-     *   lapse correction is applied, which is better than applying one to a
-     *   height that was guessed.
+     * @param elevationMetres the target's height, when known. Without it no lapse
+     * correction is applied.
      */
     fun at(
         latitude: Double,
@@ -130,9 +116,8 @@ object LocalEstimate {
             temperature = temperature,
             dewPoint = dewPoint,
             windSpeed = weighted.weightedMean { it.windSpeed },
-            // Pressure is already reduced to sea level in the report, so it
-            // needs no height correction - correcting it would apply the
-            // reduction twice.
+            // Pressure is already reduced to sea level in the report; correcting it again
+            // would apply the reduction twice.
             pressure = weighted.weightedMean { it.pressure },
             precipitatingShare = precipitatingShare,
             confidence = confidenceOf(weighted, latitude, longitude, at),
@@ -145,10 +130,8 @@ object LocalEstimate {
         -(toMetres - fromMetres) / METRES_PER_KM * LAPSE_RATE_C_PER_KM
 
     /**
-     * How much a station's word is worth here.
-     *
-     * Distance, height and age each cut it independently, because a station can
-     * fail any one of them while looking fine on the other two.
+     * How much a station's word is worth here. Distance, height and age each cut it
+     * independently.
      */
     private fun weightOf(
         observation: WeatherObservation,
@@ -173,11 +156,8 @@ object LocalEstimate {
     }
 
     /**
-     * How much the whole estimate deserves to be believed.
-     *
-     * A single station 150 km away reporting an hour ago is not the same
-     * evidence as five within 30 km reporting ten minutes ago, and an estimate
-     * that scored them alike would be the more dangerous of the two.
+     * How much the whole estimate deserves to be believed: one distant, older report
+     * is weaker evidence than five near, fresh ones.
      */
     private fun confidenceOf(
         weighted: List<Pair<WeatherObservation, Double>>,
@@ -189,9 +169,8 @@ object LocalEstimate {
         val byNearest = (1.0 - nearest / MAX_DISTANCE_KM).coerceIn(0.0, 1.0)
         val freshest = weighted.minOf { it.first.ageAt(at).toMinutes() }.toDouble()
         val byFreshness = (1.0 - freshest / MAX_AGE.toMinutes().toDouble()).coerceIn(0.0, 1.0)
-        // More stations is better, with sharply diminishing returns: the second
-        // is worth a great deal because it gives the first something to be
-        // checked against; the sixth adds very little.
+        // More stations is better, with sharply diminishing returns: the second gives the
+        // first something to be checked against.
         val byCount = 1.0 - 1.0 / (1.0 + weighted.size)
         return byNearest * byFreshness * byCount
     }

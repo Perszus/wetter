@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Instant
@@ -7,16 +10,9 @@ import lv.bolwarra.wetter.domain.provider.ProviderHealth
 import lv.bolwarra.wetter.domain.provider.ProviderHealthRegistry
 
 /**
- * Keeps what is known about each provider across a restart.
- *
- * The knowledge is slow to earn and costs a few rows to keep. Held only in
- * memory, an app waking to a service that has been down for hours would try it,
- * fail, wait, and learn that fact again from scratch every single time - which
- * is the request the backoff exists to avoid making. `docs/decisions.md` had
- * this down as an open question; this settles it.
- *
- * Nothing is aggregated and nothing leaves the device. It is a note to self
- * about who to ask first.
+ * Keeps what is known about each provider across a restart, so a service that has
+ * been down for hours is not retried from scratch on every wake. Nothing is
+ * aggregated and nothing leaves the device.
  */
 internal class ProviderHealthStore(private val dao: ProviderHealthDao) {
 

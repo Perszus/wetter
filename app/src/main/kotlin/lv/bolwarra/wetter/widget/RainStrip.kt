@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.widget
 
 import android.graphics.Canvas
@@ -19,11 +22,10 @@ import lv.bolwarra.wetter.ui.theme.WetterColors
 internal object RainStrip {
 
     /**
-     * The chart and its clock, in a box on a canvas that is not necessarily
-     * this widget's - the overview carries the same strip, drawn by the same
-     * code, so the two can never show the same rain two ways.
+     * The chart and its clock in a box on any canvas, so the rain widget and the
+     * overview draw the same rain the same way.
      *
-     * [box] is in pixels; its height in dp decides the insets, as it always has.
+     * [box] is in pixels; its height in dp decides the insets.
      */
     fun drawStrip(
         canvas: Canvas,
@@ -35,9 +37,8 @@ internal object RainStrip {
         hourLabels: List<String>,
     ) {
         val heightDp = box.height() / scale
-        // Proportional, not fixed. At one cell tall the whole widget is about
-        // 56 dp, and a 10 dp head plus a 24 dp foot would leave the chart less
-        // room than its own margins.
+        // Proportional insets: at one cell tall fixed ones would leave the chart less
+        // room than its margins.
         val chart = RectF(
             box.left + CHART_INSET_DP * scale,
             box.top + topInset(heightDp) * scale,
@@ -52,14 +53,9 @@ internal object RainStrip {
     }
 
     /**
-     * Where light becomes moderate, and moderate becomes heavy.
-     *
-     * Two hairlines and no words. In the app the level is named beside the curve
-     * and the colour merely reinforces it; here there is no room for a word that
-     * would survive being read at arm's length, so the roles swap and the colour
-     * becomes the message. The lines are what make that legible - they mark the
-     * exact heights the curve changes colour at, so a peak that crosses one is
-     * visibly a peak that crossed something.
+     * Where light becomes moderate, and moderate becomes heavy: two hairlines and no
+     * words. There is no room for a band name here, so the colour carries the level
+     * and the lines mark exactly where it changes.
      */
     private fun drawBands(canvas: Canvas, chart: RectF, scale: Float, colors: WetterColors) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -73,35 +69,10 @@ internal object RainStrip {
     }
 
     /**
-     * The clock, along the foot of the chart.
-     *
-     * The hour labels used to sit at fixed quarters of the width, which put them
-     * nowhere in particular: the window starts at *now*, so a quarter of the way
-     * along is 23:47, not midnight. They read as shifted because they were.
-     *
-     * These are the real hour boundaries, marked on the axis line and not as
-     * rules up the chart. Rules were the first attempt and they turned the thing
-     * into a grid: four verticals crossing three horizontals, competing with the
-     * one line that is supposed to be read. The chart has exactly one subject
-     * and the clock is not it.
-     *
-     * So the marks sit on the foot, where an axis belongs, and the label for
-     * each hour starts just to the right of its tick - the tick is the moment
-     * and the text belongs to it, rather than floating between two of them.
-     * Because the window is exactly four hours the boundaries stay a quarter
-     * apart, and only the offset to the first one changes.
-     *
-     * The hour's tick runs all the way down to the text baseline, so it stands
-     * immediately to the left of its own label and the two read as one mark. At
-     * six and four device-independent pixels the two kinds of tick were close
-     * enough in length to be told apart only by looking for it, which is not
-     * something anybody does to a widget; against a tick four times longer,
-     * with a time written beside it, there is nothing to tell apart.
-     *
-     * Half hours keep the short tick and no text. They are not meant to be read
-     * individually; they are there so the eye can halve the gap between two
-     * hours without measuring it, which is most of what anybody does with "when
-     * does this start".
+     * The clock, along the foot of the chart. Ticks sit on the real hour boundaries
+     * (the window starts at now), each hour's label just to the right of its tick.
+     * The hour tick runs down to the label's baseline so the two read as one mark;
+     * half hours get a short tick and no text.
      */
     private fun drawHours(
         canvas: Canvas,
@@ -111,10 +82,7 @@ internal object RainStrip {
         hourOffset: Float,
         hourLabels: List<String>,
     ) {
-        // The marks are read, so they take a text tone rather than the gridline
-        // one. Drawn in the tone the band rules use they were technically
-        // present and practically invisible - a scale nobody can see is a scale
-        // that is not there.
+        // A text tone, not the gridline one: the marks are read.
         val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = colors.textTertiary.toArgb()
         }
@@ -128,13 +96,11 @@ internal object RainStrip {
         }
         val baseline = chart.bottom + LABEL_BASELINE_DP * scale
 
-        // The line the marks hang from. Drawn after the curve so the fill,
-        // whose own bottom edge sits here, cannot soften it.
+        // Drawn after the curve so the fill cannot soften it.
         canvas.drawLine(chart.left, chart.bottom, chart.right, chart.bottom, paint)
 
-        // Counted in half-hour steps from the first hour boundary, so whether a
-        // mark is on the hour is the parity of the step rather than a modulus of
-        // a float that has been added to itself a dozen times.
+        // Counted in half-hour steps, so whether a mark is on the hour is the step's
+        // parity rather than a modulus of an accumulated float.
         var step = 0
         while (hourOffset + step * HALF_HOUR > 0f) step--
         while (true) {
@@ -152,10 +118,8 @@ internal object RainStrip {
                     tick,
                 )
 
-                // The label belongs to the rule beside it, so it starts just to
-                // its right rather than centred on it. Anything that would run
-                // off the end is dropped: a clipped hour is worse than a missing
-                // one, because a clipped one still looks like a reading.
+                // A label that would run off the end is dropped: a clipped hour still looks like
+                // a reading.
                 if (onTheHour) {
                     val hour = hourLabels.getOrNull(step / 2)
                     if (hour != null) {
@@ -173,19 +137,9 @@ internal object RainStrip {
     /**
      * The curve, coloured by the band each part of it is in.
      *
-     * A vertical gradient with hard steps at the band edges rather than a path
-     * cut into coloured segments. Height *is* intensity on this axis, so a
-     * colour that varies with height varies with intensity by construction - and
-     * a stroke takes its colour from where its pixels are, so a line climbing
-     * through a boundary changes colour exactly where it crosses. The part in
-     * moderate is the moderate tone and the part below it is not, with no
-     * off-by-one at the boundary and no seam where the line grazes a level
-     * without settling in it.
-     *
-     * This is the same construction as the app's chart, for the same reasons,
-     * written twice because Compose and android.graphics do not share a brush.
-     * What they do share is [RainCurveBands], which is the part that must not
-     * differ.
+     * A vertical gradient with hard steps at the band edges: height is intensity on
+     * this axis, so a stroke changes colour exactly where it crosses a level. The
+     * same construction as the app's chart, sharing [RainCurveBands] for the edges.
      */
     private fun drawCurve(
         canvas: Canvas,
@@ -227,8 +181,8 @@ internal object RainStrip {
             },
         )
 
-        // Gradient space runs down from the top, so a band's ceiling in
-        // intensity is its lower bound here.
+        // Gradient space runs down from the top, so a band's ceiling in intensity is its
+        // lower bound here.
         val heavy = 1f - RainCurveBands.heavyEdge
         val moderate = 1f - RainCurveBands.moderateEdge
         canvas.drawPath(
@@ -251,9 +205,8 @@ internal object RainStrip {
                         WidgetPlate.mix(muted, full, LIGHT_MIX),
                         WidgetPlate.mix(muted, full, LIGHT_MIX),
                     ),
-                    // A hair apart, because stops have to keep increasing and
-                    // two at the same offset are not guaranteed to draw as an
-                    // edge.
+                    // A hair apart: stops must keep increasing, and two at the same offset are not
+                    // guaranteed to draw as an edge.
                     floatArrayOf(0f, heavy, heavy + SEAM, moderate, moderate + SEAM, 1f),
                     Shader.TileMode.CLAMP,
                 )
@@ -266,9 +219,8 @@ internal object RainStrip {
         (heightDp * TOP_SHARE).coerceIn(MIN_TOP_DP, MAX_TOP_DP)
 
     /**
-     * The strip the hour labels sit in, which is text and therefore does not
-     * shrink in proportion to anything. Hence a floor: below this the labels
-     * would start clipping whatever the chart wanted.
+     * The strip the hour labels sit in. Text does not shrink with the widget, hence
+     * a floor.
      */
     fun labelInset(heightDp: Float): Float =
         (heightDp * LABEL_SHARE).coerceIn(MIN_LABEL_DP, MAX_LABEL_DP)
@@ -276,49 +228,17 @@ internal object RainStrip {
     /**
      * Low rain, lifted so that it reads at this size.
      *
-     * The shared axis puts the least rain there is at eight percent of the
-     * track. That is enough in the app, where the band is captioned "Light"
-     * right beside the curve; here there are no captions and a third of the
-     * height, so a genuine forecast of rain until four in the morning drew as a
-     * line along the floor and read as an empty widget.
-     *
-     * ### It stays inside the light band
-     *
-     * The lift is a square root applied only below the light band's ceiling, and
-     * that ceiling is a fixed point of it - so the boundaries stay exactly on
-     * the thirds and **the three levels remain the same height**. Only where a
-     * rate lands *within* light changes.
-     *
-     * The first attempt lifted everything, band lines included, which pushed
-     * light to 40.7% of the height against 29.7% for the other two. That is the
-     * same unequal-levels fault it was meant to avoid, reintroduced one surface
-     * over - the bands are a scale of the three words anybody acts on, and a
-     * scale whose steps are different sizes asks the reader to remember which
-     * step is which.
-     *
-     * The attempt before that raised the shared floor in [RainCurveBands], which
-     * fixed the widget and quietly redrew the main chart at the same time. A
-     * legibility problem on one surface gets fixed on that surface.
-     *
-     * Dry is exempt - zero maps to zero - because the whole point is to open a
-     * gap between no rain and some rain.
-     *
-     * The arithmetic itself now lives beside the axis it bends, because the
-     * week's hour strip is a short track with the same problem, and two
-     * hand-copied square roots is how two surfaces start disagreeing about a
-     * drizzle. Which surfaces apply it is still each surface's own decision.
+     * Without captions and at a third of the height, light rain at the shared axis
+     * reads as an empty widget. The lift applies only within the light band and
+     * leaves its ceiling fixed, so the three levels stay equal thirds. Dry stays at
+     * zero, keeping the gap between no rain and some.
      */
     private fun lifted(fraction: Float): Float = RainCurveBands.spreadWithinLight(fraction)
 
     /**
-     * A path through the samples, rounded at the joins.
-     *
-     * Quadratic segments anchored at the midpoints between samples: each pair
-     * contributes one curve whose control point is the sample itself, so the
-     * line passes smoothly near every reading without the overshoot a spline
-     * would add. Overshoot matters here - a spline between a dry step and a wet
-     * one dips below zero on the way, drawing rain that stops harder than
-     * stopped.
+     * A path through the samples, rounded at the joins: quadratic segments anchored at
+     * the midpoints, each controlled by its sample. Unlike a spline it cannot
+     * overshoot below zero between a dry step and a wet one.
      */
     private fun smoothPath(points: List<Pair<Float, Float>>): Path {
         val path = Path()
@@ -341,18 +261,14 @@ internal object RainStrip {
     private const val CHART_INSET_DP = 10f
 
     /**
-     * Nothing above the chart.
-     *
-     * Any inset here is empty space sitting directly on top of the heavy lane
-     * with no rule between them, so it reads as part of that lane and makes
-     * heavy look taller than the other two when all three are equal thirds. The
-     * ceiling of the scale is the top of the plate.
+     * Nothing above the chart: an inset there would read as part of the heavy lane
+     * and make it look taller than the other two.
      */
     private const val TOP_SHARE = 0f
     private const val MIN_TOP_DP = 0f
     private const val MAX_TOP_DP = 0f
 
-    /** Room under the chart for the hour labels, which are real text on top. */
+    /** Room under the chart for the hour labels. */
     private const val LABEL_SHARE = 0.30f
     private const val MIN_LABEL_DP = 17f
     private const val MAX_LABEL_DP = 24f
@@ -364,9 +280,8 @@ internal object RainStrip {
     private const val HALF_HOUR = 0.125f
 
     /**
-     * The hour reaches the baseline of the text it belongs to; the half hour is
-     * a short mark on the line. Tied to [LABEL_BASELINE_DP] rather than given
-     * its own number, so the tick cannot drift away from the type beside it.
+     * The hour tick reaches the baseline of its label; the half hour is a short mark
+     * on the line.
      */
     private val HOUR_TICK_DP get() = LABEL_BASELINE_DP
     private const val HALF_TICK_DP = 4f
@@ -379,13 +294,8 @@ internal object RainStrip {
     private const val HAIRLINE_DP = 1f
 
     /**
-     * The fill does not fade to nothing.
-     *
-     * Light rain sits at about a twelfth of the track, so a fill that vanishes
-     * on the way down leaves a hairline hugging the floor - which is what the
-     * first build showed for a genuine "rain until four", and it read as an
-     * empty widget. Keeping a floor under the fill means any rain at all is a
-     * band of colour rather than a line.
+     * The fill does not fade to nothing, so any rain at all is a band of colour
+     * rather than a hairline along the floor.
      */
     private const val FILL_TOP_ALPHA = 0.5f
     private const val FILL_BOTTOM_ALPHA = 0.16f

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.verification
 
 import java.time.Duration
@@ -98,9 +101,8 @@ class CorrectedForecastTest {
 
     @Test
     fun `a well evidenced warm bias cools the whole forecast`() {
-        // The measured Riga evening: every model warm by about a degree and a
-        // half. Corrected, 15.1 should come down towards the 14 that was
-        // actually reported.
+        // Every model warm by about a degree and a half: corrected, 15.1 comes down
+        // towards the 14 that was reported.
         val corrected = forecast.withLocalCorrection(
             bias(offset = 1.4, samples = BiasCorrection.CONFIDENT_SAMPLES),
         )

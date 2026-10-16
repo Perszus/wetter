@@ -1,46 +1,27 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.curve
 
 import kotlin.math.sqrt
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 
 /**
- * The vertical axis of every rain curve Wetter draws.
+ * The vertical axis of every rain curve Wetter draws: given a rate, how high up
+ * the track it sits and which level it is in. Geometry only, shared by the app's
+ * chart and the widgets so both put the same hour at the same height.
  *
- * This is geometry, not painting: given a rate it says how high up the track
- * that rate sits, and which of the three levels it is in. Nothing here knows
- * about a canvas, a colour or a screen.
- *
- * It lives in `:domain` because there are now two painters. The app draws the
- * curve in Compose at full size with the level named in words beside it; the
- * home-screen widget draws the same curve into a bitmap at a fifth of the area,
- * with no words at all. Those are different pictures of one shape, and the one
- * thing that must not differ is the shape - a widget whose peak sits in
- * "moderate" while the app puts the same hour in "heavy" is worse than no
- * widget, because the reader has no way to tell which lied.
- *
- * ### Why it is not a scale of millimetres
- *
- * The rates are wildly unevenly spaced: a trace is a tenth of a millimetre and
- * torrential is fifty. Drawn linearly against a real downpour, drizzle is two
- * percent of the height and reads as nothing at all - when it is precisely the
- * difference between nothing and take a coat.
- *
- * So the axis is anchored to the conventional intensity bands, each given a
- * slice of the height wide enough to see. It is not linear in millimetres and
- * does not pretend to be; there is no number on it. What it is linear in is how
- * wet you get, which is what the chart is for.
+ * Not a scale of millimetres: the bands are wildly unevenly spaced (a trace is a
+ * tenth of a millimetre, torrential fifty), so the axis is anchored to the
+ * intensity bands, each given an equal slice of the height. It is linear in how
+ * wet you get, not in millimetres, and carries no numbers.
  */
 object RainCurveBands {
 
     /**
-     * The level the curve names a rate, which is coarser than the domain's own.
-     *
-     * Two things went with the earlier five-level version. "Barely" was a level
-     * nobody does anything differently about, so it is folded into light: the
-     * bottom band means anything from a spit to a proper shower. And the top
-     * band was reserved for torrential, which put a fifth of the chart aside for
-     * weather that essentially never arrives and pushed everything real into the
-     * lower half.
+     * The level the curve names a rate: coarser than the domain's own. A trace is part
+     * of light, and violent rain shares the top band with heavy rather than reserving
+     * height for weather that almost never arrives.
      */
     fun levelOf(millimetresPerHour: Double): PrecipitationIntensity = when {
         millimetresPerHour < PrecipitationIntensity.TRACE_MM_PER_HOUR ->
@@ -64,12 +45,8 @@ object RainCurveBands {
             val (highMm, highY) = ANCHORS[i + 1]
             if (mm <= highMm) {
                 val t = ((mm - lowMm) / (highMm - lowMm)).toFloat()
-                // Eased across each band rather than run straight through it.
-                // The anchors are what carry the meaning - trace here, heavy
-                // there - but joining them with straight segments puts a slope
-                // change at every boundary, so a perfectly smooth rate still
-                // drew a visibly kinked line wherever it crossed from one
-                // intensity into the next.
+                // Eased across each band rather than run straight through it, so a smooth rate
+                // draws no kink at the boundaries.
                 return lowY + (highY - lowY) * smoothStep(t)
             }
         }
@@ -77,46 +54,20 @@ object RainCurveBands {
     }
 
     /**
-     * The height at which light becomes moderate, and moderate becomes heavy.
-     *
-     * Exposed because both painters need to put something at these two
-     * places - a guide line, a colour step - and both must put it at the same
-     * height as the curve that crosses it.
+     * The heights at which light becomes moderate, and moderate becomes heavy, for
+     * the guide lines and colour steps both painters draw.
      */
     val moderateEdge: Float get() = heightFraction(MODERATE_EDGE_MM)
 
     val heavyEdge: Float get() = heightFraction(HEAVY_EDGE_MM)
 
     /**
-     * The same height, spread out inside the light band, for a short track.
+     * The same height, spread out inside the light band, for a short track where the
+     * least rain would otherwise be a pixel or two.
      *
-     * This axis puts the least rain there is at eight percent of the track. On
-     * the app's chart that is plenty — the band is captioned "Light" right
-     * beside the curve, and the track is tall enough for eight percent to be a
-     * real mark. On a surface a fifth of that height it is one or two pixels,
-     * and a genuine forecast of drizzle all evening draws as nothing at all.
-     *
-     * ### What it is allowed to change, and what it is not
-     *
-     * Only where a rate lands *within* the light band. The square root is
-     * anchored so that the light band's ceiling is a fixed point of it, which
-     * leaves both boundaries exactly where they were: **the three levels stay
-     * the same height**, which is the one thing about this axis that must never
-     * move. A scale whose steps are different sizes asks the reader to remember
-     * which step is which.
-     *
-     * Dry is exempt — zero maps to zero — because the whole point is to open a
-     * gap between no rain and some rain.
-     *
-     * ### Why it lives here and is still opt-in
-     *
-     * docs/design-principles.md says a legibility problem on one surface gets
-     * fixed on that surface, and the widget's own version of this was written
-     * under that rule. Two surfaces now need it — the widget's bitmap and the
-     * week's hour strip — and two hand-copied square roots is how they start
-     * disagreeing about a drizzle. So the arithmetic is shared and the
-     * *decision* is not: the tall chart does not call this, and nothing here
-     * changes what it draws.
+     * The light band's ceiling is a fixed point, so the three levels stay the same
+     * height; only where a rate lands within light changes. Dry stays at zero. Opt-in:
+     * the widgets and the hour strip call it, the tall chart does not.
      */
     fun spreadWithinLight(fraction: Float): Float {
         val ceiling = moderateEdge
@@ -125,9 +76,8 @@ object RainCurveBands {
     }
 
     /**
-     * Dry sits on the floor and the least rain there is steps just clear of it,
-     * so the question the chart is asked most - whether it will rain at all - is
-     * answered without reading anything.
+     * Dry sits on the floor and the least rain steps just clear of it, so whether it
+     * will rain at all is answered without reading anything.
      */
     private val ANCHORS = listOf(
         0.0 to 0.00f,
@@ -139,11 +89,8 @@ object RainCurveBands {
     )
 
     /**
-     * Smoothstep: flat at both ends, steepest in the middle.
-     *
-     * Chosen over a spline through the anchors because it is local. A spline
-     * would let a change to one band's height shift the curve inside its
-     * neighbours, which would make the bands stop meaning exactly what they say.
+     * Smoothstep: flat at both ends, steepest in the middle. Local, unlike a spline,
+     * so one band's height never shifts the curve inside its neighbours.
      */
     private fun smoothStep(t: Float): Float {
         val x = t.coerceIn(0f, 1f)
@@ -157,20 +104,9 @@ private const val MODERATE_EDGE_MM = PrecipitationIntensity.MODERATE_MM_PER_HOUR
 private const val HEAVY_EDGE_MM = PrecipitationIntensity.HEAVY_MM_PER_HOUR.toFloat()
 
 /**
- * The three levels take the same height as each other.
- *
- * Light used to take a fifth less, on the reasoning that it is the least of the
- * three. There is no reading of the chart that wants that: the bands are a scale
- * of the three words anybody acts on, and a scale whose steps are different
- * sizes is asking the reader to remember which step is which. Equal thirds means
- * the height a curve has climbed is the fraction of the way through the levels
- * it has climbed, with nothing to correct for.
- *
- * The floor sits *inside* the light band rather than under all three. The first
- * attempt at equal bands added it underneath, which made light 38.7% of the
- * height against 30.7% for the other two - arithmetic that said "equal" over a
- * picture that plainly was not. A trace is not a fourth level; it is the bottom
- * of the light one.
+ * The three levels take equal height, so how far a curve has climbed is how far
+ * through the levels it is. The floor sits inside the light band: a trace is the
+ * bottom of light, not a fourth level.
  */
 private const val BANDS = 3f
 private const val LIGHT_TOP = 1f / BANDS

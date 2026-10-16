@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.radar
 
 import kotlin.math.floor
@@ -13,18 +16,9 @@ data class Motion(val x: Float, val y: Float) {
 }
 
 /**
- * Where the precipitation is going, across the grid.
- *
- * Coarse by construction. Motion is estimated per block rather than per pixel
- * because a single pixel of a rain field carries almost no trackable structure -
- * matching one against the previous frame finds noise, confidently. A block
- * large enough to contain a recognisable piece of a shower is the smallest thing
- * that can honestly be tracked.
- *
- * Between block centres the field is interpolated, so advection sees a smooth
- * flow rather than a grid of discontinuous jumps. A front curving across the map
- * is the normal case, and a single translation for the whole image cannot
- * express it - the spec is explicit that the motion has to vary in space.
+ * Where the precipitation is going, across the grid. Estimated per block, the
+ * smallest thing with trackable structure, and interpolated between block centres
+ * so a curving front advects smoothly.
  */
 class MotionField(
     val blockSize: Int,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import android.Manifest
@@ -36,24 +39,12 @@ import lv.bolwarra.wetter.ui.map.TileLoader
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * Putting a point on the map.
+ * Putting a point on the map, for places a gazetteer of settlements cannot name.
+ * A pin sharpens the observed part of the forecast, radar sampling at about a
+ * kilometre, while the models still resolve their own grids.
  *
- * The answer to the question the place search cannot take: a gazetteer knows
- * settlements, so it returns nothing at all for a street address and nothing
- * whatever for a field behind a house. A coordinate needs no service to resolve
- * and is the exact thing every provider is asked for anyway.
- *
- * What it buys is worth being straight about. The forecast models interpolate to
- * their own grids, one to eleven kilometres wide, and a pin does not make one of
- * them resolve a street. Radar does: it samples at about a kilometre, and inside
- * the first hour the radar is what the timeline is made of. So a pin sharpens
- * the part of the forecast that is actually observed, and leaves the rest where
- * it was.
- *
- * The chosen point is shown as coordinates rather than a name because there is
- * no name - reverse geocoding is another service and another decision
- * (docs/decisions.md). The label is written in the form the search box can read
- * back, so a point kept this way can be found again by typing it.
+ * The label is an address where the reverse geocoder has one, and always the
+ * coordinates, written in the form the search box can read back.
  */
 @Composable
 fun PinPicker(
@@ -70,9 +61,8 @@ fun PinPicker(
     val colors = WetterTheme.colors
     val scope = rememberCoroutineScope()
 
-    // Nothing is chosen until somebody taps the map. The screen used to open
-    // holding an answer it had been given by nobody, which made the confirm
-    // button a trap: pressing it saved wherever the map happened to have opened.
+    // Nothing is chosen until somebody taps the map, so confirming can never save
+    // wherever the map happened to open.
     var chosen by remember { mutableStateOf<Coordinates?>(null) }
     var name by remember { mutableStateOf<PlaceName?>(null) }
 
@@ -101,13 +91,9 @@ fun PinPicker(
         }
     }
 
-    // Asked once the map has been still for a moment, never during a drag.
-    //
-    // The lookup runs against a volunteer-run server, and a pin dragged across
-    // a city would otherwise fire one request per frame at it. Restarting on
-    // every change and pausing first means exactly one request per place
-    // somebody actually stops on - and the name clears the instant the map
-    // moves, so what is on screen is never a label for somewhere else.
+    // Asked once the map has been still for a moment, never during a drag: one request
+    // per place somebody stops on, against a volunteer-run server. The name clears the
+    // moment the map moves.
     LaunchedEffect(chosen) {
         name = null
         val at = chosen ?: return@LaunchedEffect
@@ -136,12 +122,8 @@ fun PinPicker(
 
         Spacer(Modifier.height(spacing.s))
 
-        // Asking to be found, and what came of it.
-        //
-        // The permission is requested at the moment it is used rather than on
-        // the way into the screen. A prompt that arrives before anybody has
-        // asked for anything is a prompt with no context, and it is refused more
-        // often than not - deservedly.
+        // The location permission is requested when it is used, not on the way into the
+        // screen.
         TextButton(
             onClick = {
                 located = null
@@ -175,12 +157,8 @@ fun PinPicker(
 
         Spacer(Modifier.height(spacing.s))
 
-        // The address when there is one, the coordinate when there is not.
-        //
-        // The coordinate is always shown underneath either way: it is the real
-        // identity of the place - the thing the forecast is actually fetched
-        // for - and a street name is a description of it that most of the earth
-        // does not have.
+        // The address when there is one, the coordinate when there is not, and the
+        // coordinate always underneath: it is what the forecast is fetched for.
         val place = name
         if (place != null) {
             Text(

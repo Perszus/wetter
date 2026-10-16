@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.chart
 
 import org.junit.Assert.assertEquals
@@ -5,14 +8,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The honesty guarantee of the rain curve.
- *
- * A smooth line through forecast points is only acceptable if it cannot claim
- * more than the points do. These tests are the proof of that: no negative
- * rainfall between dry hours, no invented peak higher than the heaviest hour,
- * and every drawn value between the two samples it sits between.
- *
- * The naive alternative fails all three, which is why this file exists.
+ * The rain curve cannot claim more than its points: no negative rainfall between
+ * dry hours, no peak above the heaviest hour, and every drawn value between the
+ * two samples it sits between.
  */
 class MonotoneCurveTest {
 

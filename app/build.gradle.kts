@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import java.util.Properties
 
 plugins {
@@ -53,11 +56,8 @@ android {
             versionNameSuffix = "-debug"
         }
         // For carrying around: the debug build's identity and key, so it installs
-        // over one and keeps its data, but not debuggable. A debuggable app runs
-        // with most of the runtime's compilation switched off, and the radar
-        // projection - tight loops over half a million pixels - measured over
-        // thirty seconds a sweep on a phone that way, against well under one on a
-        // desktop. Nobody should judge how fresh the app is from that build.
+        // over one and keeps its data, but not debuggable, since a debuggable
+        // runtime runs the radar projection's tight loops many times slower.
         create("daily") {
             initWith(getByName("debug"))
             isDebuggable = false

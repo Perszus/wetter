@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.db
 
 import android.content.Context
@@ -17,12 +20,8 @@ import androidx.sqlite.execSQL
 import kotlinx.coroutines.flow.Flow
 
 /**
- * One cached forecast, keyed by rounded coordinates.
- *
- * [fetchedAtEpochSecond] and [providerId] are real columns rather than fields
- * inside the payload, because the app asks about them without needing the
- * forecast: how old is this, and who supplied it. Everything else lives in the
- * JSON — see [StoredForecast] for why.
+ * One cached forecast, keyed by rounded coordinates. Age and provider are columns
+ * so they can be read without decoding the JSON payload ([StoredForecast]).
  */
 @Entity(tableName = "forecasts")
 internal data class ForecastEntity(
@@ -33,10 +32,8 @@ internal data class ForecastEntity(
 )
 
 /**
- * The place the app is showing, as a single row.
- *
- * It has to be on disk rather than in memory because the background refresh runs
- * in its own process lifetime and cannot fetch a location it is unable to read.
+ * The place the app is showing, as a single row on disk, so the background work
+ * can read it without the screen.
  */
 @Entity(tableName = "selected_location")
 internal data class SelectedLocationEntity(
@@ -47,29 +44,19 @@ internal data class SelectedLocationEntity(
     val zoneId: String,
     val region: String?,
     val country: String?,
-    /**
-     * Defaulted, so a row written before the column existed still reads back.
-     *
-     * Dropped on the way through, the observation layer would silently stop
-     * correcting for height at the one place it matters most - the one being
-     * looked at.
-     */
+    /** Defaulted, so a row written before the column existed still reads back. */
     val elevationMetres: Double? = null,
 ) {
     companion object {
-        /** There is exactly one selected location, so it always occupies row 1. */
+        /** There is one selected location, always row 1. */
         const val SINGLE_ROW = 1
     }
 }
 
 /**
- * One prediction, kept until the hour it describes has passed and can be marked.
- *
- * This is the first thing in the database that is genuinely irreplaceable. A
- * cached forecast can be fetched again and a selected location re-chosen, but a
- * record of what was predicted a fortnight ago cannot be recovered from anywhere
- * once it is gone - which is why this table arrives with a real migration and why
- * the destructive fallback had to go with it.
+ * One prediction, kept until its hour has passed and it can be scored. This is
+ * the one table whose data cannot be fetched again, which is why every schema
+ * change from here has a real migration.
  */
 @Entity(
     tableName = "forecast_records",
@@ -92,37 +79,18 @@ internal data class ForecastRecordEntity(
     /** Null until the hour has passed and an observation has been found. */
     val observed: Double?,
     /**
-     * How much the projection believed itself, 0..1, and how well the two
-     * sweeps it was built from actually matched.
-     *
-     * Both null for anything that is not a radar projection. They are here
-     * because an error is only worth learning from if something distinguishes
-     * the times it happens from the times it does not: sixteen hours of records
-     * showed the nowcast over-forecasting more the further ahead it looked, and
-     * with these it becomes possible to ask whether that is the extrapolation
-     * decaying or simply a poor motion estimate being carried forward.
+     * How much the projection believed itself and how well its sweeps matched, both
+     * 0..1 and null for anything that is not a radar projection, so errors can be
+     * told apart by cause.
      */
     val confidence: Double? = null,
     val motionQuality: Double? = null,
 )
 
 /**
- * A place somebody chose to keep.
- *
- * Keyed by rounded coordinates rather than by the service's own id, so the same
- * place found twice through different spellings is stored once, and so the table
- * does not depend on a gazetteer's identifiers staying stable.
- */
-/**
- * What is known about a provider's recent behaviour.
- *
- * Kept across a restart because the knowledge is slow to earn and cheap to
- * store. Held only in memory, an app that woke to a service which had been down
- * for hours would try it, fail, and learn that fact again from scratch every
- * time - which is exactly the request the backoff exists to avoid making.
- *
- * Nothing here is aggregated or reported anywhere. It is a note to self about
- * who to ask first (docs/providers.md).
+ * What is known about a provider's recent behaviour, kept across restarts so a
+ * service that has been down is not retried from scratch (docs/providers.md).
+ * Never aggregated or reported anywhere.
  */
 @Entity(tableName = "provider_health")
 internal data class ProviderHealthEntity(
@@ -153,22 +121,14 @@ internal data class SavedLocationEntity(
     val region: String?,
     val country: String?,
     val elevationMetres: Double?,
-    /** Newest first in the list, so a place just added is where it is expected. */
+    /** Newest first in the list. */
     val addedAtEpochSecond: Long,
 )
 
 /**
  * The last radar projection for a place, so opening the app does not start from
- * nothing.
- *
- * Only the sampled series is kept, not the field it came from. The projection
- * covers a 768 by 768 grid of rates, which is megabytes and none of which the
- * screen ever reads: the chart consumes the dozen values under the user's own
- * coordinates. Storing those is a few hundred bytes and loses nothing.
- *
- * The samples carry absolute times rather than lead offsets, which is what makes
- * a stale row still worth having - the parts of it that are still in the future
- * remain true, and the rest simply falls outside the window.
+ * nothing. Only the samples under the place are kept, with absolute times, so the
+ * part of a stale row still in the future stays usable.
  */
 @Entity(tableName = "radar_series")
 internal data class RadarSeriesEntity(
@@ -178,15 +138,7 @@ internal data class RadarSeriesEntity(
     val payload: String,
 )
 
-/**
- * The last ensemble for a place, kept so a cold start has models to average.
- *
- * The forecast and the radar projection were both already on disk; this was
- * not, and it was the only one of the three that mattered for everything past
- * the first hour. So every fresh process drew that stretch from the single
- * chosen provider until a fetch came back - which is exactly when a wet evening
- * several models agreed on could render as flat and dry.
- */
+/** The last ensemble for a place, so a cold start has models to take a median of. */
 @Entity(tableName = "model_ensembles")
 internal data class EnsembleEntity(
     @PrimaryKey val cacheKey: String,
@@ -203,7 +155,7 @@ internal interface EnsembleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun write(ensemble: EnsembleEntity)
 
-    /** Runs publish hourly; a day-old spread describes nothing worth drawing. */
+    /** Runs publish hourly; a day-old spread is not worth drawing. */
     @Query("DELETE FROM model_ensembles WHERE fetchedAtEpochSecond < :cutoffEpochSecond")
     suspend fun deleteOlderThan(cutoffEpochSecond: Long)
 }
@@ -215,9 +167,8 @@ internal interface RadarSeriesDao {
     suspend fun read(cacheKey: String): RadarSeriesEntity?
 
     /**
-     * The same row, watched. Room re-emits on every write to the table, which is
-     * how a sweep collected by the background worker reaches a screen that is
-     * already open without the screen having to go looking for it.
+     * The same row, watched: Room re-emits on every write, so a sweep collected in
+     * the background reaches an open screen.
      */
     @Query("SELECT sweepAtEpochSecond FROM radar_series WHERE cacheKey = :cacheKey")
     fun observeSweep(cacheKey: String): Flow<Long?>
@@ -225,7 +176,7 @@ internal interface RadarSeriesDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun write(series: RadarSeriesEntity)
 
-    /** Nothing here is worth keeping for long; a projection is spent within hours. */
+    /** A projection is spent within hours. */
     @Query("DELETE FROM radar_series WHERE sweepAtEpochSecond < :cutoffEpochSecond")
     suspend fun deleteOlderThan(cutoffEpochSecond: Long)
 }
@@ -249,12 +200,7 @@ internal interface ForecastRecordDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun write(records: List<ForecastRecordEntity>)
 
-    /**
-     * Predictions whose hour has passed and which nothing has checked yet.
-     *
-     * These are what a verification pass works through - the whole backlog of
-     * claims the app has made and not yet been held to.
-     */
+    /** Predictions whose hour has passed and which nothing has scored yet. */
     @Query(
         "SELECT * FROM forecast_records WHERE observed IS NULL " +
             "AND validAtEpochSecond <= :nowEpochSecond " +
@@ -267,11 +213,8 @@ internal interface ForecastRecordDao {
     ): List<ForecastRecordEntity>
 
     /**
-     * When the oldest unsettled claim from one source was due, if any.
-     *
-     * Used to decide how far back to fetch sweeps. A claim can only be marked
-     * while a frame near its moment is in hand, so after the device has slept
-     * the backlog needs sweeps older than a routine run would bother with.
+     * When the oldest unsettled claim from one source was due, so scoring knows how
+     * far back to fetch sweeps.
      */
     @Query(
         "SELECT MIN(validAtEpochSecond) FROM forecast_records " +
@@ -299,11 +242,8 @@ internal interface ForecastRecordDao {
     suspend fun verifiedCount(): Int
 
     /**
-     * Records too old to be worth keeping.
-     *
-     * A month, which is long enough for a seasonal pattern to be visible and
-     * short enough that a correction learned in February is not still being
-     * applied in May.
+     * Records too old to keep: a month, long enough for a seasonal pattern and short
+     * enough that an old correction is not applied in a new season.
      */
     @Query("DELETE FROM forecast_records WHERE validAtEpochSecond < :cutoffEpochSecond")
     suspend fun deleteOlderThan(cutoffEpochSecond: Long)
@@ -321,12 +261,7 @@ internal interface ForecastDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun write(forecast: ForecastEntity)
 
-    /**
-     * Forecasts for places nobody is looking at any more.
-     *
-     * A cache that only ever grows is a leak with a nicer name. Anything older
-     * than the cutoff is past being useful even as stale data.
-     */
+    /** Forecasts for places nobody is looking at any more. */
     @Query("DELETE FROM forecasts WHERE fetchedAtEpochSecond < :cutoffEpochSecond")
     suspend fun deleteOlderThan(cutoffEpochSecond: Long)
 }
@@ -345,12 +280,8 @@ internal interface SelectedLocationDao {
 }
 
 /**
- * The computed normals for a place, as one row.
- *
- * The eighty kilobytes of archive they were built from are not kept. A decade of
- * daily rows is raw material, the three hundred and sixty-six normals are the
- * answer, and the answer does not change until the location does - so what is
- * stored is the answer.
+ * The computed normals for a place, as one row; the archive they were built from
+ * is not kept.
  */
 @Entity(tableName = "climate_normals")
 internal data class ClimateNormalsEntity(
@@ -373,15 +304,8 @@ internal interface ClimateNormalsDao {
 }
 
 /**
- * What the reader has chosen, as a single row.
- *
- * Stored the way [SelectedLocationEntity] is, and for the same reason: the
- * background worker redraws the widget in its own process lifetime and has to be
- * able to read the units without a screen ever having been open.
- *
- * Every column is defaulted, so a row written before a preference existed still
- * reads back - which is what lets a new setting ship without a migration that
- * touches data.
+ * What the reader has chosen, as a single row the background work can read.
+ * Every column is defaulted, so a new setting needs no data migration.
  */
 @Entity(tableName = "preferences")
 internal data class PreferencesEntity(
@@ -390,12 +314,7 @@ internal data class PreferencesEntity(
     val windUnit: String = "",
     val precipitationUnit: String = "",
     val theme: String = "",
-    /**
-     * Whether severe weather is worth a notification. On by default: somebody
-     * who installed a weather app wants to be told a storm is coming, and a
-     * warning nobody opted into is the one kind of interruption that earns its
-     * keep.
-     */
+    /** Whether severe weather is worth a notification. On by default. */
     val warnings: Boolean = true,
 ) {
     companion object {
@@ -417,15 +336,9 @@ internal interface PreferencesDao {
 }
 
 /**
- * A warning that has already been given.
- *
- * One row per thing said, kept only long enough to stop it being said again.
- * The key comes from the domain (`HazardAnnouncements.keyFor`) and carries the
- * kind, the severity and the day - so this table never needs to know what a
- * hazard is, only that this one has been mentioned.
- *
- * Keyed by place as well, because the same night is a frost in one town and not
- * in another, and somebody who keeps two places wants to hear about both.
+ * A warning that has already been given, kept only long enough not to repeat it.
+ * Keyed by place and by the domain's key (kind, severity and day,
+ * `HazardAnnouncements.keyFor`).
  */
 @Entity(tableName = "announced_hazards", primaryKeys = ["cacheKey", "hazardKey"])
 internal data class AnnouncedHazardEntity(
@@ -487,13 +400,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
 
     companion object {
 
-        /**
-         * Adds the verification store.
-         *
-         * Purely additive - it creates a table and touches nothing that already
-         * exists, so an upgrade cannot lose a cached forecast or the selected
-         * location.
-         */
+        /** Adds the verification store. Additive. */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL(
@@ -521,17 +428,10 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * Adds the places somebody has kept.
-         *
-         * Additive like the one before it: a new table, nothing existing
-         * touched, so an upgrade cannot lose a saved place, the selected
-         * location or the verification history.
-         */
+        /** Adds saved places. Additive. */
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(connection: SQLiteConnection) {
-                // The selected place gains a height too, or picking a searched
-                // one would quietly discard the elevation it arrived with.
+                // The selected place gains an elevation too.
                 connection.execSQL(
                     "ALTER TABLE `selected_location` ADD COLUMN `elevationMetres` REAL",
                 )
@@ -551,7 +451,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
-        /** Adds the kept radar projection. Additive, like the two before it. */
+        /** Adds the kept radar projection. Additive. */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL(
@@ -579,12 +479,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
         }
 
         /**
-         * Two columns describing how much a projection deserved to be believed.
-         *
-         * Added rather than the table rebuilt, so the weeks of records already
-         * in there survive - they are the whole reason this database stopped
-         * having a destructive fallback. Existing rows get null, which reads
-         * correctly as "nobody wrote this down at the time".
+         * Two columns describing how much a projection deserved belief. Added rather than
+         * rebuilding the table, so existing records survive with null.
          */
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(connection: SQLiteConnection) {
@@ -593,7 +489,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
-        /** Somewhere to keep the ensemble, so a cold start never waits for one. */
+        /** Adds the kept ensemble. */
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL(
@@ -606,12 +502,7 @@ internal abstract class WetterDatabase : RoomDatabase() {
             }
         }
 
-        /**
-         * Adds the climate normals store.
-         *
-         * Purely additive, like every migration before it: a new table and
-         * nothing touched that already exists.
-         */
+        /** Adds the climate normals store. Additive. */
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(connection: SQLiteConnection) {
                 connection.execSQL(
@@ -625,11 +516,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds the preferences row.
-         *
-         * Additive, and every column defaulted so the absent row reads as the
-         * defaults rather than as a failure - the app has to work on the launch
-         * before anybody has opened Settings.
+         * Adds the preferences row, every column defaulted so an absent row reads as the
+         * defaults.
          */
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(connection: SQLiteConnection) {
@@ -646,11 +534,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
         }
 
         /**
-         * Adds the record of warnings already given, and the switch for them.
-         *
-         * Additive on both counts. The new column carries a default of 1, so an
-         * upgrade arrives with warnings on rather than with a preference nobody
-         * chose reading as off.
+         * Adds the record of warnings already given, and the warnings switch, defaulting
+         * to on.
          */
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(connection: SQLiteConnection) {
@@ -673,16 +558,8 @@ internal abstract class WetterDatabase : RoomDatabase() {
             WetterDatabase::class.java,
             "wetter.db",
         )
-            // The destructive fallback that used to be here is deliberately
-            // gone. It was justified while everything in this database was
-            // either a cache or a preference that is trivially re-chosen -
-            // neither of which is a loss worth writing a migration to avoid.
-            // The verification store is not like that: it is weeks of
-            // accumulated records of what was predicted and what actually
-            // happened, it cannot be fetched again from anywhere, and wiping
-            // it would silently throw away everything the app had learned
-            // about this location. Every schema change from here needs a
-            // migration.
+            // No destructive fallback: the verification records cannot be fetched again, so
+            // every schema change needs a migration.
             .addMigrations(
                 MIGRATION_1_2,
                 MIGRATION_2_3,

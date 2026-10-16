@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.widget
 
 import android.graphics.Bitmap
@@ -15,31 +18,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The widget's drawn geometry, on a real Canvas.
+ * The widget's drawn geometry, on a real Canvas: `android.graphics` stubs draw
+ * nothing on the JVM.
  *
- * This is the one part of the app that cannot be checked on the JVM. The strip
- * is drawn with `android.graphics`, whose desktop stubs return zero and draw
- * nothing, so a unit test of it would pass against a blank bitmap and prove
- * nothing.
+ * The chart and the widget draw the same forecast from one axis,
+ * [RainCurveBands], and may differ in one way only: a short track lifts a rate
+ * within the light band. Everything above the light ceiling must map identically.
  *
- * What is being defended is the agreement between two surfaces. The chart and
- * the widget draw the same forecast from one axis, [RainCurveBands], and are
- * allowed to differ in exactly one way: a short track lifts a rate *within* the
- * light band so a drizzle is not a line along the floor. Everything above the
- * light ceiling must map identically, or the same hour reads as light on the
- * phone and moderate on the home screen.
- *
- * ### Found by difference, not by colour
- *
- * The first version of this looked for the curve by its colour and failed on
- * every assertion. Hairlines are antialiased, so a drawn pixel is a blend of the
- * mark and the plate rather than either of them, and a tolerance loose enough to
- * catch the curve also caught the rim.
- *
- * So nothing here matches a colour. Two strips are rendered from the same
- * everything except the rates, and the curve is wherever they differ — the
- * plate, the rim, the band lines, the ticks and the labels are identical between
- * the two and cancel exactly.
+ * The curve is found by difference, not by colour: antialiased hairlines blend
+ * into the plate, so two strips are rendered from the same everything except the
+ * rates, and the curve is wherever they differ.
  */
 @RunWith(AndroidJUnit4::class)
 class RainStripGeometryTest {
@@ -84,15 +72,9 @@ class RainStripGeometryTest {
 
     @Test
     fun the_three_levels_are_the_same_height_on_the_glass() {
-        // The one thing about this axis that must never move, measured in
-        // pixels rather than asserted in arithmetic: light, moderate and heavy
-        // take equal thirds of the chart. A scale whose steps are different
-        // sizes asks the reader to remember which step is which, and the widget
-        // is the surface where that would happen unnoticed.
-        //
-        // Three rates, two gaps, and the gaps must match. Differences rather
-        // than absolute rows, so nothing here needs to know where the chart
-        // begins or how wide the curve's stroke is - both cancel.
+        // Light, moderate and heavy take equal thirds of the chart, measured in pixels.
+        // Three rates, two gaps, and the gaps must match; differences rather than absolute
+        // rows, so the chart's origin and the stroke width cancel.
         val moderate = curveTop(PrecipitationIntensity.MODERATE_MM_PER_HOUR)
         val heavy = curveTop(PrecipitationIntensity.HEAVY_MM_PER_HOUR)
         val violent = curveTop(PrecipitationIntensity.VIOLENT_MM_PER_HOUR)

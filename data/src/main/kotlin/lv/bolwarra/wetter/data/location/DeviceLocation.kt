@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.location
 
 import android.Manifest
@@ -17,32 +20,12 @@ import lv.bolwarra.wetter.domain.location.Coordinates
 /**
  * Where the phone thinks it is.
  *
- * ### The framework's own location, not Google's
+ * The framework's `LocationManager`, not a fused provider from a proprietary
+ * services library (docs/decisions.md), so it also works on phones without them.
+ * A town-level answer is all that is needed.
  *
- * `LocationManager`, not the fused provider. docs/decisions.md rules out Play
- * Services entirely, and this is the one place that rule costs something real:
- * the fused provider blends sensors, is quicker to a first answer, and is what
- * every other weather app uses. The framework manager is what is left, and it is
- * enough — the question being asked is which town this is, not which side of the
- * street.
- *
- * It is also the only version that works at all on a phone with no Google
- * services, which is a large share of anybody installing from F-Droid.
- *
- * ### It is asked once and never watched
- *
- * A single fix, on demand, when somebody presses a button, and the listener is
- * removed the moment it answers. Nothing here subscribes to updates and nothing
- * runs in the background: the app has no use for where you are except at the
- * instant you ask it to put a pin there, and a weather app that quietly follows
- * you around is the thing this one is written not to be.
- *
- * ### No `LocationManagerCompat`
- *
- * The compat class would collapse the two branches below into one call, and it
- * lives in `androidx.core` — which `:data` does not otherwise depend on, and
- * which brings a profile installer with it. Fifteen lines of version check is
- * the cheaper of the two.
+ * Asked once, on demand, and the listener removed the moment it answers: nothing
+ * here subscribes to updates or runs in the background.
  */
 class DeviceLocation internal constructor(private val context: Context) {
 
@@ -53,13 +36,8 @@ class DeviceLocation internal constructor(private val context: Context) {
         }
 
     /**
-     * One fix, or null.
-     *
-     * Null covers every way this can fail — permission refused, location
-     * switched off, no provider enabled, a phone that has not managed a fix yet
-     * — and they are deliberately not distinguished. Every one of them leads to
-     * the same place: the map stays where it was and the reader taps where they
-     * know they are.
+     * One fix, or null for every way it can fail: in each case the map stays put and
+     * the reader taps where they are.
      */
     suspend fun current(): Coordinates? {
         if (!permitted) return null
@@ -121,13 +99,9 @@ class DeviceLocation internal constructor(private val context: Context) {
         )
 
         /**
-         * Network first, then GPS.
-         *
-         * The usual order is the other way round and it is wrong for this. GPS is
-         * precise and can take half a minute outdoors and forever indoors; the
-         * network provider answers in about a second to within a few hundred
-         * metres, which is well inside the grid any forecast model resolves. The
-         * reader can nudge the pin if they care, and they cannot nudge a spinner.
+         * Network first, then GPS: the network provider answers in about a second to
+         * within a few hundred metres, well inside any forecast grid, while GPS can take
+         * minutes indoors.
          */
         val PROVIDERS = listOf(
             LocationManager.NETWORK_PROVIDER,

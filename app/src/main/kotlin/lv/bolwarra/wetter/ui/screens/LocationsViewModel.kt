@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.lifecycle.ViewModel
@@ -31,22 +34,11 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.ui.map.BasemapLoader
 import lv.bolwarra.wetter.ui.map.TileLoader
 
-/** What the locations screen is showing. */
 /**
- * What makes one row in the locations list different from another.
- *
- * Coordinates alone were used for this and are not an identity. The geocoder
- * returns "Singapore" and "Singapore Island" at exactly 1.36667, 103.8 - two
- * different places by name, one point on the earth - and a list keyed on the
- * point alone crashed outright the moment somebody searched for it.
- *
- * So the key is everything the row actually shows. Two rows identical in all of
- * it are the same row to whoever is reading, and showing one of them is the
- * right answer rather than a workaround.
- *
- * Coordinates are formatted against the root locale on purpose: a decimal comma
- * would still be deterministic, but a key that changes shape with the phone's
- * language is a bug waiting for somebody else's device.
+ * What makes one row in the locations list different from another: everything
+ * the row shows. Coordinates alone are not an identity, since the geocoder returns
+ * "Singapore" and "Singapore Island" at the same point. Formatted against the root
+ * locale, so the key does not change shape with the phone's language.
  */
 internal fun WeatherLocation.rowKey(): String = listOf(
     name,
@@ -55,6 +47,7 @@ internal fun WeatherLocation.rowKey(): String = listOf(
     String.format(Locale.ROOT, "%.5f,%.5f", latitude, longitude),
 ).joinToString("|")
 
+/** What the locations screen is showing. */
 data class LocationsUiState(
     val query: String = "",
     val results: List<WeatherLocation> = emptyList(),
@@ -71,12 +64,8 @@ data class LocationsUiState(
 }
 
 /**
- * The locations screen.
- *
- * Search runs from the typing rather than from a button, so the list follows the
- * query without anybody having to commit to it - but it is debounced, because a
- * request per keystroke would spend somebody else's service to answer questions
- * nobody asked. "Riga" typed at a normal pace is one request, not four.
+ * The locations screen. Search follows the typing, debounced, so a name typed at
+ * a normal pace is one request rather than one per keystroke.
  */
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class LocationsViewModel(
@@ -90,15 +79,14 @@ class LocationsViewModel(
     /** Asked only when somebody presses the button on the map. */
     private val deviceLocation: DeviceLocation,
     /**
-     * For the one job here that must finish after this screen has gone: keeping
-     * a place somebody just chose.
+     * For the one job here that must finish after this screen has gone: keeping a
+     * place somebody just chose.
      */
     private val applicationScope: CoroutineScope,
     basemap: MapTileSource,
     /**
-     * Told when the chosen place changes, so the home screen stops showing the
-     * last one. Passed in rather than reached for, because a view model with a
-     * Context in it is a view model that cannot be tested without one.
+     * Told when the chosen place changes, so the home screen stops showing the last
+     * one. Passed in, so the view model needs no Context.
      */
     private val onPlaceChanged: suspend () -> Unit = {},
 ) : ViewModel() {
@@ -151,18 +139,8 @@ class LocationsViewModel(
     val selected: StateFlow<WeatherLocation> = selectedLocation.selected
 
     /**
-     * The list to offer, which always contains wherever you currently are.
-     *
-     * Until somebody has kept a place of their own the built-in set stands in,
-     * because an empty list under a search box is a worse first impression than
-     * a short list of somewhere to start.
-     *
-     * The subtle part is the selected place. It is only saved when it is chosen
-     * *here*, so the one the app starts on has never been through that - and the
-     * moment a first real place was kept, the built-in list stopped standing in
-     * and the starting place vanished from the screen with it. Whatever is
-     * selected is always listed, so the way back is never somewhere you have to
-     * search for again.
+     * The list to offer: the built-in set until somebody keeps a place, and always
+     * the selected place, so the way back never needs a second search.
      */
     private fun placesFor(saved: List<WeatherLocation>): List<WeatherLocation> {
         val base = saved.ifEmpty { BuiltInLocations.all }
@@ -180,66 +158,36 @@ class LocationsViewModel(
     }
 
     /**
-     * Choose a place, and keep it.
-     *
-     * Selecting from a search result saves it too: somebody who went to the
-     * trouble of finding a place will want it back without finding it again,
-     * and asking them to press a second button to say so is a question with an
-     * obvious answer.
+     * Choose a place, and keep it: somebody who searched for a place will want it
+     * back.
      */
     fun select(location: WeatherLocation) {
         selectedLocation.select(location)
         viewModelScope.launch {
             savedLocations.save(location)
-            // The first place anybody picks is the only clue the app has about
-            // which units they read in, and it is a good one. Does nothing
-            // after the first time - see PreferencesStore.seedFor.
+            // The first place anybody picks suggests which units they read in. Does nothing
+            // after the first time (PreferencesStore.seedFor).
             preferences.seedFor(location)
             onPlaceChanged()
         }
     }
 
     /**
-     * One fix from the device, for the map's "use my current location".
-     *
-     * Null for every way it can fail, which the picker draws as one message: the
-     * reader taps the map instead, and the distinction between "refused",
-     * "switched off" and "no fix yet" changes nothing about what they do next.
+     * One fix from the device, for the map's "use my current location". Null for every
+     * way it can fail: the reader taps the map instead either way.
      */
     suspend fun locate(): Coordinates? = runCatching { deviceLocation.current() }.getOrNull()
 
     /**
      * Keep the exact point somebody put a pin on.
      *
-     * ### It runs on a scope that outlives this screen, and that is the whole fix
+     * Written first, on the application's scope: the picker closes as soon as the
+     * button is pressed, which would cancel this view model's own scope mid-request.
      *
-     * This used to fetch a forecast *first* — to learn the timezone — and save
-     * afterwards, on the view model's own scope. The screen closes itself the
-     * instant the button is pressed, which pops the destination, which clears
-     * this view model, which cancels that coroutine while it is still waiting on
-     * the network. The pin was then never written: chosen, confirmed, and gone.
-     *
-     * It was a race the whole time and it started being lost when Open-Meteo's
-     * request grew from seven days to sixteen — the same code, a slower answer,
-     * and suddenly the cancellation always won.
-     *
-     * So the place is written first and on the application's scope, before
-     * anything that can suspend for a network. The timezone is corrected after,
-     * as a second write, because a zone is worth waiting for and a lost pin is
-     * not.
-     *
-     * A coordinate has no timezone, and [WeatherLocation] needs one because
-     * "18:00" on a forecast means 18:00 *there*. Nothing on the device knows
-     * which zone an arbitrary point is in - that is a map of political
-     * boundaries, not arithmetic - so the answer comes from the one request the
-     * app was about to make anyway: Open-Meteo resolves the zone from the
-     * coordinates and the forecast comes back carrying it.
-     *
-     * The device's own zone stands in until that lands, and is corrected rather
-     * than kept: a pin dropped across a border would otherwise read every hour
-     * of its forecast against the wrong clock forever. Both spellings share a
-     * cache key - which is coordinates only - so the request made under the
-     * provisional zone is not wasted.
+     * A coordinate has no timezone, and "18:00" on a forecast means 18:00 there. The
+     * device's zone stands in until the forecast request, which resolves the zone from
+     * the coordinates, brings back the real one; the row is then rewritten. The cache
+     * key is coordinates only, so the provisional request is not wasted.
      */
     fun savePin(at: Coordinates, name: PlaceName?) {
         val provisional = WeatherLocation(
@@ -255,14 +203,12 @@ class LocationsViewModel(
             savedLocations.save(provisional)
             selectedLocation.select(provisional)
             preferences.seedFor(provisional)
-            // The home screen is looking at the place that was selected a
-            // moment ago, and will not find out on its own until its next tick.
+            // The home screen is looking at the place selected a moment ago and would not
+            // notice until its next tick.
             onPlaceChanged()
 
-            // Then the zone. The forecast request carries it back, and the
-            // saved row is rewritten under the same key - coordinates rounded
-            // to three decimals - so this replaces the place rather than
-            // adding a second one beside it.
+            // Then the zone, rewritten under the same key, so this replaces the place
+            // rather than adding a second.
             val resolved = repository.refresh(provisional).getOrNull()?.location ?: return@launch
             if (resolved.zone == provisional.zone) return@launch
 
@@ -290,8 +236,8 @@ class LocationsViewModel(
         const val SAME_PLACE_DEGREES = 0.01
 
         /**
-         * Long enough to cover the gap between keystrokes at speed, short enough
-         * that stopping to look at the list does not feel like waiting.
+         * Long enough to cover the gap between fast keystrokes, short enough that
+         * stopping to look does not feel like waiting.
          */
         const val TYPING_PAUSE_MS = 300L
 

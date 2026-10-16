@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.format
 
 import android.text.format.DateFormat
@@ -30,34 +33,16 @@ import lv.bolwarra.wetter.domain.settings.WindUnit
 import lv.bolwarra.wetter.domain.sky.TideState
 
 /**
- * The one place where domain values become text.
- *
- * Keeping this out of the composables means a unit change or a wording change is
- * a single edit, and it is testable without a device.
- */
-
-/**
- * What a reading looks like when there isn't one. An em dash, not a zero and not
- * an empty string: the row keeps its shape and says plainly that the number is
- * missing.
+ * What a reading looks like when there isn't one: an em dash, so the row keeps its
+ * shape and the number is plainly missing.
  */
 const val NO_READING: String = "\u2014"
 
-/**
- * Temperatures are rounded, never truncated, and always carry the degree sign
- * without a space. The unit letter is shown once in the header rather than after
- * every number.
- */
+/** Temperatures are rounded, never truncated, with the degree sign and no space. */
 fun formatTemperature(celsius: Double?, unit: TemperatureUnit): String =
     if (celsius == null) NO_READING else "${unit.from(celsius).roundToInt()}°"
 
-/**
- * Rain, to one decimal below ten and whole above it.
- *
- * Inches keep their decimals throughout: the "whole above ten" rule exists
- * because a tenth of a millimetre stops mattering once there are ten of them,
- * and ten inches of rain in a day is not a number this app will ever draw.
- */
+/** Rain, to one decimal below ten and whole above it. Inches keep their decimals. */
 fun formatMillimetres(mm: Double?, unit: PrecipitationUnit): String {
     if (mm == null) return NO_READING
     val value = unit.from(mm)
@@ -113,11 +98,8 @@ fun formatWeekdayShort(date: LocalDate): String =
 fun formatDayOfMonth(date: LocalDate): String = date.dayOfMonth.toString()
 
 /**
- * A weekday's initial, for the head of a calendar column.
- *
- * NARROW rather than a hand-cut first letter, because the initial that
- * identifies a day is not the first letter of its name in every language, and in
- * several it is not one letter at all.
+ * A weekday's initial, for the head of a calendar column. NARROW from the locale,
+ * since the identifying initial is not always the first letter of the name.
  */
 fun formatWeekdayInitial(day: DayOfWeek): String =
     day.getDisplayName(TextStyle.NARROW, Locale.getDefault())
@@ -127,12 +109,9 @@ fun formatWeekday(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
 
 /**
- * How far off a day is, in the terms people actually use for it.
- *
- * The distinction is not decorative. "Rain starts at 23:00" is a fine thing to
- * say about tonight and a misleading thing to say about next Wednesday, and the
- * boundary between a weekday name and a date is the point where the name stops
- * being unambiguous — seven days out, "Wednesday" is today's name again.
+ * How far off a day is, in the terms people use. "Rain starts at 23:00" is fine
+ * for tonight and misleading for next Wednesday, and seven days out a weekday name
+ * is ambiguous again.
  */
 enum class DayDistance { TODAY, TOMORROW, THIS_WEEK, LATER }
 
@@ -148,10 +127,8 @@ fun dayDistance(instant: Instant, now: Instant, zone: ZoneId): DayDistance {
 }
 
 /**
- * "12 September", ordered the way the reader's locale orders it.
- *
- * The year is deliberately absent: no forecast reaches far enough for it to be
- * in question.
+ * "12 September", ordered by the reader's locale. No year: no forecast reaches far
+ * enough for it to be in question.
  */
 fun formatDayAndMonth(date: LocalDate): String {
     val pattern = DateFormat.getBestDateTimePattern(Locale.getDefault(), DAY_MONTH_SKELETON)
@@ -167,12 +144,7 @@ fun daysBetween(instant: Instant, now: Instant, zone: ZoneId): Long = ChronoUnit
     instant.atZone(zone).toLocalDate(),
 )
 
-/**
- * What an intensity is called.
- *
- * The reason this exists at all: millimetres per hour is a unit almost nobody
- * has a feel for, including people who work near meteorology. "Light" lands.
- */
+/** What an intensity is called: "Light" lands where millimetres per hour do not. */
 @StringRes
 fun PrecipitationIntensity.labelRes(): Int = when (this) {
     PrecipitationIntensity.NONE -> R.string.intensity_none
@@ -238,12 +210,8 @@ fun MoonPhaseName.labelRes(): Int = when (this) {
 }
 
 /**
- * Which band a UV index falls in.
- *
- * The number alone is only meaningful to somebody who already knows the scale:
- * "7" is a hat and shade, "2" is nothing, and nothing about the digits says so.
- * The bands are the WHO's, which is what almost every country's public advice is
- * written against - so this reads the same in Riga and in Nairobi.
+ * Which WHO band a UV index falls in: the band says what to do, the digit alone
+ * does not.
  */
 @StringRes
 fun uvBandLabel(index: Double): Int = when (index.roundToInt()) {
@@ -258,11 +226,8 @@ fun uvBandLabel(index: Double): Int = when (index.roundToInt()) {
 fun formatUvIndex(index: Double): String = index.roundToInt().toString()
 
 /**
- * A pollutant concentration, in micrograms per cubic metre.
- *
- * One decimal below ten and none above it. Below ten the difference between 3
- * and 3.9 is a third of the reading; above a hundred a decimal is noise from a
- * model with an 11 km grid.
+ * A pollutant concentration, in micrograms per cubic metre: one decimal below ten,
+ * none above.
  */
 @Composable
 fun formatConcentration(value: Double?): String = when {
@@ -275,20 +240,9 @@ fun formatConcentration(value: Double?): String = when {
 }
 
 /**
- * The tide's place in its monthly rhythm.
- *
- * In the Moon group and nowhere else, because that is the honest frame: this is
- * a fact about where the sun and moon are, not a water level. When high water
- * arrives and how far it climbs are local, set by the shape of a particular
- * coast, and would need a tide gauge to say.
- */
-/**
- * What to call a hazard, given how far it goes.
- *
- * Only the wind needs the peak. Severity stops at "change the plan" because
- * there is nothing useful above it, but that covers a gale and a hurricane
- * alike and those are not the same afternoon - so the word carries the
- * difference the severity cannot.
+ * What to call a hazard, given how far it goes. Severity stops at "change the
+ * plan", which covers a gale and a hurricane alike, so for wind the word carries
+ * the difference.
  */
 @StringRes
 fun Hazard.labelRes(): Int = when {
@@ -311,10 +265,8 @@ fun HazardKind.labelRes(): Int = when (this) {
 }
 
 /**
- * When a hazard runs, in the fewest words that stay true.
- *
- * An open end is said as an open end. A warning that reads "until 09:00" when
- * 09:00 is merely where the forecast stopped would be inventing a reprieve.
+ * When a hazard runs, in the fewest words that stay true. An open end is said as
+ * an open end, not as the time the forecast stops.
  */
 @Composable
 fun formatHazardWindow(hazard: Hazard, now: Instant, zone: ZoneId): String {
@@ -326,9 +278,8 @@ fun formatHazardWindow(hazard: Hazard, now: Instant, zone: ZoneId): String {
         }
     }
 
-    // A window on another day has to say so. "13:00 - 16:00" for tomorrow's sun
-    // reads as this afternoon, and this afternoon has already gone - which turns
-    // a warning into a reason to ignore the mark.
+    // A window on another day says so: "13:00 - 16:00" for tomorrow would read as
+    // this afternoon.
     val start = when (dayDistance(hazard.from, now, zone)) {
         DayDistance.TODAY -> formatTime(hazard.from, zone)
         DayDistance.TOMORROW -> stringResource(
@@ -349,6 +300,10 @@ fun formatHazardWindow(hazard: Hazard, now: Instant, zone: ZoneId): String {
     }
 }
 
+/**
+ * The tide's place in its monthly rhythm: a fact about the sun and moon, not a
+ * water level, which is local to each coast.
+ */
 @StringRes
 fun TideState.labelRes(): Int = when (this) {
     TideState.SPRING -> R.string.tide_spring

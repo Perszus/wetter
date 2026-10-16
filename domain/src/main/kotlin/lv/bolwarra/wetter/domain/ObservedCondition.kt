@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
@@ -7,45 +10,22 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition
 /**
  * The condition, corrected by what was actually seen.
  *
- * The dial names the weather in one word, and until now that word came from the
- * provider's symbol for the hour - a summary computed before breakfast for a
- * whole sixty minutes. Everything under it on the same screen had already moved
- * to the radar: the chart, the rate beside the label, the bar that says when it
- * stops. So the most prominent word on the page was the least evidenced thing
- * on it, and it could plainly contradict the chart directly beneath it.
+ * The provider's symbol summarises a whole hour, computed in advance; the chart
+ * and rate beneath it follow the radar. Where the two disagree about now, the one
+ * that looked wins (docs/design-principles.md).
  *
- * Most evidence, least speculation (docs/design-principles.md). Where the two
- * disagree about *now*, the one that looked wins.
- *
- * ### The hard half
- *
- * Upgrading is easy: radar sees rain the model missed, so the screen says rain.
- *
- * Downgrading is where the rule costs something. Radar can say with confidence
- * that nothing is falling here, but it cannot see the sky - it detects
- * hydrometeors, not cloud - so it has no word to offer in place of the one it
- * just removed. Leaving "Rain" up would contradict an observation; inventing
- * "Clear" would invent an observation. So the precipitation is dropped and the
- * sky is named from the model's own cloud cover, which is the model being used
- * for the thing it does know.
- *
- * ### What is deliberately not done
- *
- * Nothing here touches thunder, fog or freezing rain. Radar sees none of them:
- * a thunderstorm is a lightning detection network, fog sits below the beam
- * entirely, and whether rain freezes on contact is a question about the ground,
- * not about the drop. On those the provider's symbol is the only evidence there
- * is, so it stands.
+ * Upgrading is easy: radar sees rain the model missed. Downgrading drops the
+ * precipitation but cannot name the sky, since radar does not see cloud, so the
+ * sky is named from the model's cloud cover. Thunder, fog and freezing rain are
+ * invisible to radar and keep the provider's word.
  */
 object ObservedCondition {
 
     /**
      * @param reported what the provider said for this hour.
-     * @param observedRate the fused rate at this moment, mm/h, or null where
-     *   there is no radar at all - in which case the provider's word stands,
-     *   because an absent observation is not a contradicting one.
-     * @param cloudCover percent, for naming the sky when precipitation is
-     *   removed.
+     * @param observedRate the fused rate at this moment, mm/h, or null where there is
+     * no radar: an absent observation is not a contradicting one.
+     * @param cloudCover percent, for naming the sky when precipitation is removed.
      */
     fun of(
         reported: WeatherCondition,
@@ -56,16 +36,9 @@ object ObservedCondition {
         if (observedRate == null) return reported
         if (reported in RADAR_CANNOT_SEE) return reported
 
-        // The lower bar here, deliberately, while the rain *claims* use the
-        // higher one.
-        //
-        // Two reasons. This reads the radar, which is an observation of what is
-        // overhead rather than a model's guess at an average hour - the 53%
-        // figure behind isWorthNaming was measured on model hours and does not
-        // transfer. And the word this produces for the trace band is "drizzle",
-        // which is the accurate name for it: the dial is describing the sky, not
-        // promising rain, and drizzle is exactly what a tenth of a millimetre
-        // falling out of an overcast is.
+        // The trace bar, lower than rain claims use: this reads an observation rather than
+        // a model's hourly average, and the word it yields for the trace band is
+        // "drizzle", the accurate name for a tenth of a millimetre from an overcast.
         val falling = observedRate >= PrecipitationIntensity.TRACE_MM_PER_HOUR
         return when {
             falling && !reported.isPrecipitating -> observedPrecipitation(observedRate, temperature)
@@ -75,11 +48,8 @@ object ObservedCondition {
     }
 
     /**
-     * What to call precipitation the provider did not report.
-     *
-     * Radar returns echoes and cannot say whether they are frozen, so the kind
-     * comes from the temperature - the same rule the rest of the app uses - and
-     * the intensity comes from the measured rate.
+     * What to call precipitation the provider did not report: the kind from the
+     * temperature, the intensity from the measured rate.
      */
     private fun observedPrecipitation(rate: Double, temperature: Double?): WeatherCondition =
         when (PrecipitationKind.likelyAt(temperature)) {
@@ -100,11 +70,8 @@ object ObservedCondition {
         }
 
     /**
-     * The sky, when the rain has been taken out of the word.
-     *
-     * From the model's cloud cover, which is a thing the model measures rather
-     * than a thing being guessed at. Without it the honest answer is UNKNOWN -
-     * a dash is better than a sky nobody looked at.
+     * The sky, once the rain is out of the word, from the model's cloud cover; without
+     * it, UNKNOWN.
      */
     private fun skyOf(cloudCover: Int?): WeatherCondition = when {
         cloudCover == null -> WeatherCondition.UNKNOWN
@@ -115,11 +82,9 @@ object ObservedCondition {
     }
 
     /**
-     * Conditions radar has nothing to say about, which therefore keep the
-     * provider's word whatever the rate does.
-     *
-     * Thunder is a lightning network, not a reflectivity field. Fog sits under
-     * the beam. Whether rain freezes on contact is a fact about the ground.
+     * Conditions radar cannot see, which keep the provider's word whatever the rate:
+     * thunder needs a lightning network, fog sits under the beam, and freezing is a
+     * fact about the ground.
      */
     private val RADAR_CANNOT_SEE = setOf(
         WeatherCondition.THUNDERSTORM,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Duration
@@ -17,28 +20,18 @@ private data class StoredSample(
     val leadMinutes: Long,
     val millimetresPerHour: Float,
     val confidence: Float,
-    /** Defaulted, so series stored before the reach depended on it still read back. */
+    /** Defaulted, so rows written before the column existed still read back. */
     val motionQuality: Float = 1f,
 )
 
 /**
- * Keeps the last radar projection for a place across a restart.
+ * Keeps the last radar projection for a place across a restart, so a launch
+ * starts from it rather than from the model's hourly guess while new sweeps are
+ * fetched.
  *
- * The in-memory cache alone was the whole of it, on the reasoning that a nowcast
- * is worthless within the hour so there is nothing worth keeping. That is true
- * about the hour and wrong about the ten minutes that matter: those are exactly
- * the gap between the app being closed and opened again, and losing them meant
- * every launch began with the model's smooth hourly guess and only sharpened
- * once twenty-odd tiles had been fetched and matched.
- *
- * Only the sampled series is kept. The projection itself is a grid of rates
- * covering hundreds of kilometres, none of which the screen reads - it wants the
- * dozen values under one set of coordinates.
- *
- * The samples carry absolute times, which is what lets a stale row still earn
- * its place. A projection made twenty minutes ago is not wrong, it is merely
- * shorter: the part still in the future is as good as it ever was, and the
- * fusion drops the rest for being nowhere near the step it is filling.
+ * Only the samples under the place are kept, with absolute times: a projection
+ * made twenty minutes ago is shorter, not wrong, and the fusion drops the steps
+ * that have passed.
  */
 internal class RadarSeriesStore(private val dao: RadarSeriesDao, private val json: Json) {
 

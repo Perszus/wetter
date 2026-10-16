@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.foundation.background
@@ -85,18 +88,9 @@ private const val COLUMNS = 2
 private val BAND_CORNER = 4.dp
 
 /**
- * A named cluster of readings inside a tile.
- *
- * A dozen metrics in one grid is a wall: somebody looking for the pressure has
- * to read the humidity, the gust and the moon on the way past. A heading every
- * few rows lets the eye skip three quarters of it, which is the whole reason
- * the drawer can afford to be generous about what goes in.
- *
- * The heading sits on a band of its own. A rule underneath was the first
- * attempt and was too quiet to survive a drawer this long - by the fourth
- * group it read as one more separator among the readings. A filled band is
- * unmistakably a heading at any scroll position, and it makes the rules between
- * groups redundant, so they are gone.
+ * A named cluster of readings inside a tile, so an eye can skip to the one it came
+ * for. The heading sits on a filled band, which stays recognisable however far
+ * down the drawer it is, and makes rules between groups unnecessary.
  */
 @Composable
 fun MetricGroup(

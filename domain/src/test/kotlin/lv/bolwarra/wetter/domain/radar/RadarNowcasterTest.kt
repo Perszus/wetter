@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.radar
 
 import java.time.Duration
@@ -94,15 +97,9 @@ class RadarNowcasterTest {
 
     @Test
     fun `radar holds the near term and gives way around two hours`() {
-        // The shape the whole design turns on. Radar is looking at rain that
-        // exists, so for the first hour it should be carrying nearly the whole
-        // answer; by two hours the extrapolation has lost the plot and the model
-        // has to be taking over.
-        //
-        // An earlier version decayed exponentially from a raw sharpness reading
-        // and gave radar about a third of the answer for the current minute,
-        // falling to two percent by two hours. That is the opposite of what
-        // radar is for.
+        // Radar is looking at rain that exists, so for the first hour it carries nearly
+        // the whole answer; by two hours the extrapolation is spent and the models take
+        // over.
         val good = RadarNowcaster.GOOD_MATCH_SHARPNESS
 
         assertTrue(

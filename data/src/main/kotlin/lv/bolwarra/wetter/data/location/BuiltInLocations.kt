@@ -1,22 +1,15 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.location
 
 import java.time.ZoneId
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /**
- * A short list of places, so the forecast pipeline can be used before the
- * location phase exists.
- *
- * This is a stand-in, not a feature. Real location handling — search, saved
- * places, and optional use of the device's own position — is its own phase with
- * its own storage. What this buys now is that the provider layer can be exercised
- * by hand instead of only by its tests, which is how mapping mistakes that no
- * test predicted get found.
- *
- * The spread is deliberate: inside the Nordic fine grid, outside it but still in
- * Europe, far from any regional provider, above the arctic circle, and south of
- * the equator. Between them they exercise every branch the selector and the
- * solar calculation have.
+ * A short list of places offered before anybody has kept one, and the place the
+ * app opens on. Spread across the Nordic fine grid, the rest of Europe, far from
+ * any regional provider, above the Arctic Circle and south of the equator.
  */
 object BuiltInLocations {
 

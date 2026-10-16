@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.db
 
 import java.time.Instant
@@ -14,21 +17,13 @@ import lv.bolwarra.wetter.domain.provider.ForecastSupplement
 import lv.bolwarra.wetter.domain.provider.ProviderMetadata
 
 /**
- * A forecast as it is written to disk.
+ * A forecast as it is written to disk: a mirror of the domain types, so `:domain`
+ * stays free of serialization annotations. Instants are epoch seconds and dates
+ * ISO strings.
  *
- * A mirror of the domain types rather than the domain types themselves, so that
- * `:domain` stays free of serialization annotations and a stored forecast cannot
- * be silently invalidated by an unrelated refactor. Instants are epoch seconds
- * and dates are ISO strings, which are stable in a way that a library's default
- * encoding of `java.time` is not.
- *
- * The whole thing is stored as one JSON column rather than normalised into
- * tables of hours and days. Nothing queries an individual hour — a forecast is
- * read whole and written whole — so tables would buy nothing and cost a
- * migration every time a domain field appears. And because this is a *cache*,
- * a payload that no longer parses after an app update is simply a miss: it costs
- * one network request, not somebody's data. That is the trade, and it is only
- * acceptable because nothing here is irreplaceable.
+ * Stored as one JSON column, since a forecast is read and written whole. Being a
+ * cache, a payload that no longer parses after an update is a miss, costing one
+ * request.
  */
 @Serializable
 internal data class StoredForecast(
@@ -81,7 +76,6 @@ internal data class StoredHour(
     val windSpeed: Double?,
     /** Defaulted, so forecasts cached before gusts existed still read back. */
     val windGust: Double? = null,
-    /** Defaulted, so forecasts cached before these existed still read back. */
     /** Defaulted, so forecasts cached before it existed still read back. */
     val uvIndex: Double? = null,
     val cloudCover: Int?,

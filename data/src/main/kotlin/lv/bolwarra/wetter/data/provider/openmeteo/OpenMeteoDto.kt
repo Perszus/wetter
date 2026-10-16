@@ -1,24 +1,18 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.openmeteo
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Open-Meteo's forecast response, exactly as it arrives.
+ * Open-Meteo's forecast response, exactly as it arrives; nothing outside
+ * `data/provider/openmeteo/` names these types (docs/providers.md).
  *
- * These types stop at the edge of this package. Nothing outside
- * `data/provider/openmeteo/` may name one — the mapper next door turns them into
- * Wetter's own models and that is the only way out (docs/providers.md).
- *
- * Every field is nullable or defaulted. Open-Meteo omits whole blocks when a
- * variable is unavailable for a location, and an app in someone's pocket must
- * degrade rather than fail on a missing array.
- *
- * Times arrive as local ISO-8601 without an offset ("2026-03-14T09:00"), paired
- * with the resolved [timezone]. That is Open-Meteo's intended pairing; the
- * unixtime alternative applies its offset differently to hourly and daily
- * values, which is one subtlety too many for a field nobody would notice being
- * an hour wrong.
+ * Every field is nullable or defaulted, since whole blocks are omitted where a
+ * variable is unavailable. Times arrive as local ISO-8601 paired with the
+ * resolved [timezone], the service's intended pairing.
  */
 @Serializable
 data class OpenMeteoResponse(

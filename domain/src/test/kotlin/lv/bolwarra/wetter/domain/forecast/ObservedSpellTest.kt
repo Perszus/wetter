@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Duration
@@ -60,8 +63,8 @@ class ObservedSpellTest {
 
     @Test
     fun `rain the radar sees is announced when the radar sees it`() {
-        // Dry for half an hour, then rain. The model, averaging over its hour,
-        // has nothing until much later - and used to be the only thing asked.
+        // Dry for half an hour, then rain. The model, averaging over its hour, has
+        // nothing until much later.
         val fused = timeline(0.0, 0.0, 0.0, 1.2, 1.4, 1.1, 0.0)
         val model = hourly(0.0, 0.0, 0.0, 2.0)
 

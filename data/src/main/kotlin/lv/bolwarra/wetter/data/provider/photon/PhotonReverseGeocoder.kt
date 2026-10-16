@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.photon
 
 import io.ktor.client.HttpClient
@@ -11,34 +14,12 @@ import lv.bolwarra.wetter.domain.location.Coordinates
 import lv.bolwarra.wetter.domain.location.PlaceName
 
 /**
- * What is at a point on the map.
+ * What is at a point on the map, for naming a dropped pin.
  *
- * The place search is a gazetteer of settlements and cannot answer this: asked
- * for a street it returns nothing, and it has no reverse direction at all. So a
- * dropped pin had no name and was labelled with its own coordinates, which is
- * exact, useless to read, and the reason this exists.
- *
- * ### Why Photon
- *
- * `docs/decisions.md` measured the two candidates that need no key. Both
- * resolve: a pin in Mezaparks comes back from either as a house number on
- * Stendera iela. Nominatim is the faster of the two - a third of Photon's
- * latency in testing - and slightly richer, naming the square in central Riga
- * where Photon named only the old town.
- *
- * Photon is used anyway, because speed is not the constraint here. Nominatim's
- * usage policy is written around a strict rate cap and forbids the interactive,
- * type-and-see pattern outright; Photon is built by komoot precisely for
- * interactive geocoding, which is what a pin being dragged about is. The cost is
- * that it is one volunteer-run instance with no promise of being up, which is
- * why nothing in the app depends on an answer arriving.
- *
- * ### It is asked rarely on purpose
- *
- * One request when the map settles, never one per frame of a drag. A pin moved
- * across a city would otherwise fire a hundred lookups at somebody's donated
- * server, which is the behaviour that gets an app blocked rather than a
- * technical limit.
+ * Photon, not Nominatim: Nominatim's usage policy forbids the interactive pattern
+ * a pin being dragged about is, while Photon is built for it. It is one
+ * volunteer-run instance, so nothing depends on an answer arriving, and it is
+ * asked once when the map settles, never per frame.
  */
 class PhotonReverseGeocoder internal constructor(
     private val client: HttpClient,

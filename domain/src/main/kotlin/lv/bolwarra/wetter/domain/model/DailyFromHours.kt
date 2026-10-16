@@ -1,46 +1,25 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.model
 
 import java.time.LocalDate
 
 /**
- * Make every daily row agree with the hours it is a summary of.
+ * Make every daily row agree with the hours it summarises.
  *
- * ### Why a mapper cannot do this
+ * A stitched forecast can carry one service's daily summary over another's hours,
+ * or a summary built from six-hourly blocks over hourly data, so this runs after
+ * the join. Two things are derived from the held hours:
  *
- * Each provider builds its daily rows from its own steps, which is the only
- * thing it has — and then the forecast gets *stitched*. A day can end up with
- * its summary from one service and its hours from another, or with a summary
- * built from six-hourly blocks sitting above hours that came from somewhere
- * publishing every hour. Neither source did anything wrong; the disagreement is
- * created by joining them, so it can only be repaired after the join.
+ * - **The peak rate**, which names a day: the hardest hour the reader could
+ * scroll to, not an average over a block they never see.
+ * - **A summary that hides precipitation**: where the day has an hour worth naming
+ * and the daily code says nothing falls, the word comes from the wettest hour.
  *
- * Measured on a real stitched forecast for Rīga: Sunday held 3.2 mm with two
- * hours at or above half a millimetre, and its row said `OVERCAST` with a peak
- * of 0.27 mm/h — which is 1.6 divided by six, the rate of a six-hour block. The
- * week drew a plain cloud on a day whose own bar said rain began at eight in the
- * evening.
- *
- * ### What it fixes, and what it leaves alone
- *
- * Two things, both derived from the hours the app is actually holding:
- *
- * - **The peak rate**, which is what names a day. Recomputed from the day's
- *   hours, so it is the hardest hour the reader could scroll to rather than an
- *   average over a block they never see.
- * - **A summary that hides precipitation.** A provider's daily code is one word
- *   for twenty-four hours and evening rain loses to an overcast afternoon. Where
- *   the day contains an hour worth naming and the code says nothing is falling,
- *   the word comes from the wettest hour instead.
- *
- * It never does the reverse. A day whose code says rain keeps it even if no
- * single hour reaches the bar — the provider may be summarising a drizzle that
- * never peaks, and a code is evidence in a way an absence is not. Intensity is
- * still reconciled downwards by [WeatherCondition.atRate] through `appearance`,
- * so a day of drizzle is still drawn as drizzle.
- *
- * A day with no hours at all is left exactly as the provider sent it: beyond the
- * hourly horizon there is nothing better to say, and inventing a summary from no
- * hours would be worse than repeating one.
+ * Never the reverse: a code saying rain is evidence in a way an absence is not,
+ * and [WeatherCondition.atRate] still reconciles intensity downwards. A day with
+ * no hours is left as the provider sent it.
  */
 fun WeatherForecast.withDailyReadFromHours(): WeatherForecast {
     if (hourly.isEmpty() || daily.isEmpty()) return this

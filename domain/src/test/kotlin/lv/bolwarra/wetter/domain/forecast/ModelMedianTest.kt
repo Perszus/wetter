@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.forecast
 
 import java.time.Duration
@@ -9,12 +12,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * No single model gets to decide.
- *
- * Built from what was actually on the phone on a wet evening in Riga. The
- * chosen provider reported 0.0 mm for every hour after the next and the symbol
- * "cloudy"; the seven-model ensemble already downloaded had six of seven wet
- * over the same hours. The screen drew a flat dry evening while it rained.
+ * No single model gets to decide. Built from a wet evening in Riga: the chosen
+ * provider reported 0.0 mm for every hour after the next, while six of seven
+ * ensemble models were wet over the same hours.
  */
 class ModelMedianTest {
 

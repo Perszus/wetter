@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.provider
 
 import java.time.Duration
@@ -158,15 +161,9 @@ class ForecastStitcherTest {
 
     @Test
     fun `the day the seam falls in stays with whoever drew most of it`() {
-        // The bug this exists for was visible on screen: a Saturday headed with a
-        // rain mark, opened, and every one of its hours dry. The seam landed in
-        // the evening, so the global model had supplied three of that day's hours
-        // and the regional model the other twenty-one - and the summary went to
-        // the global model, which had forecast drizzle into an afternoon the
-        // reader could see was clear.
-        //
-        // Neither source was wrong. They were describing the same afternoon and
-        // only one of them was drawn, so only that one may put a word on it.
+        // A day goes to the source that drew most of its hours. With the seam in the
+        // evening, the global model supplied three of the day's hours and the regional
+        // model twenty-one, so the regional model names the day.
         val primary = forecast("regional", hours = 30)
         val extension = forecast("global", hours = 168)
         val zone = riga.zone

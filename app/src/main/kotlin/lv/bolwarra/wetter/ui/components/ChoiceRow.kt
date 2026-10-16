@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.foundation.background
@@ -21,23 +24,10 @@ import androidx.compose.ui.unit.dp
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * One setting: what it is, and the answers, laid out as a row of segments.
- *
- * A segmented row rather than a dropdown or a dialog. Every one of these has two
- * to four answers and all of them fit across a phone, so the whole question and
- * its whole answer can be read at once - a menu would hide the alternatives
- * behind a tap and tell the reader nothing except what they already chose.
- *
- * It is the same shape as the domain switcher above the forecast, on purpose:
- * this app has one control for choosing one of a few things, and a second one
- * that looked different would be a second thing to learn.
- *
- * ### The selected segment is filled, not ticked
- *
- * A tick or a radio dot puts a second mark inside a control that is already
- * capable of showing its own state. Filling the chosen segment says it with the
- * thing itself, and leaves the row readable at a glance down a page of settings:
- * the answers are the only ink that moves.
+ * One setting: what it is, and its answers as a row of segments, so the whole
+ * question and every answer read at once. The same shape as the domain switcher:
+ * one control for choosing one of a few things. The chosen segment is filled
+ * rather than ticked.
  */
 @Composable
 fun <T> ChoiceRow(

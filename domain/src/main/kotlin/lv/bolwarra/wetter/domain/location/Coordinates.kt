@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.location
 
 import java.util.Locale
@@ -7,16 +10,9 @@ import kotlin.math.abs
 data class Coordinates(val latitude: Double, val longitude: Double) {
 
     /**
-     * A name for a point that has none.
-     *
-     * A pin dropped on a field has no settlement to be named after, and the app
-     * needs something to put at the top of the screen and in the list of kept
-     * places. Four decimals is about eleven metres, which is finer than anything
-     * downstream resolves and coarse enough to read.
-     *
-     * Hemisphere letters rather than signs, because this is a label rather than
-     * a value - and because [CoordinateQuery] reads this form back, so a place
-     * named this way can be typed into the search box and found again.
+     * A name for a point that has none, such as a pin dropped on a field. Four
+     * decimals, about eleven metres, with hemisphere letters, in the form
+     * [CoordinateQuery] reads back, so it can be searched for again.
      */
     fun format(): String {
         val ns = if (latitude >= 0) 'N' else 'S'
@@ -32,21 +28,9 @@ data class Coordinates(val latitude: Double, val longitude: Double) {
 }
 
 /**
- * Recognising a coordinate pair in the search box.
- *
- * A place-name search cannot answer "the field behind my house", and it cannot
- * answer a street address either - the geocoder this app uses is a gazetteer of
- * settlements, and asked for one it returns nothing at all rather than something
- * approximate. Coordinates are the one exact answer available without taking on
- * another service, and anybody who needs a point that precise usually has them.
- *
- * So the search box takes them. Nothing announces it, because a search box that
- * explains its own input formats has already failed; it simply works when
- * somebody pastes what a map gave them.
- *
- * ### What counts
- *
- * Decimal, with or without hemisphere letters, and degrees-minutes-seconds:
+ * Recognising a coordinate pair in the search box, for points a gazetteer of
+ * settlements cannot answer. Decimal, with or without hemisphere letters, and
+ * degrees-minutes-seconds:
  *
  * ```
  * 56.9496, 24.1052        56.9496 24.1052        -33.87, 151.21
@@ -54,11 +38,7 @@ data class Coordinates(val latitude: Double, val longitude: Double) {
  * 56°56'58"N 24°06'18"E
  * ```
  *
- * The discriminator against a place name is that the text carries no letters
- * except the four hemisphere ones. "Riga" has letters and is a name; "56 24" has
- * none and is a point. That is a cheap test and it does not misfire, because
- * there is no settlement on earth whose name is made only of digits, signs and
- * the letters N, S, E and W.
+ * Text with no letters but N, S, E and W is a point; anything else is a name.
  */
 object CoordinateQuery {
 
@@ -84,11 +64,8 @@ object CoordinateQuery {
     }
 
     /**
-     * Cut the text in two.
-     *
-     * A comma if there is exactly one, otherwise whitespace - and a hemisphere
-     * letter is allowed to be the seam too, so "56.9496N24.1052E" divides where
-     * a person would read it dividing.
+     * Cut the text in two: at a single comma, else whitespace, else after a
+     * hemisphere letter, so "56.9496N24.1052E" divides where a person would read it.
      */
     private fun split(text: String): Halves? {
         val comma = text.indexOf(',')
@@ -105,13 +82,10 @@ object CoordinateQuery {
             6 -> return Halves(parts.take(3).joinToString(""), parts.drop(3).joinToString(""))
         }
 
-        // Last resort, for text run together with no separator at all: cut after
-        // a hemisphere letter that is followed by a number.
-        //
-        // Tried before the whitespace split this misfires on a leading letter -
-        // "S33.87 E151.21" cuts after the S and leaves a lone hemisphere. The
-        // match is zero-width, so its index is already the position after the
-        // letter and must not be advanced again.
+        // Last resort, for text run together: cut after a hemisphere letter followed by a
+        // number. Tried after the whitespace split, which would otherwise cut
+        // "S33.87 E151.21" after the S. The match is zero-width, so its index is already
+        // past the letter.
         val seam = HEMISPHERE_SEAM.find(text) ?: return null
         return Halves(text.take(seam.range.first), text.drop(seam.range.first))
     }

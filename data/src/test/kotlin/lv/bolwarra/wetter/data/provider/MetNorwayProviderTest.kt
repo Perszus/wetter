@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider
 
 import java.time.Clock
@@ -135,11 +138,8 @@ class MetNorwayProviderTest {
 
     @Test
     fun `a day covered hour by hour is named by its hours`() = runTest {
-        // The bug this exists for was visible on screen: a Saturday headed with a
-        // rain mark whose twenty-four hours were, every one of them, dry. The
-        // six-hourly step sitting over the top of that day said rain, and it was
-        // reading a real 8.7 mm - but a reader who opens the day sees the hours,
-        // and the hours are what the day has to be named from.
+        // A six-hourly step over the day carries a real 8.7 mm, but every one of the
+        // day's hours is dry, and a reader who opens the day sees the hours.
         val day = provider(DRY_HOURS_UNDER_A_WET_SIX).getForecast(riga).getOrThrow().daily
             .single { it.date == LocalDate.of(2026, 3, 14) }
 
@@ -162,9 +162,8 @@ class MetNorwayProviderTest {
 
     @Test
     fun `past the hourly reach, six hours of real rain still names its day`() = runTest {
-        // The other side of the same threshold, so the fix cannot be "ignore
-        // six-hourly steps". 4.2 mm over six hours is 0.7 an hour, which is rain
-        // by any reading and worth putting on the day.
+        // The other side of the same threshold, so six-hourly steps are not simply
+        // ignored: 4.2 mm over six hours is 0.7 an hour, rain by any reading.
         val day = provider(sixHourlyDay(4.2)).getForecast(riga).getOrThrow().daily
             .single { it.date == LocalDate.of(2026, 3, 14) }
 

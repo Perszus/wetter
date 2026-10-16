@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.air
 
 import java.time.Instant
@@ -5,20 +8,13 @@ import java.time.Instant
 /**
  * What is in the air here, now.
  *
- * Concentrations rather than an index. An air quality index is a national
- * instrument - the European AQI, the US AQI, India's NAQI and China's all take
- * the same micrograms and return different verdicts, because each encodes what
- * its own regulator decided was acceptable. This app is used everywhere, so it
- * reports the measurement and bands it against the one threshold set that is
- * not national: the World Health Organization's global air quality guidelines
- * (2021). The same air reads the same in Riga and in Delhi.
+ * Concentrations rather than an index: national indices turn the same micrograms
+ * into different verdicts, so the measurement is banded against the WHO global air
+ * quality guidelines (2021), and the same air reads the same everywhere.
  *
- * @param pm25 fine particles, micrograms per cubic metre, this hour. The
- *   pollutant that dominates health effects nearly everywhere.
- * @param pm25Average the trailing 24-hour mean, which is what the guideline is
- *   actually defined against. Judging an instantaneous reading by a daily
- *   threshold is the usual shortcut here, and it is wrong in both directions -
- *   a single smoky hour is not a bad day, and a steady haze never spikes.
+ * @param pm25 fine particles, micrograms per cubic metre, this hour.
+ * @param pm25Average the trailing 24-hour mean, which the guideline is defined
+ * against: a single smoky hour is not a bad day.
  */
 data class AirQuality(
     val observedAt: Instant,
@@ -30,23 +26,17 @@ data class AirQuality(
 ) {
 
     /**
-     * The band, judged on the daily mean where there is one.
-     *
-     * Null when nothing was reported - which is a real outcome, not a zero.
-     * Somewhere with no coverage should say nothing rather than say "good".
+     * The band, judged on the daily mean where there is one. Null when nothing was
+     * reported: no coverage should say nothing rather than "good".
      */
     val band: AirQualityBand?
         get() = (pm25Average ?: pm25)?.let { AirQualityBand.of(it) }
 }
 
 /**
- * How bad the air is, on the WHO's 2021 ladder for 24-hour PM2.5.
- *
- * The numbers are the guideline value and its four interim targets, which exist
- * precisely because most of the world is a long way above the guideline and
- * needed a scale rather than a single pass/fail line. Using them as bands means
- * the words describe distance from a health target rather than compliance with
- * whichever regulator happens to have jurisdiction.
+ * How bad the air is, on the WHO 2021 ladder for 24-hour PM2.5: the guideline
+ * value and its four interim targets, so the words describe distance from a health
+ * target rather than any one regulator's compliance line.
  */
 enum class AirQualityBand {
     /** At or under the WHO guideline: 5 µg/m³ annual, 15 µg/m³ over a day. */
@@ -89,12 +79,9 @@ enum class AirQualityBand {
 }
 
 /**
- * Where air quality comes from.
- *
- * Separate from [lv.bolwarra.wetter.domain.provider.WeatherProvider] for the
- * same reason radar is: it answers a different question, on its own cadence,
- * from its own models, and a weather provider failing should not take it down
- * with it (docs/providers.md).
+ * Where air quality comes from. Separate from
+ * [lv.bolwarra.wetter.domain.provider.WeatherProvider], so a weather provider
+ * failing cannot take it down (docs/providers.md).
  */
 interface AirQualitySource {
 

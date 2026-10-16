@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.sky
 
 import java.time.Duration
@@ -6,17 +9,11 @@ import lv.bolwarra.wetter.domain.SolarTime
 import lv.bolwarra.wetter.domain.model.HourlyWeather
 
 /**
- * When the sky is worth going outside for, across the coming night.
+ * When the sky is worth going outside for, across the coming night: the question
+ * is whether to set an alarm, not what the sky is doing now.
  *
- * The mark on the dial answers "right now", which is the wrong horizon for
- * this one thing: nobody decides to go and look at the sky at the instant they
- * open a weather app. They want to know whether it is worth setting an alarm,
- * and that is a question about a window some hours away.
- *
- * Everything here is scanned rather than solved. The cloud decks arrive hourly,
- * so the answer cannot be finer than an hour however it is computed, and reusing
- * [Stargazing.assess] for every hour means the drawer and the mark cannot drift
- * apart - they are the same judgement asked about different instants.
+ * Scanned hour by hour with [Stargazing.assess], so the drawer and the dial's mark
+ * are the same judgement asked about different instants.
  */
 object StarWatch {
 
@@ -29,11 +26,10 @@ object StarWatch {
     /**
      * The night ahead.
      *
-     * @param darkFrom when the sky becomes dark enough, or null where it never
-     *   does - which is not an edge case to be tidied away but half the year
-     *   above the arctic circle.
-     * @param best the longest stretch that is both dark and clear, or null when
-     *   the cloud never breaks for long enough to be worth naming.
+     * @param darkFrom when the sky becomes dark enough, or null where it never does,
+     * which is half the year above the Arctic Circle.
+     * @param best the longest stretch that is both dark and clear, or null when the
+     * cloud never breaks for long enough.
      */
     data class Night(val darkFrom: Instant?, val darkUntil: Instant?, val best: Window?) {
         val hasDarkness: Boolean get() = darkFrom != null
@@ -76,13 +72,9 @@ object StarWatch {
     }
 
     /**
-     * The first and last moment dark enough for stars, inside the horizon.
-     *
-     * Sampled rather than solved. A closed form for the sun crossing -12 degrees
-     * exists, but it has to be asked separately for dusk and dawn, on two
-     * different dates, and it has no answer at all where the sun never gets that
-     * low - which is exactly where getting it wrong matters. Walking the window
-     * gives one code path that is right everywhere and is correct to the step.
+     * The first and last moment dark enough for stars, inside the horizon. Sampled
+     * rather than solved, so one code path is right everywhere, including where the
+     * sun never gets low enough.
      */
     private fun darkness(
         from: Instant,
@@ -101,9 +93,8 @@ object StarWatch {
                 if (first == null) first = at
                 last = at
             } else if (first != null) {
-                // Two separate darknesses inside 24 hours means the horizon
-                // caught the tail of one night and the start of the next. The
-                // first is the one being asked about.
+                // Two darknesses inside 24 hours: the tail of one night and the start of the
+                // next. The first is the one asked about.
                 break
             }
             at = at.plus(DARKNESS_STEP)
@@ -134,8 +125,8 @@ object StarWatch {
         }
 
         val first = hours[bestStart].timestamp
-        // The run's last hour covers the hour after it starts, so the window
-        // closes an hour later than the last row that qualified.
+        // The run's last hour covers the hour after it starts, so the window closes an
+        // hour after the last row that qualified.
         return Window(first, hours[bestStart + bestLength - 1].timestamp.plus(HOUR))
     }
 

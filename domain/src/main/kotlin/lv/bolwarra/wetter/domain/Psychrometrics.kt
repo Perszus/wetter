@@ -1,28 +1,20 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import kotlin.math.ln
 
 /**
- * Readings derived from the ones a provider actually sends.
- *
- * Dew point is the useful one and almost nobody returns it directly, yet it
- * falls out of temperature and humidity exactly. Deriving it here rather than
- * asking for another field keeps it available from every provider, including the
- * ones that will never offer it, and it stays correct offline because it is not
- * fetched at all.
+ * Readings derived from the ones a provider sends. Dew point follows exactly from
+ * temperature and humidity, so it is available from every provider.
  */
 object Psychrometrics {
 
     /**
-     * The temperature at which the air would be saturated, in degrees Celsius.
-     *
-     * The Magnus-Tetens approximation, which is good to about a tenth of a
-     * degree between roughly -45 and +60 C - far tighter than the humidity
-     * reading feeding it, so the approximation is not the limiting error here.
-     *
-     * Null when humidity is missing or nonsensical. Zero humidity has no dew
-     * point at all: the logarithm runs to negative infinity, and air that dry
-     * does not exist outdoors anyway.
+     * The temperature at which the air would be saturated, in degrees Celsius, by the
+     * Magnus-Tetens approximation: good to about a tenth of a degree between -45 and
+     * +60. Null when humidity is missing or zero.
      */
     fun dewPoint(temperatureC: Double?, relativeHumidityPercent: Int?): Double? {
         if (temperatureC == null || relativeHumidityPercent == null) return null

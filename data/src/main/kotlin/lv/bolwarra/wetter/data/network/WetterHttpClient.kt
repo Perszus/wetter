@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.network
 
 import io.ktor.client.HttpClient
@@ -12,24 +15,16 @@ import kotlinx.serialization.json.Json
 import okhttp3.Cache
 
 /**
- * The one HTTP client, shared by every provider.
- *
- * One client means one connection pool and one set of timeouts. The timeouts are
- * short on purpose: a refresh that has already taken fifteen seconds has failed
- * as far as the user is concerned, and the router has a second provider waiting.
+ * The one HTTP client, shared by every provider. Timeouts are short: a refresh that
+ * has taken fifteen seconds has failed for the reader, and the router has a second
+ * provider waiting.
  */
 internal object WetterHttpClient {
 
     /**
      * MET Norway's terms require a User-Agent that identifies the application and
-     * gives a way to make contact; sending a generic one is grounds for being
-     * blocked. Open-Meteo does not require it, but sending the same honest string
-     * everywhere is simpler than remembering which provider cares.
-     *
-     * The URL must point at somewhere a provider can actually reach a human.
-     *
-     * The version is passed in rather than read here: it belongs to the
-     * application, and :data has no business knowing what it is bundled into.
+     * gives a contact; the same string is sent everywhere. The version is passed in by
+     * the application.
      */
     fun userAgent(applicationVersion: String): String = "Wetter/$applicationVersion (+$CONTACT_URL)"
 
@@ -88,26 +83,16 @@ internal object WetterHttpClient {
     }
 
     /**
-     * An ordinary HTTP disk cache, governed entirely by what each service says.
+     * An ordinary HTTP disk cache, governed by what each service says:
      *
-     * There was none, so a cold start fetched again what a warm one already
-     * had. Every service here states its own terms, and the cache obeys them
-     * rather than any policy of ours:
+     * - radar tiles are good for two days at a sweep-unique path;
+     * - basemap tiles are good for days, as OpenStreetMap's tile policy asks;
+     * - MET Norway sends `Expires` and `Last-Modified`, and its terms ask for these
+     * conditional requests;
+     * - the radar index says `no-cache` and is revalidated every time;
+     * - Open-Meteo sends no caching headers and is never answered from disk.
      *
-     * - radar tiles live at a path unique to their sweep and are marked good
-     *   for two days, so the sweeps behind a fresh process come off disk
-     *   instead of being downloaded again;
-     * - basemap tiles are marked good for days, which OpenStreetMap's tile
-     *   policy asks clients to honour - the map reopens without asking again;
-     * - MET Norway sends `Expires` and `Last-Modified`, and its terms ask for
-     *   exactly the conditional requests this makes automatic;
-     * - the radar index says `no-cache`, so it is revalidated every time and
-     *   can never be served stale;
-     * - Open-Meteo sends no caching headers at all, so a forecast from it is
-     *   never answered from disk.
-     *
-     * Thirty-two megabytes: a day of radar sweeps and a few map openings, in
-     * the app's cache directory where the system may clear it under pressure.
+     * Thirty-two megabytes in the app's cache directory, which the system may clear.
      */
     private const val CACHE_BYTES = 32L * 1024 * 1024
 }

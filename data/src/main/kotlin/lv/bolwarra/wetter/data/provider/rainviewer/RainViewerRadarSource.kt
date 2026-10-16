@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.rainviewer
 
 import io.ktor.client.HttpClient
@@ -36,10 +39,8 @@ internal data class RainViewerIndex(
 internal data class RainViewerRadar(
     val past: List<RainViewerFrame> = emptyList(),
     /**
-     * Empty since RainViewer withdrew their own nowcast at the start of 2026.
-     * Kept so the absence is visible in the type rather than being a surprise:
-     * everything past the present moment is [lv.bolwarra.wetter.domain.radar.RadarNowcaster]'s
-     * job now.
+     * Empty since RainViewer withdrew their nowcast at the start of 2026; projection
+     * is [lv.bolwarra.wetter.domain.radar.RadarNowcaster]'s job.
      */
     val nowcast: List<RainViewerFrame> = emptyList(),
 )
@@ -53,26 +54,13 @@ internal interface TileDecoder {
 }
 
 /**
- * Radar observations from RainViewer.
+ * Radar observations from RainViewer: a global composite of national radar
+ * networks, free and without a key. Observations only; projection happens here.
  *
- * A global composite of national radar networks, free and without a key. Used as
- * an *observation* source only: their own forecast frames were withdrawn at the
- * start of 2026, so anything past the present moment is produced here.
- *
- * ### The tiles are pictures, and that is the whole difficulty
- *
- * There is no numeric endpoint. The rain field arrives as PNG map tiles and has
- * to be read back out of the colours ([RainViewerPalette]), which is why the
- * scale had to be established by measurement and why the rates it yields are
- * reliable in shape and only approximate in magnitude.
- *
- * ### Why a block of tiles rather than one
- *
- * Motion is measured by matching a sweep against the one before it. A single
- * tile around the user would let a shower move in from outside the frame with no
- * warning at all, since there is no data upwind to have seen it coming. A block
- * buys the surrounding country in every direction, which at these zooms is the
- * couple of hours of approach the nowcast needs. See [BLOCK_SIZE] for its size.
+ * There is no numeric endpoint: the rain field is read back out of PNG tile
+ * colours ([RainViewerPalette]), reliable in shape and approximate in magnitude.
+ * A block of tiles ([BLOCK_SIZE]) rather than one, so rain approaching from
+ * upwind is seen before it arrives.
  */
 internal class RainViewerRadarSource(
     private val client: HttpClient,
@@ -121,17 +109,8 @@ internal class RainViewerRadarSource(
             if (wanted.isEmpty() || index.host.isBlank()) {
                 Result.failure(WeatherFailure(WeatherError.NoProviderAvailable))
             } else {
-                // Frames together, not one after another.
-                //
-                // Each frame is a block of tiles already fetched in parallel,
-                // and then the frames themselves were awaited in turn - so three
-                // sweeps cost three round trips and the catch-up case, which asks
-                // for thirteen, cost thirteen. They do not depend on each other in
-                // any way; the only reason they were sequential is that `map` is.
-                //
-                // The whole set shares one permit pool rather than each frame
-                // holding its own, so the burst is bounded by how many requests are
-                // in the air at once instead of by how many sweeps were asked for.
+                // Frames fetched together, sharing one permit pool, so the burst is bounded by
+                // requests in the air rather than by how many sweeps were asked for.
                 val fields = coroutineScope {
                     wanted.map { frame ->
                         async { fetchFrame(index.host, frame, geometry) }
@@ -145,13 +124,7 @@ internal class RainViewerRadarSource(
             Result.failure(WeatherFailure(failure.toWeatherError()))
         }
 
-    /**
-     * One sweep, stitched from its tiles.
-     *
-     * The tiles are fetched together rather than in turn: sixteen sequential round
-     * trips is most of a second of latency for no reason, and they are
-     * independent.
-     */
+    /** One sweep, stitched from its tiles, fetched together. */
     private suspend fun fetchFrame(
         host: String,
         frame: RainViewerFrame,
@@ -204,21 +177,8 @@ internal class RainViewerRadarSource(
     }
 
     /**
-     * One tile, or null if it is missing.
-     *
-     * A missing tile is not an error. The service returns a tiny fully
-     * transparent PNG where nothing is falling, and occasionally nothing at all;
-     * either way the surrounding sweep is still worth having, and the block is
-     * left as zero there.
-     */
-    /**
-     * The index, kept for a moment.
-     *
-     * A refresh asks for it twice - once to learn the latest sweep and once to
-     * list the frames - and they are the same question a few milliseconds apart.
-     * RainViewer publishes a new index about every ten minutes, so holding the
-     * answer for one minute cannot serve a stale sweep and removes a round trip
-     * from every refresh.
+     * The index, held for a minute: a refresh asks for it twice in quick succession,
+     * and a new one is published about every ten minutes.
      */
     private suspend fun index(): RainViewerIndex {
         val now = Instant.now()
@@ -237,15 +197,12 @@ internal class RainViewerRadarSource(
     private var cached: Pair<Instant, RainViewerIndex>? = null
 
     /**
-     * How many tile requests may be in the air at once.
-     *
-     * Nine at a time. Without a bound, asking for the thirteen
-     * frames of a catch-up would put a hundred and seventeen requests on a
-     * volunteer service in one go, which is rude and, on a phone radio, slower
-     * than doing fewer at a time.
+     * How many tile requests may be in the air at once, so a thirteen-frame catch-up
+     * does not put over a hundred requests on a volunteer service at once.
      */
     private val inFlight = Semaphore(MAX_TILES_IN_FLIGHT)
 
+    /** One tile, or null if it is missing: the sweep is still worth having without it. */
     private suspend fun tile(host: String, path: String, zoom: Int, x: Int, y: Int): IntArray? =
         try {
             val size = RadarGeometry.TILE_SIZE
@@ -265,48 +222,37 @@ internal class RainViewerRadarSource(
         const val INDEX_URL = "https://api.rainviewer.com/public/weather-maps.json"
 
         /**
-         * Zoom 7 puts a pixel at roughly 670 m over the Baltic - close to the
-         * kilometre the underlying composites are produced at, so going finer
-         * would only be interpolating someone else's interpolation.
+         * Zoom 7 puts a pixel at roughly 670 m at mid-latitudes, close to the kilometre the
+         * composites are produced at.
          */
         const val ZOOM = 7
 
-        /** A row and a bit of the block at once - polite, and quick on a phone radio. */
+        /** A row and a bit of the block at once. */
         const val MAX_TILES_IN_FLIGHT = 9
 
         val INDEX_FRESH_FOR: Duration = Duration.ofMinutes(1)
 
-        /** Three by three, centred on the place: about 510 km across over the Baltic. */
+        /** Three by three, centred on the place: about 510 km across at mid-latitudes. */
         const val BLOCK_SIZE = 3
 
         /**
-         * The map's picture: a zoom out, and four tiles by four - about 1,360 km
-         * across over the Baltic, the country and every neighbour.
-         *
-         * A zoom out because the map is about what is coming from the next
-         * country, and at the chart's resolution that area is four times the
-         * pixels to fetch, hold and project. Two thirds of a kilometre a pixel
-         * matters for whether it rains on your street; at a country's width,
-         * a kilometre and a third shows the same weather.
-         *
-         * One tile wider than the map shows. It draws the middle three tiles'
-         * worth, so every projected frame has half a tile - some 170 km - of
-         * observed sky upwind of its edge to carry rain in from, rather than a
-         * blank that eats in from the side as the loop plays.
+         * The map's picture: a zoom out, four tiles by four, about 1,360 km across at
+         * mid-latitudes. Coarser, because the map shows what comes from the next country.
+         * One tile wider than the map shows, so every projected frame has observed sky
+         * upwind of its edge.
          */
         const val WIDE_ZOOM = 6
         const val WIDE_BLOCK_SIZE = 4
 
         /**
          * The colour scheme and rendering options. Every scheme currently returns
-         * byte-identical tiles, so this is the shape their API documents rather
-         * than a choice with an effect; smoothing is off because an interpolated
-         * picture is a worse thing to read numbers back out of than a blocky one.
+         * identical tiles; smoothing is off, since an interpolated picture reads back worse
+         * than a blocky one.
          */
         const val COLOUR_SCHEME = 0
         const val OPTIONS = "0_0"
 
-        /** The composite is rebuilt every ten minutes. Measured, and stated in their API. */
+        /** The composite is rebuilt every ten minutes. */
         val SWEEP_INTERVAL: Duration = Duration.ofMinutes(10)
     }
 }

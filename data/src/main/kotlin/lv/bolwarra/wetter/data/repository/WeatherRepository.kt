@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Clock
@@ -10,17 +13,10 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.model.withDailyReadFromHours
 
 /**
- * The one way to get weather.
- *
- * Offline-first in the literal sense: [observe] answers from the cache without
- * waiting for anything, and [refresh] is a separate call whose failure leaves
- * what is already on screen exactly where it is. Nothing above this can put the
- * UI in a state where it is waiting on a network request to show a forecast it
- * already has (docs/design-principles.md).
- *
- * The repository does not choose providers. It asks the router, and passes on
- * which provider produced what is currently shown so that a refresh does not
- * change source for no reason (docs/providers.md).
+ * The one way to get weather. [observe] answers from the cache without waiting;
+ * [refresh] is a separate call whose failure leaves what is on screen where it is
+ * (docs/design-principles.md). Providers are chosen by the router, told which one
+ * produced what is shown so a refresh does not switch source for no reason.
  */
 class WeatherRepository internal constructor(
     private val router: WeatherProviderRouter,
@@ -35,11 +31,8 @@ class WeatherRepository internal constructor(
     suspend fun cached(location: WeatherLocation): WeatherForecast? = cache.read(location)
 
     /**
-     * Fetches and stores a new forecast.
-     *
-     * The caller decides when; [needsRefresh] says when it is worth it. Keeping
-     * those apart is what lets a manual pull-to-refresh ignore the freshness
-     * window while an app launch respects it.
+     * Fetches and stores a new forecast. The caller decides when; [needsRefresh] says
+     * when it is worth it, so a manual refresh can ignore the window.
      */
     suspend fun refresh(location: WeatherLocation): Result<WeatherForecast> {
         val incumbentId = cache.read(location)?.provider?.id
@@ -52,18 +45,10 @@ class WeatherRepository internal constructor(
     }
 
     /**
-     * Whether a forecast is old enough to be worth asking again.
-     *
-     * Ten minutes, the same clock the radar keeps. It was half an hour, on the
-     * reasoning that the models publish hourly - but "hourly" lands at a different
-     * minute for every service and every run, so a half-hour window meant a new
-     * run could sit published for up to forty-five minutes before anything here
-     * asked for it. Asking sooner costs nothing when nothing has changed: MET
-     * Norway's answers are revalidated against its own `Last-Modified` and come
-     * back "not modified", and the disk cache answers outright inside `Expires`
-     * (WetterHttpClient). The only full re-download is Open-Meteo, which says
-     * nothing about caching, and one small request every ten minutes is well
-     * inside what it asks of a free client (docs/providers.md).
+     * Whether a forecast is old enough to be worth asking again: ten minutes, the
+     * radar's clock, since models publish at a different minute for every service and
+     * run. Asking costs little when nothing changed: MET Norway revalidates to "not
+     * modified" and the disk cache answers inside `Expires` (WetterHttpClient).
      */
     fun needsRefresh(forecast: WeatherForecast?): Boolean {
         if (forecast == null) return true

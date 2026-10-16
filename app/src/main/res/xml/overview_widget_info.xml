@@ -3,11 +3,9 @@
   Four cells by three. Shorter drops the week, then the hours; the face and
   the next rain stay (widget/OverviewWidget.kt).
 
-  minWidth and minHeight are cells in the old 70n - 30 dp formula, for launchers
-  that still place by dp; targetCellWidth and targetCellHeight say the same in
-  cells for Android 12 and later. The half-hour update is the system's backstop,
-  not the plan: the heartbeat redraws every widget at each radar sweep (see
-  rain_widget_info.xml for why the backstop is kept).
+  minWidth and minHeight use the 70n - 30 dp cell formula for older launchers;
+  targetCellWidth and targetCellHeight say the same for Android 12 and later.
+  The half-hour update is a backstop; the heartbeat redraws at each radar sweep.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_overview_description"

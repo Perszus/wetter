@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.provider
 
 import lv.bolwarra.wetter.domain.model.WeatherError
@@ -5,19 +8,13 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /**
- * One source of weather, behind a single door.
- *
- * Everything above this line — router, repository, view models, UI, widget —
- * sees only Wetter's own models. That is what makes a provider replaceable, and
- * why nothing outside `data/provider/` may import a concrete implementation
+ * One source of weather, behind a single door. Everything above sees only
+ * Wetter's own models; nothing outside `data/provider/` imports an implementation
  * (docs/providers.md).
  *
- * [getForecast] returns a `Result` rather than throwing, because a provider
- * failing is an ordinary event in a multi-provider system — it is the router's
- * cue to try the next candidate, not an exception to propagate. The failure
- * inside the `Result` is always a
- * [lv.bolwarra.wetter.domain.model.WeatherError], so the router can decide
- * whether to fail over without inspecting exception types.
+ * [getForecast] returns a `Result`, since a failure is the router's cue to try the
+ * next candidate. Its failure is always a
+ * [lv.bolwarra.wetter.domain.model.WeatherError].
  */
 interface WeatherProvider {
 

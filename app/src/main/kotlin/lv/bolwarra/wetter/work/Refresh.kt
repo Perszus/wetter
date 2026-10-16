@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.work
 
 import android.content.Context
@@ -18,21 +21,15 @@ import lv.bolwarra.wetter.notify.HazardNotifier
 import lv.bolwarra.wetter.widget.Widgets
 
 /**
- * One background pass, whoever woke the app to do it.
+ * One background pass, whichever wake started it (the [Heartbeat] alarm or the
+ * periodic job behind it). The order is the app's priorities:
  *
- * Two things wake it - the [Heartbeat] alarm, timed to the radar, and the
- * periodic job that backs it up - and they used to be two copies of this with
- * two opinions about order. Now there is one pass, and the order is the
- * app's priorities written down:
- *
- * 1. **Radar.** The next half hour is what people open a weather app for, and
- *    radar is what carries it. A wake-up in Doze gets seconds of network, so the
- *    part that matters most goes first rather than after a forecast download.
- * 2. **The model,** when it has aged out - which the HTTP cache makes nearly free
- *    when nothing new has been published.
+ * 1. **Radar.** It carries the next half hour, and a wake in Doze gets only
+ * seconds of network.
+ * 2. **The model,** when it has aged out; the HTTP cache makes this nearly free
+ * when nothing new is published.
  * 3. **Warnings,** on whatever forecast is now on disk.
- * 4. **The widgets,** last and always, because time moves even when the network
- *    does not.
+ * 4. **The widgets,** last and always, because time moves even without network.
  */
 internal object Refresh {
 
@@ -48,13 +45,9 @@ internal object Refresh {
     }
 
     /**
-     * One pass at a time. The alarm and the backup job can land together, and two
-     * passes would ask every service twice for the same answer.
-     *
-     * A second caller waits rather than standing down: the wake that arrives
-     * mid-pass has to time its next alarm from the sweep that pass is fetching,
-     * and standing down left it timing from nothing. Its own pass afterwards is
-     * nearly free - everything it would fetch was just fetched.
+     * One pass at a time, since the alarm and the backup job can land together. A
+     * second caller waits rather than standing down, so it times its next alarm from
+     * the sweep the first pass fetched; its own pass is then nearly free.
      */
     private val running = Mutex()
 
@@ -62,16 +55,15 @@ internal object Refresh {
 
     private suspend fun pass(context: Context): Outcome {
         val container = (context.applicationContext as WetterApplication).container
-        // From storage rather than the flow: this process may have started
-        // seconds ago and never observed it.
+        // From storage rather than the flow: this process may have started seconds ago.
         val location = container.selectedLocation.current()
         val cached = container.repository.cached(location)
 
         val started = System.nanoTime()
         fun lap() = (System.nanoTime() - started) / 1_000_000
 
-        // 1. Radar, against the forecast in hand. With none yet there is nothing
-        //    to fuse it into, and the model below comes first instead.
+        // 1. Radar, against the forecast in hand. With none yet there is nothing to fuse
+        // it into, and the model comes first instead.
         if (cached != null) warmRadar(container, cached)
         val radarMs = lap()
 
@@ -82,15 +74,14 @@ internal object Refresh {
         }
         val modelMs = lap()
 
-        // 3. Warnings, on every pass rather than only on the ones that fetched a
-        //    forecast. A hazard is announced once and then remembered, so this is
-        //    a read and a set lookup most of the time - and a storm that entered
-        //    the horizon between two model runs is said when it appears.
+        // 3. Warnings, on every pass: a hazard is remembered once announced, so this is
+        // usually a read and a lookup, and a storm entering the horizon between model
+        // runs is said when it appears.
         runCatching { announceHazards(context, container, location) }
             .onFailure { log("could not check for severe weather: ${it.message}") }
 
-        // 4. Redraw last, and whatever happened above: the widget is a picture of
-        //    the next four hours *from now*, and now moves without the network.
+        // 4. Redraw last, whatever happened above: the widget shows the next hours from
+        // now.
         runCatching { Widgets.refresh(context) }
             .onFailure { log("could not redraw the widget: ${it.message}") }
 
@@ -103,14 +94,12 @@ internal object Refresh {
     /** The newest sweep, collected before this pass returns. */
     private suspend fun warmRadar(container: WetterContainer, forecast: WeatherForecast) {
         runCatching {
-            // Fresh, so the sweep is in hand before the widgets are drawn. Handed
-            // to a background scope instead, the process could be frozen with the
-            // tiles half downloaded.
+            // Fresh, so the sweep is in hand before the widgets are drawn; a background job
+            // could be frozen with the process mid-download.
             container.nowcasts.timeline(forecast, Instant.now(), fresh = true)
             container.nowcasts.prune()
         }.onFailure {
-            // No radar is a normal condition - most of the world has none - and
-            // never a reason to call the pass a failure.
+            // No radar is normal (most of the world has none), never a failed pass.
             log("radar did not refresh: ${it.message}")
         }
     }
@@ -123,17 +112,15 @@ internal object Refresh {
         onSuccess = { forecast ->
             log("refreshed ${location.name}")
             if (!radarDone) warmRadar(container, forecast)
-            // The verification loop rides on the refresh rather than keeping a
-            // schedule of its own: it needs exactly a fresh forecast to write
-            // down, and a run that fetched nothing new must not record the same
-            // claim twice.
+            // Verification rides on the refresh: it needs a fresh forecast to write down,
+            // and a run that fetched nothing new must not record the same claim twice.
             runCatching {
                 container.verification.record(forecast)
                 val settled = container.verification.verify(location)
                 container.verification.prune()
                 if (settled > 0) log("verified $settled past predictions")
             }.onFailure {
-                // Never fail a refresh over bookkeeping. The forecast is on disk.
+                // Bookkeeping never fails a refresh.
                 log("verification pass did not complete: ${it.message}")
             }
             Outcome.DONE
@@ -146,13 +133,10 @@ internal object Refresh {
     )
 
     /**
-     * Tell somebody about severe weather they have not been told about.
-     *
-     * Detection is `Hazards.scan`, the same call the amber mark on the dial is
-     * drawn from, so the phone and the screen can never disagree. What happens
-     * here is only delivery - and the record is written *before* the
-     * notification is posted, so a phone that fails between the two does not
-     * repeat the warning at every wake.
+     * Tell somebody about severe weather they have not been told about. Detection is
+     * `Hazards.scan`, as for the dial's mark; this is only delivery. The record is
+     * written before the notification is posted, so a failure between the two does not
+     * repeat the warning.
      */
     private suspend fun announceHazards(
         context: Context,
@@ -163,8 +147,8 @@ internal object Refresh {
 
         val forecast = container.repository.cached(location) ?: return
         val now = Instant.now()
-        // The same decade of archive the Month page keeps, so the thresholds are
-        // what this place does. Cached for a month: a disk read on most passes.
+        // The decade of archive the Month page keeps, so thresholds are this place's.
+        // Cached for a month.
         val climate = runCatching { container.climatology.normals(location) }.getOrNull()
         val hazards = Hazards.scan(forecast, air = null, now = now, climate = climate)
         if (hazards.isEmpty()) return
@@ -187,11 +171,8 @@ internal object Refresh {
 }
 
 /**
- * Whether a failed refresh is worth another try before the next scheduled one.
- *
- * Being offline is: connectivity comes back. A provider rejecting the request is
- * not - it will reject the next one identically, and the ranking already routes
- * around a service that is unwell.
+ * Whether a failed refresh is worth another try before the next scheduled one:
+ * offline is, a provider rejecting the request is not.
  */
 private val WeatherError.isWorthRetrying: Boolean
     get() = when (this) {

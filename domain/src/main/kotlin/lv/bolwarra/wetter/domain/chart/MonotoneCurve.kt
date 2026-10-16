@@ -1,24 +1,15 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.chart
 
 /**
- * Smooth interpolation through a series that never invents a value the series
- * does not contain.
+ * Smooth interpolation that never invents a value the series does not contain.
  *
- * This exists because the obvious way to draw a flowing curve is wrong. A
- * Catmull-Rom spline — the usual choice, and what most charting libraries reach
- * for — overshoots: given rainfall of 0, 0, 4, 0 it dips *below zero* between
- * the flat points and bulges *above 4* around the peak. On a rain chart that
- * means drawing negative rainfall, and drawing a heavier downpour than anybody
- * forecast, purely as an artefact of the curve.
- *
- * The Fritsch–Carlson construction fixes exactly that. It picks tangents such
- * that the curve is monotone on every interval where the data is, which
- * guarantees the drawn value between two samples always lies between them.
- * Smooth to look at, and incapable of claiming more than it was given.
- *
- * The tangents are what the whole thing turns on, so they are computed here
- * rather than left to a library whose overshoot behaviour would be somebody
- * else's decision.
+ * A Catmull-Rom spline overshoots: rainfall of 0, 0, 4, 0 dips below zero and
+ * bulges above 4. The Fritsch–Carlson construction picks tangents so the curve is
+ * monotone wherever the data is, keeping every drawn value between its
+ * neighbouring samples.
  */
 object MonotoneCurve {
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.radar
 
 import kotlin.math.PI
@@ -9,20 +12,10 @@ import kotlin.math.sinh
 import kotlin.math.tan
 
 /**
- * Where a radar grid sits on the Earth.
- *
- * Radar reaches us as square map tiles, so the grid inherits Web Mercator
- * whether or not that is the projection anyone would choose for meteorology. It
- * is not a neutral choice: Mercator stretches ground distance towards the poles,
- * so a pixel over Riga covers noticeably less ground than one over Rome. Motion
- * measured in pixels is therefore not motion over the ground, and treating the
- * two as the same is how a nowcast quietly acquires a latitude-dependent speed
- * error. [metresPerPixel] is the conversion, and it takes a latitude for exactly
- * that reason.
- *
- * The grid is a window onto the world pixel plane rather than a list of tiles.
- * Once the tiles are stitched their boundaries mean nothing, and carrying them
- * around would put a seam through the middle of every calculation spanning one.
+ * Where a radar grid sits on the Earth: a window onto the Web Mercator world pixel
+ * plane, as the tiles arrive. Mercator stretches distance towards the poles, so
+ * motion in pixels is not motion over the ground; [metresPerPixel] converts, given
+ * a latitude.
  */
 data class RadarGeometry(
     val zoom: Int,
@@ -41,12 +34,8 @@ data class RadarGeometry(
     private val worldSize: Double get() = TILE_SIZE.toDouble() * (1 shl zoom)
 
     /**
-     * Where a place falls on the grid, in fractional pixels, or null when it
-     * falls outside.
-     *
-     * Fractional on purpose: the caller interpolates. Rounding to whole pixels
-     * here would quantise every sample to about a kilometre, the same order as
-     * the features being tracked.
+     * Where a place falls on the grid, in fractional pixels for the caller to
+     * interpolate, or null outside it.
      */
     fun pointOf(latitude: Double, longitude: Double): GridPoint? {
         if (latitude < -MERCATOR_LIMIT || latitude > MERCATOR_LIMIT) return null
@@ -94,14 +83,8 @@ data class RadarGeometry(
         }
 
         /**
-         * A square block of [tiles] tiles whose middle is as close to a place as
-         * whole tiles allow - within half a tile of it, whether [tiles] is odd
-         * or even.
-         *
-         * Centring by tile rather than by "the tile the place is in, plus a
-         * ring" is what lets an even block be used at all: a four-by-four block
-         * has no middle tile, only a middle corner, and which corner is nearest
-         * depends on which half of its tile the place falls in.
+         * A square block of [tiles] tiles whose middle is within half a tile of a place,
+         * whether [tiles] is odd or even.
          */
         fun blockAround(latitude: Double, longitude: Double, zoom: Int, tiles: Int): RadarGeometry {
             val n = 1 shl zoom

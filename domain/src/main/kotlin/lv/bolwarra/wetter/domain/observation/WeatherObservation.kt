@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.observation
 
 import java.time.Duration
@@ -41,18 +44,9 @@ data class ObservationStation(
 }
 
 /**
- * What one station measured, at one moment.
- *
- * An observation, not a forecast, and the distinction is the whole point of this
- * package: everything else in the app is a prediction, and there is no way to
- * tell whether a prediction was any good without something that was actually
- * measured to compare it against.
- *
- * Precipitation arrives as a category rather than a rate. A routine report says
- * that light rain is falling, not that 0.4 mm fell in the last ten minutes, so
- * this carries [precipitating] and an intensity qualifier and does not invent a
- * number. That is enough to verify whether rain was forecast correctly, which is
- * the question worth asking.
+ * What one station measured, at one moment: the thing predictions are checked
+ * against. Precipitation is a category with an intensity qualifier, as reports
+ * give it, never an invented amount.
  */
 data class WeatherObservation(
     val station: ObservationStation,

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import kotlinx.coroutines.flow.Flow
@@ -13,28 +16,15 @@ import lv.bolwarra.wetter.domain.settings.ThemeChoice
 import lv.bolwarra.wetter.domain.settings.WindUnit
 
 /**
- * What the reader has chosen, kept across restarts.
- *
- * ### Stored by name, and unreadable names fall back
- *
- * Each choice is written as the enum's own name rather than its position. An
- * ordinal is smaller and is the wrong thing to persist: reordering the options
- * in the list — which is a layout decision — would silently change what everyone
- * had chosen. A name only breaks if the option is removed, and then it should
- * break.
- *
- * A value that no longer parses reads back as the default rather than throwing.
- * The alternative is an app that will not start because a preference was renamed
- * in a version somebody skipped.
+ * What the reader has chosen, kept across restarts. Each choice is stored by the
+ * enum's name, not its ordinal, so reordering options cannot change anybody's
+ * choice; a name that no longer parses reads back as the default.
  */
 class PreferencesStore internal constructor(private val dao: PreferencesDao) {
 
     /**
-     * The current preferences, and every later change.
-     *
-     * An absent row means nobody has opened Settings, which is the ordinary case
-     * for most installs forever. It reads as the defaults rather than as
-     * something missing, so nothing downstream has to handle a null.
+     * The current preferences, and every later change. An absent row reads as the
+     * defaults.
      */
     val preferences: Flow<Preferences> = dao.observe().map { it.toPreferences() }
 
@@ -42,17 +32,10 @@ class PreferencesStore internal constructor(private val dao: PreferencesDao) {
     suspend fun current(): Preferences = dao.read().toPreferences()
 
     /**
-     * A first guess at the units, from the first place somebody picks.
-     *
-     * Does nothing at all once anything has been chosen - and "chosen" means a
-     * row exists, not that the values differ from the defaults. Those are the
-     * same thing to look at and completely different to act on: a reader in
-     * Boston who deliberately set Celsius has a row that reads exactly like a
-     * fresh install, and re-guessing Fahrenheit at them because they moved a pin
-     * would be the app overruling a decision they had already made.
-     *
-     * That is also why this writes a row even when the guess is the defaults.
-     * The row is the record that the question has been answered.
+     * A first guess at the units, from the first place somebody picks. Does nothing
+     * once a row exists, even one equal to the defaults: a deliberate choice must not
+     * be re-guessed when a pin moves. Writes a row even when the guess is the
+     * defaults, as the record that the question was answered.
      */
     suspend fun seedFor(location: WeatherLocation) {
         if (dao.read() != null) return

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider
 
 import android.util.Log
@@ -22,24 +25,15 @@ import lv.bolwarra.wetter.domain.provider.WeatherProviderSelector
 import lv.bolwarra.wetter.domain.provider.asWeatherError
 
 /**
- * Chooses a provider, asks it, and falls back when that was the wrong answer.
+ * Chooses a provider, asks it, and falls back when that was the wrong answer. The
+ * only component that knows more than one provider exists (docs/providers.md).
  *
- * Everything above this sees one method that returns one forecast. The router is
- * the only component that knows more than one provider exists (docs/providers.md).
+ * When the winner stops being hourly short of the horizon, the router asks the
+ * next candidate for the rest and joins the two ([ForecastStitcher]).
  *
- * It also makes sure there is always an hourly timeline to draw. The provider
- * that wins on geography is often not the one with the longest hourly reach, so
- * when the winner stops being hourly well short of the horizon Wetter needs, the
- * router asks the next candidate for the rest and joins the two — see
- * [ForecastStitcher] for why that is done this way and not by stretching the
- * coarse steps.
- *
- * There is deliberately no retry against the same provider inside a single
- * refresh. A provider that just timed out will most likely time out again a
- * second later, and the alternative — a fallback that is probably healthy — is
- * already ranked and waiting. Backoff happens between refreshes instead, through
- * [ProviderHealthRegistry], which is what keeps Wetter from hammering a service
- * that is having a bad afternoon (docs/providers.md).
+ * No retry against the same provider within a refresh: a fallback is already
+ * ranked and waiting. Backoff happens between refreshes, through
+ * [ProviderHealthRegistry].
  */
 internal class WeatherProviderRouter(
     private val providers: List<WeatherProvider>,
@@ -83,13 +77,9 @@ internal class WeatherProviderRouter(
         }
 
         return coroutineScope {
-            // Asked alongside the first choice rather than after it, when the
-            // first choice is known in advance to stop being hourly short of the
-            // horizon. Its capabilities say so before a byte is fetched - MET
-            // Norway is hourly for 60 hours of the 144 needed - so waiting for
-            // its answer to find out only put a second round trip in series with
-            // the first on every refresh in the Nordics. The same answer is also
-            // very often the fallback, so a failed first choice costs no wait.
+            // Asked alongside the first choice when its capabilities already say it stops
+            // being hourly short of the horizon, so the two round trips are not in series.
+            // The same answer is often the fallback too.
             val first = candidates.first().provider
             val reach = first.capabilities.hourlyHorizonHours
             val companion = extensionCandidate(first, reach.toLong(), ranked)
@@ -150,15 +140,9 @@ internal class WeatherProviderRouter(
     }
 
     /**
-     * Fills in the hourly timeline past the point the chosen provider stops
-     * being hourly.
-     *
-     * At most one extra request, and it is entirely optional: if the second
-     * provider fails, the user still gets the forecast that already succeeded.
-     * Extending a forecast must never be able to cost somebody one.
-     *
-     * The candidate is taken from the same ranking that chose the primary, so
-     * the second-best provider for the location is also the one that extends it.
+     * Fills in the hourly timeline past where the chosen provider stops being hourly,
+     * from the next provider in the same ranking. At most one extra request, and
+     * optional: its failure never costs the forecast that already succeeded.
      */
     private suspend fun extendIfShort(
         forecast: WeatherForecast,
@@ -217,14 +201,10 @@ internal class WeatherProviderRouter(
     }?.provider
 
     /**
-     * Whether the next provider is worth trying.
-     *
-     * The question is whether the failure was about *this* provider. A timeout, a
-     * server error or a rate limit are; being offline and a rejected request are
-     * not — no second provider fixes a device with no connection, and a request
-     * the first service considered malformed is a bug that another service will
-     * most likely also reject, so trying again would be two wasted calls rather
-     * than one (docs/providers.md).
+     * Whether the next provider is worth trying: only when the failure was about this
+     * provider (a timeout, a server error, a rate limit). No second provider fixes a
+     * device that is offline, and a request one service rejected another most likely
+     * will too (docs/providers.md).
      */
     private fun shouldFailOver(error: WeatherError): Boolean = when (error) {
         is WeatherError.Offline -> false
@@ -254,11 +234,8 @@ internal class WeatherProviderRouter(
     }
 
     /**
-     * Write the registry down, swallowing anything that goes wrong.
-     *
-     * A provider's reputation is worth keeping and worth nothing compared to
-     * the forecast: if the disk is full or the database is locked, the app
-     * forgets what it learned rather than failing the request that taught it.
+     * Write the registry down, swallowing anything that goes wrong: a provider's
+     * reputation is worth nothing compared to the forecast.
      */
     private suspend fun rememberHealth() {
         onHealthChanged?.let { runCatching { it() } }

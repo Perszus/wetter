@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.openmeteo
 
 import io.ktor.client.HttpClient
@@ -35,20 +38,10 @@ internal data class AirQualityHourly(
 )
 
 /**
- * Air quality from Open-Meteo's CAMS-backed service.
+ * Air quality from Open-Meteo's CAMS-backed service: a different host and models
+ * from the forecast, so a source of its own. Global coverage, refined over Europe.
  *
- * A different host and a different set of models from the forecast endpoint, so
- * it is a source of its own rather than another field on the weather provider.
- * Coverage is genuinely global - CAMS runs a 40 km global model, refined to
- * 11 km over Europe - which was checked rather than assumed: Nairobi, Delhi,
- * Sao Paulo, Sydney and Svalbard all answer.
- *
- * ### Why the past 24 hours are fetched
- *
- * The WHO threshold this is banded against is a 24-hour mean, so a 24-hour mean
- * is what gets computed. It costs one extra parameter on a request already being
- * made, and it is the difference between "the air here is bad" and "there was a
- * bonfire an hour ago".
+ * The past 24 hours are fetched because the WHO threshold is a 24-hour mean.
  */
 internal class OpenMeteoAirQuality(
     private val client: HttpClient,

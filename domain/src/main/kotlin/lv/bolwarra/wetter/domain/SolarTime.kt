@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import java.time.Duration
@@ -14,23 +17,16 @@ import kotlin.math.tan
 /**
  * Where the sun is, from a date and a place.
  *
- * Wetter needs this because not every provider supplies it. MET Norway publishes
- * no sunrise, no sunset and no day flag, and the timeline's night wash is not
- * optional decoration — an unshaded 03:00 reads as an afternoon. Computing it
- * costs one file of arithmetic and works offline, whereas asking a second
- * service would mean a second network call, a second failure mode and a second
- * set of terms to honour.
- *
- * The NOAA general solar position equations, which are accurate to about a
- * minute at these latitudes. That is far inside the precision anyone reads off a
- * shaded band, and the algorithm has no data files and no dependencies.
+ * MET Norway publishes no sunrise, no sunset and no day flag, and the timeline's
+ * night wash depends on them, so they are computed offline rather than fetched
+ * from another service. The NOAA solar position algorithm: no data files, no
+ * dependencies, and accurate to well under the minute the screen prints.
  */
 object SolarTime {
 
     /**
-     * Standard refraction correction: the sun is called risen when its centre is
-     * 50 arcminutes below the horizon, because the atmosphere bends the image up
-     * by roughly that much and the disc has a radius of its own.
+     * Standard refraction correction: the sun counts as risen with its centre 50
+     * arcminutes below the horizon, for atmospheric bending plus the disc's radius.
      */
     private const val SUNRISE_ZENITH_DEGREES = 90.833
 
@@ -41,35 +37,23 @@ object SolarTime {
         longitude: Double,
         zone: ZoneId,
     ): SolarDay {
-        // Noon local is the reference point for the day's declination: using
-        // midnight would compute a declination up to twelve hours stale, which
-        // matters near the equinoxes at high latitude.
+        // Local noon is the reference for the day's declination; midnight would be up to
+        // twelve hours stale.
         val noonUtc = date.atTime(12, 0).atZone(zone).toInstant()
         val midnightUtc = date.atStartOfDay(ZoneOffset.UTC).toInstant()
 
-        // Is there a sunrise at all? Decided on the noon position, which is the
-        // day's most favourable one - if the sun cannot reach the horizon then,
-        // it does not reach it at any hour.
+        // Whether there is a sunrise at all is decided at noon, the day's most favourable
+        // position.
         val atNoon = solarPosition(noonUtc)
         if (hourAngleFor(latitude, atNoon.declination) == null) {
             val polarDay = elevationDegrees(noonUtc, latitude, longitude) > 0.0
             return SolarDay(sunrise = null, sunset = null, isPolarDay = polarDay)
         }
 
-        // Then each end is solved for separately, and iterated.
-        //
-        // The sun's declination is not a property of the day; it moves about
-        // four tenths of a degree between one equinox midnight and the next. At
-        // Longyearbyen in September sunrise is nearly eight hours before noon,
-        // so a declination taken at noon is an eighth of a degree wrong for the
-        // moment being solved for - and near a grazing sun an eighth of a degree
-        // is minutes.
-        //
-        // So the noon position gives a first guess at each time, the position is
-        // recomputed *at that time*, and the time is solved again. Two passes
-        // are enough: the correction is small and the second one moves it by
-        // seconds. Measured at Longyearbyen, this is worth about two minutes on
-        // sunset and a minute and a half on sunrise; at Rīga, twenty seconds.
+        // Each end is then solved separately and iterated: the declination moves through
+        // the day, and near a grazing sun at high latitude a fraction of a degree is
+        // minutes. The noon position gives a first guess, the position is recomputed at
+        // that time, and the time solved again.
         var sunrise = midnightUtc.plusSeconds(
             (
                 (
@@ -96,9 +80,9 @@ object SolarTime {
     }
 
     /**
-     * One end of the day, solved again from the sun's position at the time the
-     * previous pass produced. Null when that position puts the sun out of reach
-     * of the horizon, in which case the previous answer stands.
+     * One end of the day, solved again from the sun's position at the previous pass's
+     * time. Null when that position puts the sun out of reach of the horizon, and the
+     * previous answer stands.
      */
     private fun solve(
         approximate: Instant,
@@ -115,8 +99,8 @@ object SolarTime {
     }
 
     /**
-     * How far from solar noon the sun sits on the horizon, in degrees, or null
-     * where it never gets there on this date.
+     * How far from solar noon the sun sits on the horizon, in degrees, or null where
+     * it never gets there on this date.
      */
     private fun hourAngleFor(latitude: Double, declination: Double): Double? {
         val latRad = Math.toRadians(latitude)
@@ -141,8 +125,8 @@ object SolarTime {
         val utc = instant.atZone(ZoneOffset.UTC)
         val minutesUtc = utc.hour * 60.0 + utc.minute + utc.second / 60.0
         val trueSolarTime = minutesUtc + equationOfTime + 4.0 * longitude
-        // Solar noon is 720 minutes of true solar time; every four minutes either
-        // side is one degree of hour angle.
+        // Solar noon is 720 minutes of true solar time; every four minutes either side is
+        // one degree of hour angle.
         val hourAngle = Math.toRadians(trueSolarTime / 4.0 - 180.0)
 
         val latRad = Math.toRadians(latitude)
@@ -153,32 +137,11 @@ object SolarTime {
     }
 
     /**
-     * Where the sun is, to a hundredth of a degree.
-     *
-     * ### Why not the short version
-     *
-     * This used to be the Fourier series that circulates as "the NOAA
-     * equations" - seven terms for the declination, five for the equation of
-     * time, and no Julian date anywhere. It is a genuinely useful approximation
-     * and it is wrong by up to 0.43 degrees, with the error at its worst
-     * precisely at the equinoxes, where it read the declination as -0.46 on
-     * 20 March 2026 when the true value was -0.04. That is the equinox itself
-     * misplaced by most of a day.
-     *
-     * Half a degree of declination is nothing at noon and everything at dawn,
-     * because near sunrise the sun moves almost horizontally and it is the
-     * *vertical* rate that turns an angle into a time. Measured against an
-     * almanac, the old series made the day too long by 5.4 minutes at Rīga, 9.6
-     * at Tromsø and 18.7 at Longyearbyen - always too long, always at both ends,
-     * growing with latitude, which is the fingerprint of a declination error
-     * rather than a clock or a timezone one.
-     *
-     * So this is the full algorithm the NOAA calculator itself runs: mean
-     * longitude and anomaly from the Julian century, the equation of centre,
-     * the correction for nutation, and the true obliquity. It is perhaps twenty
-     * floating-point operations more expensive, runs once per day per place,
-     * and is accurate to about a hundredth of a degree over several centuries -
-     * which is to say, to well under the minute the screen prints.
+     * Where the sun is, to about a hundredth of a degree: the full algorithm the NOAA
+     * calculator runs (mean longitude and anomaly from the Julian century, equation of
+     * centre, nutation, true obliquity). The short Fourier series often quoted as "the
+     * NOAA equations" is off by up to 0.43° in declination at the equinoxes, which
+     * lengthens the day by minutes at high latitudes.
      */
     private data class SolarPosition(
         /** Radians. */
@@ -188,8 +151,8 @@ object SolarTime {
     )
 
     private fun solarPosition(instant: Instant): SolarPosition {
-        // Julian centuries since J2000.0, straight from the epoch second: no
-        // calendar arithmetic, no day-of-year, and no leap-year special case.
+        // Julian centuries since J2000.0, straight from the epoch second: no calendar
+        // arithmetic and no leap-year case.
         val julianDay = instant.epochSecond / SECONDS_PER_DAY + JULIAN_DAY_AT_EPOCH
         val t = (julianDay - J2000) / DAYS_PER_JULIAN_CENTURY
 
@@ -197,15 +160,13 @@ object SolarTime {
         val meanAnomaly = 357.52911 + t * (35999.05029 - 0.0001537 * t)
         val anomaly = Math.toRadians(meanAnomaly)
 
-        // The orbit is an ellipse, so the sun runs ahead of its mean position
-        // for half the year and behind for the other half.
+        // The orbit is an ellipse, so the sun runs ahead of its mean position half the
+        // year and behind it the other half.
         val centre = sin(anomaly) * (1.914602 - t * (0.004817 + 0.000014 * t)) +
             sin(2 * anomaly) * (0.019993 - 0.000101 * t) +
             sin(3 * anomaly) * 0.000289
 
-        // The moon's node wobbles the apparent position by a few arcseconds a
-        // year. Small, but it is the difference between this and the series it
-        // replaces having any point.
+        // The moon's node wobbles the apparent position by a few arcseconds.
         val node = Math.toRadians(125.04 - 1934.136 * t)
         val apparentLongitude = Math.toRadians(
             meanLongitude + centre - 0.00569 - 0.00478 * sin(node),
@@ -246,11 +207,8 @@ object SolarTime {
 }
 
 /**
- * What the sun did on one date at one place.
- *
- * Both times are null above the polar circles, where [isPolarDay] says whether
- * the sun stayed up or stayed down — a distinction that decides whether the
- * whole timeline is shaded or none of it is.
+ * What the sun did on one date at one place. Both times are null above the polar
+ * circles, where [isPolarDay] says whether the sun stayed up or down.
  */
 data class SolarDay(val sunrise: Instant?, val sunset: Instant?, val isPolarDay: Boolean) {
     val hasSunriseAndSunset: Boolean get() = sunrise != null && sunset != null

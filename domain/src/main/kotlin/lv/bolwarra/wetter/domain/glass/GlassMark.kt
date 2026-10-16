@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.glass
 
 import lv.bolwarra.wetter.domain.hazard.Hazards
@@ -28,29 +31,20 @@ import lv.bolwarra.wetter.domain.model.WeatherCondition.UNKNOWN
 /**
  * What the weather leaves on the dial's glass, as the name of one picture.
  *
- * The dial is a pane facing the weather, and the weather marks it: rain beads,
- * snow settles, frost creeps in from the edge (workbench/dial-marks). There is a
- * picture for each of the 91 states the app can actually name, by day and by
- * night, and this decides which one - from exactly what the dial already shows,
- * so the glass can never disagree with the word printed on it.
+ * Rain beads, snow settles, frost creeps in from the edge. There is a picture for
+ * each state the app can name, by day and by night, chosen from exactly what the
+ * dial shows, so the glass cannot disagree with the word printed on it.
  *
- * Every threshold is one the app already uses. Nothing here is invented for the
- * sake of a picture:
+ * Every threshold is one the app already uses:
  * - how hard it falls: [PrecipitationIntensity], then the torrential-rain and
- *   heavy-snow hazard thresholds in [Hazards];
- * - wind: Beaufort, with the same gale and storm limits the warnings use;
- * - mist: a dry, quiet hour at [MIST_HUMIDITY] or more - no service forecasts
- *   visibility, and condensation on glass is what humidity does.
+ * heavy-snow hazard thresholds in [Hazards];
+ * - wind: Beaufort, with the gale and storm limits the warnings use;
+ * - mist: a dry, quiet hour at [MIST_HUMIDITY] or more, since no service forecasts
+ * visibility.
  *
- * Where the provider's own word and the app's correction of it disagree, the
- * picture shows both halves, because each is half right: a provider's "rain" at a
- * drizzle rate is drizzle and rain; its "drizzle" below freezing is drizzle and
- * snow grains. Those are the mixed pictures, and this is the only honest way to
- * reach them.
- *
- * The rules are written out a second time, in Python, as workbench/dial-marks/
- * mark_select.py - which also checks that every input lands on a picture and
- * every picture can be reached. The tests here hold this copy to the same.
+ * Where the provider's word and the app's correction disagree, the picture shows
+ * both halves: a provider's "rain" at a drizzle rate is drizzle and rain; its
+ * "drizzle" below freezing is drizzle and snow grains.
  */
 object GlassMark {
 
@@ -65,10 +59,9 @@ object GlassMark {
      * @param extremeCold an extreme-cold hazard is in force now
      * @param extremeHeat an extreme-heat hazard is in force now
      * @param hazyAir the air quality is notably poor, which makes heat hazy
-     * @param shown the word the dial actually prints, when it has been corrected
-     *   further than [raw] can be - the radar overriding the model (see
-     *   ObservedCondition). The glass follows the printed word; without it, the
-     *   word is worked out from [raw] the way every other surface does it.
+     * @param shown the word the dial prints, when corrected further than [raw] can
+     * be, such as by radar (see ObservedCondition). Without it, the word is worked
+     * out from [raw] as on every other surface.
      */
     data class Input(
         val raw: WeatherCondition,
@@ -199,7 +192,7 @@ object GlassMark {
                 i == null -> "SNOW_SHOWERS"
                 i == PrecipitationIntensity.NONE -> "PASSING_SNOW_SHOWERS"
                 i == PrecipitationIntensity.TRACE -> "SNOW_FLURRIES"
-                rate != null && rate >= Hazards.SNOW_WARNING_MM -> "HEAVY_SNOW_SHOWERS"
+                rate >= Hazards.SNOW_WARNING_MM -> "HEAVY_SNOW_SHOWERS"
                 else -> "SNOW_SHOWERS"
             }
             FOG -> {
@@ -314,9 +307,8 @@ object GlassMark {
         doubleArrayOf(0.5, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7)
 
     /**
-     * The glass's wind words. Beaufort 8 and 9 are both a gale on the glass: no
-     * severe-gale picture exists, and the dial's own wind light and lines carry
-     * the exact speed - the mark only has to agree with them.
+     * The glass's wind words. Beaufort 8 and 9 are both a gale: the dial's wind
+     * reading carries the exact speed.
      */
     private fun windWord(speed: Double?): String? {
         if (speed == null) return null
@@ -332,8 +324,8 @@ object GlassMark {
     }
 
     /**
-     * Wind over falling rain, snow or sleet, rounded DOWN to a rung that was
-     * drawn - so the glass never claims more wind than there is.
+     * Wind over falling rain, snow or sleet, rounded down to a drawn rung, so the
+     * glass never claims more wind than there is.
      */
     private fun wetWind(word: String?, what: WeatherCondition): String? {
         if (word == null) return null

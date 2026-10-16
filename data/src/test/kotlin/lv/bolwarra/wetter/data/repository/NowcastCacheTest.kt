@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Clock
@@ -428,9 +431,8 @@ class NowcastCacheTest {
 
     @Test
     fun `radar stays on the chart once a projection is held in memory`() = runBlocking {
-        // The production repository always has a scope, and the path that has
-        // one used to answer "no radar" whenever a projection was already in
-        // memory - which, after the first fetch of a process, is every time.
+        // The production repository always has a scope; with a projection already in
+        // memory, the scoped path must still answer with radar.
         val sweep = Instant.parse("2026-09-04T12:00:00Z")
         val clock = TestClock(sweep.plus(Duration.ofSeconds(30)))
         val radar = FakeRadar(latest = sweep)

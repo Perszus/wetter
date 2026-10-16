@@ -20,6 +20,16 @@
     <string name="section_appearance">Appearance</string>
     <string name="section_about">About</string>
     <string name="section_sources">Sources</string>
+    <string name="section_units">Units</string>
+    <string name="settings_place">Place</string>
+    <string name="settings_source">Forecast</string>
+    <string name="settings_updated">Updated</string>
+    <string name="settings_age_now">Just now</string>
+    <string name="settings_age_minutes">%1$d min</string>
+    <string name="settings_age_hours">%1$d h</string>
+    <string name="settings_age_days">%1$d d</string>
+    <string name="settings_warnings_on">Warnings on</string>
+    <string name="settings_warnings_off">Warnings off</string>
 
     <!--
       Settings. Every label is the thing being chosen, not an instruction: the
@@ -92,19 +102,11 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="compass_sw">SW</string>
     <string name="compass_w">W</string>
     <string name="compass_nw">NW</string>
-    <string name="current_feels_like">Feels like %1$s</string>
 
     <!--
       Freshness. Every one of these lines appears while a real forecast is still
       on screen, so none of them apologises or asks for anything.
     -->
-    <string name="status_updating">Updating…</string>
-    <string name="status_just_now">Updated just now</string>
-    <string name="status_minutes_ago">Updated %1$d min ago</string>
-    <string name="status_hours_ago">Updated %1$d h ago</string>
-    <string name="status_days_ago">Updated %1$d days ago</string>
-    <string name="status_offline_cached">Offline · showing the last forecast</string>
-    <string name="status_update_failed">Could not update · showing the last forecast</string>
 
     <!-- States where there is nothing at all to show -->
     <string name="state_no_forecast">No forecast available</string>
@@ -120,21 +122,9 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="domain_week">Week</string>
     <string name="domain_month">Month</string>
 
-    <!--
-      Tile headings.
-
-      The rain heading names what is falling and stops there. It used to end
-      "· next 6 hours", which was true when the chart held exactly that and
-      became a lie in both directions when it grew to hold a day: it holds
-      twenty-four hours and it shows six of them, and no single phrase says
-      both. The axis underneath is already answering it in clock time, and
-      answering it as the chart moves, which the heading cannot do.
-    -->
+    <!-- Tile headings. The rain heading names what is falling; the axis gives the time. -->
     <string name="tile_precipitation">%1$s</string>
     <string name="metric_chance_of">Chance of %1$s</string>
-    <string name="tile_next_rain">Next rain</string>
-    <string name="tile_daylight">Sun</string>
-    <string name="tile_air">Air</string>
 
     <!--
       What falls. Used inside sentences ("Rain from 14:00"), so these are
@@ -145,7 +135,6 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="kind_snow">Snow</string>
     <string name="kind_sleet">Sleet</string>
 
-    <string name="relative_today">today</string>
     <string name="relative_tomorrow">tomorrow</string>
 
     <string name="next_rain_none">No rain in the forecast</string>
@@ -178,7 +167,6 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <string name="metric_feels_like">Feels like</string>
     <string name="metric_wind">Wind</string>
     <string name="metric_gust">Gusts</string>
-    <string name="metric_chance_of_rain">Chance of rain</string>
     <string name="metric_uv">UV index</string>
     <string name="plate_stars">Good night for stars</string>
     <string name="plate_hazard">Severe weather warning</string>
@@ -268,6 +256,21 @@ It is about the whole day rather than the hours left in it, so it does not disap
     <!-- About -->
     <string name="about_version">Version %1$s</string>
     <string name="about_licence">GNU General Public License v3.0 or later</string>
+    <string name="about_purpose">Wetter answers the question a weather app is opened for: is it going to rain, when, how hard, and when will it stop. It has no account and no tracking, and no server of its own. Your phone asks the weather services directly, for the place you are looking at and nothing else.</string>
+    <string name="about_feature_rain">Rain, minute by minute</string>
+    <string name="about_feature_rain_gloss">radar for the next two hours, the forecast after it</string>
+    <string name="about_feature_source">The best forecast for where you are</string>
+    <string name="about_feature_source_gloss">a regional model where one runs, a global one everywhere else</string>
+    <string name="about_feature_warnings">Warnings only when it matters</string>
+    <string name="about_feature_warnings_gloss">gales, torrential rain, ice, heavy snow and dangerous temperatures</string>
+    <string name="about_feature_offline">Works offline</string>
+    <string name="about_feature_offline_gloss">the last forecast stays on screen, with its age</string>
+    <string name="about_feature_widgets">Five widgets</string>
+    <string name="about_feature_widgets_gloss">the rain, the weather now, the hours, the week, and all of them together</string>
+    <string name="about_links">Links</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_made_by">Designed and created by Roberts Kains</string>
+    <string name="about_copyright">© Bolwarra Technologies</string>
     <string name="about_sources_detail">Wetter picks whichever of these suits the place you are looking at. It has no server of its own and asks these services directly.</string>
 
     <!--

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import java.time.Duration
@@ -7,26 +10,9 @@ import lv.bolwarra.wetter.domain.model.HourlyWeather
 import lv.bolwarra.wetter.domain.model.WeatherForecast
 
 /**
- * What the weather is *now*, as opposed to what it was when we last asked.
- *
- * [WeatherForecast.current] is an observation stamped at fetch time, and nothing
- * ages it. Everywhere else on the screen moves with the clock — the mark on the
- * dial, the rolling rain window, the sentence about when it next rains — so a
- * forecast left sitting produced a dial pointing at two in the afternoon beside
- * the temperature from eight that morning. The screen contradicted itself, and
- * the contradiction grew the longer it was open.
- *
- * The hourly series already contains the answer: it has a row for the hour we
- * are actually in. So the rule is simply that the freshest thing describing this
- * hour wins.
- */
-
-/**
- * The hourly row covering [instant], or null if the series does not reach it.
- *
- * A row runs until the next one starts rather than for a fixed hour, because a
- * stitched timeline (docs/providers.md) widens to three- and six-hourly steps
- * further out and a hard hour would leave gaps the lookup fell through.
+ * The hourly row covering [instant], or null if the series does not reach it. A
+ * row runs until the next one starts, since a stitched timeline (docs/providers.md)
+ * widens to three- and six-hourly steps further out.
  */
 fun List<HourlyWeather>.at(instant: Instant): HourlyWeather? {
     val hours = sortedBy { it.timestamp }
@@ -40,29 +26,26 @@ fun List<HourlyWeather>.at(instant: Instant): HourlyWeather? {
 /**
  * The current conditions, corrected to [instant].
  *
- * While the data is fresh — the observation and [instant] fall in the same
- * hourly slot, which is every ordinary refresh — this is exactly
- * [WeatherForecast.current]. It only does anything once the observation has been
- * overtaken, and then it hands back the forecast for the hour we are in.
+ * [WeatherForecast.current] is stamped at fetch time and nothing ages it, while
+ * the rest of the screen moves with the clock. While the observation falls in the
+ * same hourly slot as [instant] this is exactly that observation; once overtaken,
+ * the forecast for the hour covering [instant] stands in.
  *
- * The fields the hourly row does not carry are dropped rather than kept. Wind
- * direction, humidity and pressure would otherwise be presented, unlabelled and
- * alongside corrected numbers, as readings for a moment they do not describe;
- * six hours is long enough for all three to be wrong. The grid renders a missing
- * value as a dash, which is the true answer to a question this forecast can no
- * longer settle.
+ * Fields the hourly row does not carry (wind direction, humidity, pressure) are
+ * dropped rather than kept, so stale readings are not shown beside fresh ones; a
+ * missing value is drawn as a dash.
  */
 fun WeatherForecast.conditionsAt(instant: Instant): CurrentWeather {
     val row = hourly.at(instant) ?: return current
-    // The observation belongs to the hour we are in, so it is both fresh and
-    // richer than the row. Nothing to correct.
+    // The observation belongs to the hour covering [instant], so it is fresh and
+    // richer than the row.
     if (hourly.at(current.observedAt)?.timestamp == row.timestamp) return current
 
     return CurrentWeather(
         observedAt = row.timestamp,
         temperature = row.temperature,
-        // Derived from temperature, wind and humidity. Kept, it would be the old
-        // hour's answer sitting next to the new hour's temperature.
+        // Derived from temperature, wind and humidity, so it comes from the same hour as
+        // the temperature.
         apparentTemperature = row.apparentTemperature,
         condition = row.appearance,
         isDay = row.isDay,

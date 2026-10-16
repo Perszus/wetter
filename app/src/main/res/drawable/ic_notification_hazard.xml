@@ -2,12 +2,8 @@
 <!--
   The status-bar mark for a severe-weather warning.
 
-  A single flat silhouette on transparency, because that is the only thing
-  Android will render here: the system takes the alpha channel and paints it in
-  its own colour, so any fill of ours is discarded and any hole in the shape
-  becomes a hole in the icon. Hence a solid triangle with the bar and dot cut
-  out of it rather than drawn on top - the cut-outs are what make it read as a
-  warning sign once the whole thing is one colour.
+  A flat silhouette: the system paints the alpha channel in its own colour, so
+  the bar and dot are cut out of the triangle rather than drawn on it.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"

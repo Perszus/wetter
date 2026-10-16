@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.EnterTransition
@@ -11,23 +14,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 
 /**
- * How anything on this screen opens and shuts.
+ * How anything on this screen opens and shuts, shared so panels open at the same
+ * rate.
  *
- * One pair of transitions rather than each caller reaching for the defaults,
- * because two panels on the same page opening at visibly different rates is the
- * sort of thing nobody consciously notices and everybody feels.
- *
- * ### Opening and closing are not the same gesture
- *
- * Opening decelerates: it arrives quickly and settles, which reads as the panel
- * coming to rest where it belongs. Closing accelerates away and is shorter,
- * because once you have asked for something to go there is nothing to look at
- * and a slow exit is just latency. The default symmetric curve makes both feel
- * slightly wrong in opposite directions.
- *
- * The fade is deliberately quicker than the height on the way out, so the box
- * empties before it finishes collapsing. Fading and shrinking in lockstep leaves
- * text legible right down to a few pixels tall, which looks like a fault.
+ * Opening decelerates and settles; closing accelerates away and is shorter, since
+ * there is nothing to look at once something is asked to go. On the way out the
+ * fade is quicker than the collapse, so text is gone before the box is a few
+ * pixels tall.
  */
 internal object Reveal {
 

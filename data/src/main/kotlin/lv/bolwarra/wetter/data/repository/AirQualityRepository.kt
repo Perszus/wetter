@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Duration
@@ -10,15 +13,9 @@ import lv.bolwarra.wetter.domain.air.AirQualitySource
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /**
- * Air quality for the place on screen, asked for at most twice an hour.
- *
- * Held in memory only. The source publishes hourly values, so anything kept
- * across a restart would be worth minutes at best, and unlike a forecast there
- * is nothing here worth showing stale - "the air was clean when you last opened
- * this" is not an answer to "is the air clean".
- *
- * Keyed on coordinates rounded to about a kilometre. CAMS resolves 11 km at
- * best, so a finer key would only make identical requests look different.
+ * Air quality for the place on screen, asked for at most twice an hour. In memory
+ * only: stale air quality answers nothing. Keyed on coordinates rounded to about a
+ * kilometre, well inside the source's resolution.
  */
 class AirQualityRepository(private val source: AirQualitySource) {
 
@@ -43,13 +40,8 @@ class AirQualityRepository(private val source: AirQualitySource) {
     }
 
     /**
-     * Locale.ROOT, like every other key in this package.
-     *
-     * `String.format` without one uses the device's locale, and half of Europe
-     * writes a decimal point as a comma - so this produced "56,95,24,11" on a
-     * Latvian phone. Consistent within a run, so nothing is broken today; it
-     * would break silently the day this key is written to disk or compared
-     * across devices.
+     * Locale.ROOT, like every other key here, so a decimal comma never changes the
+     * key's shape.
      */
     private fun keyOf(location: WeatherLocation): String =
         String.format(Locale.ROOT, "%.2f,%.2f", location.latitude, location.longitude)

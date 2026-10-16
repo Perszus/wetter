@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.provider
 
 import kotlin.math.abs
@@ -5,14 +8,9 @@ import kotlin.math.hypot
 import kotlin.math.min
 
 /**
- * A latitude/longitude rectangle.
- *
- * docs/providers.md rules out both country lookups and a GIS engine, so this is
- * the whole geographic vocabulary: rectangles, and how far outside one a point
- * falls. It is crude — a box around the Nordics also contains a slice of the
- * Atlantic — but provider coverage genuinely is coarse, and the alternative is
- * shipping a polygon dataset to answer a question that only ever ranks two or
- * three candidates.
+ * A latitude/longitude rectangle: the whole geographic vocabulary here
+ * (docs/providers.md rules out country lookups and GIS). Crude, but provider
+ * coverage is coarse, and it only ever ranks two or three candidates.
  */
 data class GeoBox(val south: Double, val north: Double, val west: Double, val east: Double) {
     init {
@@ -33,11 +31,8 @@ data class GeoBox(val south: Double, val north: Double, val west: Double, val ea
     }
 
     /**
-     * How far outside the box a point lies, in degrees, or 0.0 when inside.
-     *
-     * Degrees, not kilometres: this feeds a soft boundary in the scoring, where
-     * only the ordering matters, and converting to kilometres would add a
-     * latitude-dependent term that changes nothing about which provider wins.
+     * How far outside the box a point lies, in degrees, or 0.0 when inside. Degrees
+     * suffice: only the ordering matters.
      */
     fun degreesOutside(latitude: Double, longitude: Double): Double {
         if (contains(latitude, longitude)) return 0.0
@@ -73,25 +68,17 @@ data class GeoBox(val south: Double, val north: Double, val west: Double, val ea
 }
 
 /**
- * A named area where a provider is particularly worth using.
- *
- * [strength] is the provider's own claim about that area, between 0 and 1 —
- * 1.0 for the model's home ground, lower for the fringes where it still has an
- * edge but a smaller one.
+ * A named area where a provider is particularly worth using. [strength] is 1.0 for
+ * the model's home ground, lower at the fringes.
  */
 data class ProviderRegion(
     val name: String,
     val box: GeoBox,
     val strength: Double = 1.0,
     /**
-     * Grid spacing of the model that actually runs here, when it is finer than
-     * the provider's baseline.
-     *
-     * This is why regional providers exist. MET Norway runs a 2.5 km Nordic
-     * model over Scandinavia and falls back to a global model everywhere else —
-     * so a single resolution figure on the provider would either flatter it
-     * abroad or understate it at home, and the selector would rank on a number
-     * that is true in neither place.
+     * Grid spacing of the model that runs here, when finer than the provider's
+     * baseline: MET Norway runs a 2.5 km model over the Nordics and a global one
+     * elsewhere, so one figure for the provider would be true in neither place.
      */
     val resolutionKm: Double? = null,
 ) {
@@ -101,11 +88,9 @@ data class ProviderRegion(
 }
 
 /**
- * Where a provider answers, and where it answers best.
- *
- * A global provider answers everywhere; its preferred regions, if any, are where
- * it should be picked over another global provider. A non-global provider serves
- * only inside its regions and is not a candidate elsewhere.
+ * Where a provider answers, and where it answers best. A global provider answers
+ * everywhere and is preferred in its regions; a non-global one serves only inside
+ * them.
  */
 data class ProviderCoverage(
     val isGlobal: Boolean,
@@ -116,12 +101,8 @@ data class ProviderCoverage(
 
     /**
      * The strongest regional claim at this point, decayed to zero over
-     * [GRACE_DEGREES] beyond a region's edge.
-     *
-     * The decay is what stops a provider changing the instant a border is
-     * crossed. Weather does not respect the edge of a rectangle, and neither
-     * should a forecast someone is watching while they walk down a street
-     * (docs/providers.md, boundary conditions).
+     * [GRACE_DEGREES] beyond a region's edge, so the provider does not change the
+     * instant a border is crossed (docs/providers.md).
      */
     fun regionalStrength(latitude: Double, longitude: Double): Double =
         preferredRegions.maxOfOrNull { region ->
@@ -143,12 +124,8 @@ data class ProviderCoverage(
         ?.name
 
     /**
-     * The finest resolution available at this point: a region's own figure where
-     * one applies, otherwise the provider's baseline.
-     *
-     * Only regions that genuinely contain the point count. A decayed regional
-     * preference reaching across a border does not mean the fine-grid model
-     * reaches with it.
+     * The finest resolution available at this point: a region's own figure where the
+     * point is genuinely inside one, otherwise the provider's baseline.
      */
     fun resolutionKmAt(latitude: Double, longitude: Double, baseline: Double?): Double? =
         preferredRegions

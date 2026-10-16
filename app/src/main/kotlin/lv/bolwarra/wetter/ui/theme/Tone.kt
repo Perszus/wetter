@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.theme
 
 import androidx.compose.ui.graphics.Color
@@ -9,45 +12,20 @@ import kotlin.math.sin
 /**
  * Every colour in this app, generated rather than chosen.
  *
- * ### Why not a list of hex values
+ * A tone is declared in the terms it is reasoned about (lightness, chroma, hue)
+ * and converted to a screen value by arithmetic. sRGB values are not perceptual,
+ * so hand-picked hexes drift in contrast; declaring "L* 44" fixes the contrast
+ * against a known ground whatever the hue.
  *
- * The palette this replaces was seventeen hand-picked hexes, and measuring it
- * showed what hand-picking costs. The most-used colour in the app failed WCAG AA
- * against its own background in both themes. Every accent on the light plate
- * failed while the same accents on the dark plate passed comfortably, so the two
- * themes were not one system read two ways - they were two systems that happened
- * to share names. Two roles held identical values under different names, and in
- * the dark plate a temperature and a severe-weather alert were the same colour.
- *
- * None of that is carelessness. It is what happens when a value is picked in
- * isolation and judged by eye, because sRGB's numbers are not perceptual: #767676
- * and #808080 look a step apart and are, while #101010 and #1A1A1A look identical
- * and are numerically further.
- *
- * So a tone here is declared in the terms it is actually reasoned about - how
- * light it is, how coloured it is, and which colour - and the conversion to a
- * screen value is arithmetic. Declaring "L* 44" fixes the contrast against a
- * known ground whatever the hue; declaring "#7C8A92" fixes nothing and has to be
- * re-measured every time it is touched.
- *
- * ### The space
- *
- * CIE L*C*h, which is CIELAB in polar form. L* is lightness on a scale where
- * equal steps look equal, C* is how far the colour sits from grey, and h is the
- * hue angle. Not a perfect model of vision - nothing cheap is - but it is right
- * about the thing that matters here, which is that lightness must be spaced
- * evenly and contrast must be predictable.
+ * The space is CIE L*C*h, CIELAB in polar form: L* is lightness in perceptually
+ * even steps, C* the distance from grey, h the hue angle.
  */
 object Tone {
 
     /**
-     * The hue every neutral is built on.
-     *
-     * The greys are not neutral. They carry a trace of blue, at a chroma low
-     * enough that nobody would call them blue - it reads as material rather than
-     * as colour, the way paper and graphite are never quite grey either. It also
-     * means the one saturated hue in the app sits *in* the surface rather than on
-     * top of it.
+     * The hue every neutral is built on. The greys carry a trace of blue, too little
+     * to call blue, so they read as material, and the one saturated hue sits in the
+     * surface rather than on it.
      */
     const val NEUTRAL_HUE = 250.0
 
@@ -68,12 +46,9 @@ object Tone {
     }
 
     /**
-     * The lightness that would sit at a given contrast ratio against a ground.
-     *
-     * This is the whole point of working in L*. A contrast requirement is a
-     * statement about luminance, so it can be solved for rather than nudged
-     * towards - and the answer holds when the hue changes, which is what lets an
-     * accent and the text beside it carry the same weight.
+     * The lightness that sits at a given contrast ratio against a ground. Contrast is
+     * a statement about luminance, so it is solved for, and holds when the hue
+     * changes.
      *
      * @param ratio the WCAG contrast ratio wanted, 1..21.
      * @param darker true when the answer should be darker than the ground.
@@ -109,7 +84,7 @@ object Tone {
         return (hi + OFFSET) / (lo + OFFSET)
     }
 
-    // --- CIELAB to sRGB, D65 ---------------------------------------------------
+    // CIELAB to sRGB, D65.
 
     private fun fromLab(l: Double, a: Double, b: Double): Color {
         val fy = (l + 16.0) / 116.0
@@ -131,13 +106,8 @@ object Tone {
         if (t * t * t > EPSILON) t * t * t else (116.0 * t - 16.0) / KAPPA
 
     /**
-     * Linear light to sRGB, clamped.
-     *
-     * Clamping matters: a high-chroma tone at an extreme lightness can land
-     * outside the gamut, and the clamp is what keeps that from wrapping round to
-     * a colour nobody asked for. Every tone in this app is chosen to sit well
-     * inside it, so the clamp should never fire - but a rule that only works when
-     * nobody makes a mistake is not a rule.
+     * Linear light to sRGB, clamped, so an out-of-gamut tone cannot wrap round to an
+     * unintended colour. Every tone here sits well inside the gamut.
      */
     private fun gamma(channel: Double): Float {
         val v = channel.coerceIn(0.0, 1.0)

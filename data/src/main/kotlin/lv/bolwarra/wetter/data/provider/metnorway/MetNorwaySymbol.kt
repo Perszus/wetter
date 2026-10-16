@@ -1,20 +1,15 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metnorway
 
 import lv.bolwarra.wetter.domain.model.WeatherCondition
 
 /**
- * MET Norway's symbol codes, translated into Wetter's conditions.
- *
- * The codes are compound words — "heavysleetshowersandthunder" — with an
- * optional `_day`, `_night` or `_polartwilight` suffix. Matching on substrings
- * rather than enumerating all ninety-odd spellings is what keeps this readable,
- * but the order of the checks is then load-bearing: "sleetshowers" contains
- * neither "rain" nor "snow", while "rainshowersandthunder" contains "rain",
- * "showers" and "thunder" at once and is a thunderstorm.
- *
- * The day/night suffix is ignored. Wetter derives daylight from the sun's actual
- * position, which is available for every hour rather than only for the hours MET
- * Norway happens to mark, and agrees with itself across providers.
+ * MET Norway's symbol codes, translated into Wetter's conditions. Matched on
+ * substrings, so the order of checks matters: "rainshowersandthunder" contains
+ * "rain", "showers" and "thunder" and is a thunderstorm. The day/night suffix is
+ * ignored; daylight comes from the sun's position.
  */
 internal fun weatherConditionFromMetSymbol(symbolCode: String?): WeatherCondition {
     val symbol = symbolCode?.substringBefore('_')?.lowercase() ?: return WeatherCondition.UNKNOWN

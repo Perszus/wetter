@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.provider.metar
 
 import lv.bolwarra.wetter.domain.observation.ObservedIntensity
@@ -7,10 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The groups here are taken from real reports, including the two that were
- * actually falling over Denmark and Germany when this was written.
- */
+/** The groups here are taken from real reports. */
 class PresentWeatherTest {
 
     @Test

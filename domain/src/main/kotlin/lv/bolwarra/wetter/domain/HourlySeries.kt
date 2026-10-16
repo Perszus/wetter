@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain
 
 import java.time.Duration
@@ -10,27 +13,14 @@ import lv.bolwarra.wetter.domain.model.PrecipitationIntensity
 import lv.bolwarra.wetter.domain.model.PrecipitationKind
 import lv.bolwarra.wetter.domain.model.PrecipitationSpell
 
-/**
- * Reading an hourly forecast.
- *
- * Everything here is a pure function of a list of hours, so the questions the
- * screens ask — what does today look like, when does the rain start, when does
- * it stop — are answered in one place and tested without a device.
- */
-
 /** The hours belonging to one calendar date at a place. */
 fun List<HourlyWeather>.onDay(date: LocalDate, zone: ZoneId): List<HourlyWeather> =
     filter { it.timestamp.atZone(zone).toLocalDate() == date }
 
 /**
- * A rolling window of hours starting at the hour containing [from].
- *
- * This, rather than a calendar day, is what the timeline draws. Providers do not
- * agree on where an hourly series begins — Open-Meteo returns the day from local
- * midnight, MET Norway returns it from the current hour — so slicing by date
- * gives a full chart from one and a stump from the other, depending on the time
- * of day and on which provider happened to win the location. A window from now
- * is the same length whoever answered, and is the question being asked anyway.
+ * A rolling window of hours starting at the hour containing [from]. Providers
+ * disagree on where an hourly series begins (local midnight or the current hour),
+ * so a window from now is the same length whoever answered.
  */
 fun List<HourlyWeather>.window(from: Instant, hours: Long): List<HourlyWeather> {
     val sorted = sortedBy { it.timestamp }
@@ -40,54 +30,26 @@ fun List<HourlyWeather>.window(from: Instant, hours: Long): List<HourlyWeather> 
 }
 
 /**
- * When the row that covers [instant] began.
- *
- * ### Why this is not `truncatedTo(HOURS)`
- *
- * It was, and that is an assumption that a forecast hour starts on a whole UTC
- * hour. Most of the world agrees. India, Nepal, Iran, Afghanistan, Myanmar,
- * Newfoundland, the Chatham Islands, Lord Howe and central Australia do not:
- * their clocks run half or three quarters of an hour off UTC, and a provider
- * asked for local time answers on the local hour - so the rows land at :15, :30
- * or :45 past the UTC hour.
- *
- * Truncating to UTC then lands *before* the row covering now, which sounds
- * harmless and is not: the filter that follows drops that row, the window opens
- * on the next hour instead, and everything downstream is answering about an
- * hour that has not started.
- *
- * What that looked like, measured in Kathmandu at 21:54 local: the hour covering
- * the reader had 0.4 mm of drizzle in it and the dial said `Drizzle`, while the
- * rain tile beside it read `0.0 mm/h` - because the window had begun at 22:00
- * and the lookup for "now" fell off the front of it into a default of zero. A
- * wrong number, silently, on the main screen, for about a fifth of the people on
- * earth.
- *
- * So the start comes from the series rather than from the clock: whichever row
- * is the last one that has already begun. For a series on whole hours this is
- * exactly what truncation gave, which is why nothing anywhere else changes.
+ * When the row that covers [instant] began, read from the series rather than
+ * truncated to the UTC hour: in India, Nepal, Iran, Newfoundland, central
+ * Australia and other half- and quarter-hour zones, the provider's rows start at
+ * :15, :30 or :45 past, and truncation would open the window on an hour that has
+ * not started.
  */
 fun List<HourlyWeather>.hourCovering(instant: Instant): Instant = asSequence()
     .map { it.timestamp }
     .filter { !it.isAfter(instant) }
     .maxOrNull()
-    // Nothing has begun yet - a forecast entirely in the future, which is a
-    // cache read a moment before the first row. The clock is the only answer
-    // left and it is the right one: the window then opens on what is coming.
+    // Nothing has begun yet (a forecast entirely in the future), so the window opens
+    // on what is coming.
     ?: instant.truncatedTo(ChronoUnit.HOURS)
 
 /**
- * Every unbroken run of wet hours, in order.
+ * Every unbroken run of wet hours, in order. A single dry hour splits a run: told
+ * it stops at three, somebody can leave at three.
  *
- * A single dry hour splits a run rather than being bridged. That is the literal
- * reading of the data, and the literal reading is what somebody deciding whether
- * to leave now actually wants: told that it stops at three, they can go at
- * three. Smoothing a gap away to make the chart tidier would be the app
- * inventing a shower that the forecast does not contain.
- *
- * "Wet" here means worth calling rain rather than merely measurable, which is a
- * higher bar than the curve is drawn at - see
- * [PrecipitationIntensity.isWorthNaming].
+ * Wet means worth calling rain, a higher bar than the curve is drawn at
+ * ([PrecipitationIntensity.isWorthNaming]).
  */
 fun List<HourlyWeather>.precipitationSpells(): List<PrecipitationSpell> {
     if (isEmpty()) return emptyList()
@@ -109,8 +71,8 @@ fun List<HourlyWeather>.precipitationSpells(): List<PrecipitationSpell> {
             close(openEnded = false)
         }
     }
-    // A run still open at the end of the data is open-ended: the forecast stops,
-    // the weather does not.
+    // A run still open at the end of the data is open-ended: the forecast stops, the
+    // weather does not.
     close(openEnded = true)
 
     return spells
@@ -136,16 +98,9 @@ fun List<HourlyWeather>.totalPrecipitation(): Double? {
 }
 
 /**
- * Accumulation between two instants, pro-rating the hours the range cuts.
- *
- * Needed because the timeline rolls by the minute while the data arrives in
- * whole hours. Asked at 14:45 for the next six hours, summing whole buckets
- * would charge the window the entire 14:00 hour - three quarters of which has
- * already fallen - and the headline would not be the total for the stretch of
- * chart underneath it.
- *
- * The share is taken linearly across the hour, which is the same assumption the
- * curve between two samples already makes.
+ * Accumulation between two instants, pro-rating the hours the range cuts: the
+ * timeline rolls by the minute while the data comes in whole hours. Linear
+ * across the hour, as the curve between two samples is.
  */
 fun List<HourlyWeather>.totalPrecipitation(from: Instant, to: Instant): Double? {
     if (!to.isAfter(from)) return null
@@ -180,8 +135,7 @@ private fun List<HourlyWeather>.toSpell(openEnded: Boolean): PrecipitationSpell 
     val last = last()
     return PrecipitationSpell(
         start = first.timestamp,
-        // Each row describes one hour, so the spell ends when the last wet hour
-        // does, not when it began.
+        // Each row describes one hour, so the spell ends when the last wet hour does.
         end = last.timestamp.plus(Duration.ofHours(1)),
         peak = maxOf { it.intensity.ordinal }.let { PrecipitationIntensity.entries[it] },
         kind = dominantKind(),
@@ -191,11 +145,8 @@ private fun List<HourlyWeather>.toSpell(openEnded: Boolean): PrecipitationSpell 
 }
 
 /**
- * What the spell is mostly made of.
- *
- * A shower that turns to sleet is reported as sleet: the awkward part of the
- * spell is the part worth knowing about, and mixed is already the more cautious
- * of the two readings.
+ * What the spell is mostly made of. A shower that turns to sleet is reported as
+ * sleet: the awkward part is the part worth knowing.
  */
 fun List<HourlyWeather>.dominantKind(): PrecipitationKind {
     val kinds = map { it.kind }.filter { it != PrecipitationKind.NONE }

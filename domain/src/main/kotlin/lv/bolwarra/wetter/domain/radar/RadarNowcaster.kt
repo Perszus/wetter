@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.radar
 
 import java.time.Duration
@@ -10,7 +13,7 @@ data class RadarNowcastStep(
     val at: Instant,
     val lead: Duration,
     val field: RadarField,
-    /** 0..1. Falls with lead time, because extrapolation stops working. */
+    /** 0..1, falling with lead time as extrapolation stops working. */
     val confidence: Float,
 )
 
@@ -21,31 +24,14 @@ data class RadarNowcast(
     val steps: List<RadarNowcastStep>,
 ) {
     /**
-     * The rate expected at a place over time.
-     *
-     * Steps where the trajectory left the grid or crossed a coverage hole are
-     * dropped rather than reported as dry - off the edge of the radar we do not
-     * know, and the fusion layer must be able to tell that from a forecast of no
-     * rain.
+     * The rate expected at a place over time. Steps whose trajectory left the grid or
+     * crossed a coverage hole are dropped rather than reported as dry.
      */
     fun seriesAt(latitude: Double, longitude: Double): List<RadarSample> {
-        // Say nothing at all where the radar is not watching.
-        //
-        // The tile source draws "no echo" and "outside coverage" identically, so
-        // an empty pixel over Lagos looks exactly like an empty pixel over a dry
-        // afternoon in Riga. Inside the window the radar now carries 95% of the
-        // answer, which means reading the first as dry would confidently
-        // override a model that is forecasting rain, in precisely the places
-        // with no radar to correct it.
-        //
-        // Echo somewhere in the neighbourhood is the evidence that the composite
-        // covers this place. With it, a dry reading here is a real observation
-        // of dry. Without it, there is no observation - and no observation must
-        // never be dressed as one.
-        // Every step, not just the nearest: rain approaching from beyond the
-        // neighbourhood is exactly the case worth catching, and silencing it
-        // because the first frame happened to be empty would be the same
-        // mistake in the other direction.
+        // Say nothing where the radar is not watching: the source draws "no echo" and
+        // "outside coverage" identically, so a dry reading counts only where there is echo
+        // in the neighbourhood at some step. Every step is checked, so rain approaching
+        // from beyond the neighbourhood still counts.
         val observing = steps.any { it.field.hasEchoNear(latitude, longitude, COVERAGE_RADIUS) }
         if (!observing) return emptyList()
 
@@ -64,13 +50,8 @@ data class RadarNowcast(
 
     private companion object {
         /**
-         * How far to look for evidence that the composite covers this place.
-         *
-         * Sixty-four pixels is one motion block, about forty kilometres at the
-         * zoom and latitudes used here - roughly the scale over which a single
-         * radar's footprint is continuous. Wide enough that a shower passing
-         * beside you still counts as the radar watching, narrow enough that rain
-         * in the next country does not.
+         * How far to look for evidence that the composite covers this place: one motion
+         * block, about forty kilometres.
          */
         const val COVERAGE_RADIUS = 64
     }
@@ -82,16 +63,9 @@ data class RadarSample(
     val millimetresPerHour: Float,
     val confidence: Float,
     /**
-     * How well the motion behind this projection was measured, 0..1.
-     *
-     * The same value for every sample in one projection, because there is one
-     * motion estimate behind them all. Carried on the sample anyway so that
-     * whatever consumes it - including a projection read back from disk after a
-     * restart - knows how far this field can be carried before the estimate
-     * stops supporting it.
-     *
-     * Distinct from [confidence], which already folds this together with lead
-     * decay and so cannot be untangled again. This is the motion on its own.
+     * How well the motion behind this projection was measured, 0..1, kept apart from
+     * [confidence] (which also folds in lead decay) and carried on each sample so a
+     * projection read back from disk still knows it.
      */
     val motionQuality: Float = 1f,
 )
@@ -99,73 +73,34 @@ data class RadarSample(
 /**
  * Projects the observed rain field forward.
  *
- * ### Backward trajectories, not forward scatter
+ * Backward trajectories rather than forward scatter: for each output pixel, trace
+ * where its air came from and sample there, so the output cannot tear. The trace
+ * uses the midpoint rule, which handles curving flow.
  *
- * The obvious implementation pushes each pixel to where it is going. It leaves
- * holes: where the flow spreads out, no source pixel lands, and the output is
- * torn with dry gaps that were never forecast. So the loop runs the other way -
- * for each output pixel, ask where the air arriving there came from, and sample
- * that. Every output pixel gets exactly one answer and no tearing is possible.
- *
- * The trajectory is traced in two half steps rather than one whole one. With a
- * flow that varies in space, taking the velocity at the destination for the
- * entire journey is wrong wherever the flow curves; sampling again at the
- * midpoint corrects most of it for one extra lookup.
- *
- * ### Growth and decay, but on a leash
- *
- * Pure advection says a shower will still be exactly as heavy in two hours,
- * which is never true. The intensity trend of each block is measured across the
- * recent sweeps and carried forward - but its cumulative effect saturates,
- * because a cell that has been intensifying for ten minutes is not going to keep
- * intensifying for two hours. Without that ceiling the arithmetic happily
- * forecasts negative rain, or a thunderstorm over a drizzle.
+ * Each block's measured intensity trend is carried forward, but its cumulative
+ * effect saturates ([TREND_SATURATION_MINUTES]), so a growing cell is not
+ * extrapolated into a deluge.
  */
 object RadarNowcaster {
 
-    /**
-     * How long the observed trend keeps contributing. A cell growing steadily
-     * gains at most trend x this, no matter how far ahead we look.
-     */
+    /** How long the observed trend keeps contributing to a projection. */
     const val TREND_SATURATION_MINUTES = 20.0
 
     /**
-     * The lead at which radar skill has halved, and the model is about to take
-     * the answer over.
-     *
-     * Radar and a model are good at opposite ends. Radar is looking at rain that
-     * exists, so for the next hour it is simply better; a model has to be told
-     * what is currently overhead and is not. Past a couple of hours the
-     * extrapolation has lost the plot - storms grow, die and turn - and the
-     * model is the only thing left worth having. Just under two hours is where
-     * those two curves cross.
+     * The lead at which radar skill has halved and the models are about to take the
+     * answer over: just under two hours.
      */
     const val CROSSOVER_MINUTES = 110.0
 
     /**
-     * How sharply skill falls away either side of the crossover.
-     *
-     * Two, which makes this a sigmoid rather than an exponential, and that shape
-     * matters. An exponential decays fastest at zero lead - precisely where
-     * radar is at its best and should be losing nothing at all. This holds near
-     * the top for the first half hour, then gives way.
+     * How sharply skill falls either side of the crossover: a sigmoid, so it holds
+     * near the top for the first half hour instead of decaying fastest at zero.
      */
     private const val SKILL_STEEPNESS = 2.0
 
     /**
-     * The match sharpness a genuinely good estimate reads, measured rather than
-     * assumed.
-     *
-     * This is the correction to a units error that had been quietly gutting the
-     * radar. Sharpness is a peak-contrast measure - how much better the best
-     * displacement fits than the average one - and on real precipitation fields
-     * a good match reads about 0.3. It never approaches 1. Feeding it straight
-     * in as though it were a probability therefore capped radar at roughly a
-     * third of the answer even for the current minute: measured across ten
-     * European sites, sharpness ran 0.16 to 0.38, so radar was being given
-     * 15-36% weight at zero lead while the model carried the rest. For an app
-     * whose whole purpose is that radar knows what is happening now, that was
-     * backwards.
+     * The match sharpness a good motion estimate actually reads. Sharpness is a peak
+     * contrast, and on real fields a good match is about 0.3, never near 1.
      */
     const val GOOD_MATCH_SHARPNESS = 0.30f
 
@@ -173,17 +108,9 @@ object RadarNowcaster {
     const val MINIMUM_MATCH_SHARPNESS = 0.10f
 
     /**
-     * How quickly the answer comes to depend on the motion estimate.
-     *
-     * At zero lead it does not depend on it at all: that is the sweep itself, an
-     * observation of rain that is currently falling, and it is worth believing
-     * whether or not anything could be tracked between frames. Only the
-     * projection needs the motion, and the further ahead it reaches the more
-     * entirely it rests on it. Around twenty minutes the two have swapped over.
-     *
-     * This is why a flat, featureless rain field - London, at 0.16 - is still
-     * trusted completely about the present moment and discounted quickly for
-     * anything beyond it.
+     * How quickly the answer comes to depend on the motion estimate. At zero lead it
+     * does not at all, since that step is the sweep itself; by about twenty minutes it
+     * rests on it, so a featureless field is trusted now and discounted after.
      */
     const val MOTION_RELEVANCE_MINUTES = 20.0
 
@@ -194,27 +121,19 @@ object RadarNowcaster {
     private const val MAX_TREND_MM_PER_HOUR_PER_MINUTE = 2.0f
 
     /**
-     * @param recent sweeps in ascending time order. The last is the starting
-     *   point; earlier ones are what the motion and trend are measured from.
+     * @param recent sweeps in ascending order: the last is the starting point, the
+     * earlier ones measure the motion and trend.
      */
     fun nowcast(recent: List<RadarField>, leads: List<Duration>): RadarNowcast? =
         project(recent, leads, around = null)
 
     /**
-     * The same projection, worked out only where it will be read: a window
-     * around one place, wide enough for [RadarNowcast.seriesAt] and its
-     * coverage check.
+     * The same projection, computed only in a window around one place, wide enough
+     * for [RadarNowcast.seriesAt] and its coverage check. Every window pixel is still
+     * traced through the full motion field and sampled from the whole sweep, so rain
+     * from outside arrives as it would; only pixels never read are skipped.
      *
-     * The chart and the widget read a single point from the projection, and
-     * projecting the whole grid to read it spent most of the effort moving
-     * pixels nobody looks at - a 768-pixel square, sixteen times over, which on
-     * a phone was the larger part of every new sweep's wait. Every pixel in the
-     * window is still traced back through the full motion field and sampled
-     * from the whole of the latest sweep, so rain approaching from far outside
-     * the window arrives exactly as it would have. Only pixels whose answer is
-     * never read are skipped.
-     *
-     * Null where the place is off the grid: there is no point to read.
+     * Null where the place is off the grid.
      */
     fun nowcastAround(
         recent: List<RadarField>,
@@ -224,7 +143,7 @@ object RadarNowcaster {
     ): RadarNowcast? {
         val latest = recent.maxByOrNull { it.at } ?: return null
         val point = latest.geometry.pointOf(latitude, longitude) ?: return null
-        // The coverage radius, and one more for the bilinear sample's neighbour.
+        // The coverage radius, plus one for the bilinear sample's neighbour.
         val reach = AROUND_RADIUS + 1
         val x0 = (point.x.toInt() - reach).coerceAtLeast(0)
         val y0 = (point.y.toInt() - reach).coerceAtLeast(0)
@@ -247,16 +166,13 @@ object RadarNowcaster {
         if (recent.size < 2 || leads.isEmpty()) return null
         val frames = recent.sortedBy { it.at }
         val latest = frames.last()
-        // Every frame held, not just the last pair: a long baseline finds
-        // motion on smooth fields that ten minutes cannot resolve, and the two
+        // Every frame held: a long baseline finds motion on smooth fields, and the two
         // spans check each other.
         val motion = MotionEstimator.estimate(frames) ?: return null
 
         val trend = estimateTrend(frames, motion)
 
-        // Zero is kept, unlike before: that step is the latest sweep itself -
-        // what is falling right now, observed rather than predicted - and it is
-        // the single most reliable thing this whole package produces.
+        // Zero lead is kept: it is the latest sweep itself, the most reliable step.
         val steps = leads.filter { !it.isNegative }.map { lead ->
             val minutes = lead.toMillis() / MILLIS_PER_MINUTE
             RadarNowcastStep(
@@ -270,18 +186,12 @@ object RadarNowcaster {
     }
 
     /**
-     * How much a projected step deserves to be believed.
-     *
-     * Two independent things multiplied: how well radar can see this far ahead
-     * at all, and how much this particular estimate can be trusted to get it
-     * there. Keeping them apart is the point - the first is a property of radar,
-     * the second of tonight's rain field, and collapsing them into one number is
-     * what made the near term unreliable.
+     * How much a projected step deserves belief: radar's skill at this lead, times
+     * how far this particular motion estimate can be trusted to carry it.
      */
     fun confidenceAt(minutes: Double, motionSharpness: Float): Float {
         val quality = matchQualityOf(motionSharpness)
-        // Near zero lead the sweep stands on its own; further out it leans
-        // entirely on the motion estimate.
+        // Near zero lead the sweep stands alone; further out it rests on the motion.
         val leaning = exp(-minutes / MOTION_RELEVANCE_MINUTES)
         val effective = quality + (1.0 - quality) * leaning
         return (skillAtLead(minutes) * effective).toFloat().coerceIn(0f, 1f)
@@ -292,11 +202,8 @@ object RadarNowcaster {
         1.0 / (1.0 + Math.pow(minutes.coerceAtLeast(0.0) / CROSSOVER_MINUTES, SKILL_STEEPNESS))
 
     /**
-     * A raw sharpness reading turned into a 0..1 quality.
-     *
-     * Normalised against what a good match actually measures, so an ordinary
-     * good one scores full marks and only a genuinely structureless field is
-     * marked down.
+     * A raw sharpness reading as a 0..1 quality, normalised against what a good
+     * match measures.
      */
     fun matchQualityOf(sharpness: Float): Double {
         val span = (GOOD_MATCH_SHARPNESS - MINIMUM_MATCH_SHARPNESS).toDouble()
@@ -304,11 +211,8 @@ object RadarNowcaster {
     }
 
     /**
-     * One projected field.
-     *
-     * Blocks with no measured trend simply advect, which is the correct default:
-     * absent evidence of growth, the honest forecast is that the rain carries on
-     * as it is.
+     * One projected field. Blocks with no measured trend simply advect: absent
+     * evidence of growth, rain carries on as it is.
      */
     private fun advance(
         latest: RadarField,
@@ -319,9 +223,8 @@ object RadarNowcaster {
     ): RadarField {
         val full = latest.geometry
         val window = around ?: Window(0, 0, full.width, full.height)
-        // The output covers the window; the arithmetic is done in the full
-        // grid's coordinates, so a window pixel gets exactly the value the same
-        // pixel of a whole-grid projection would.
+        // The output covers the window, computed in the full grid's coordinates so each
+        // pixel matches a whole-grid projection.
         val geometry = if (around == null) {
             full
         } else {
@@ -346,17 +249,8 @@ object RadarNowcaster {
                     out[wy * geometry.width + wx] = RadarField.NO_ECHO
                     continue
                 }
-                // Growth is something rain does, so it applies only where rain
-                // is - and it is the trend of the block the rain came *from*,
-                // since that is where it was measured growing.
-                //
-                // Both were wrong once. The trend was added to every pixel of
-                // the destination block, dry ones included, so a block with one
-                // strengthening cell in a corner rained evenly across all of it:
-                // squares of light rain forty kilometres wide that nothing had
-                // observed, and one of them over the reader's pin. It was the
-                // radar map that showed it; the chart had been sampling those
-                // squares all along.
+                // Growth only where rain is, using the trend of the block the rain came from,
+                // where it was measured growing.
                 if (advected < RadarField.TRACE_MM_PER_HOUR) {
                     out[wy * geometry.width + wx] = advected.coerceAtLeast(MIN_RATE)
                     continue
@@ -374,11 +268,8 @@ object RadarNowcaster {
     }
 
     /**
-     * Where the rain now at (x, y) will have come from.
-     *
-     * Half a step at the arrival velocity, re-read there, then the whole step at
-     * that better estimate - the midpoint rule. Straight-line tracing at the
-     * arrival velocity is only right where the flow is uniform.
+     * Where the rain now at (x, y) will have come from: half a step at the arrival
+     * velocity, re-read there, then the whole step (the midpoint rule).
      */
     private fun traceBack(motion: MotionField, x: Float, y: Float, minutes: Double): GridPoint {
         val arrival = motion.at(x, y)
@@ -395,12 +286,8 @@ object RadarNowcaster {
     }
 
     /**
-     * How fast each block is intensifying, in mm/h per minute.
-     *
-     * Measured after motion compensation, which is the whole point: comparing
-     * the same map square across two sweeps measures rain arriving and leaving,
-     * not rain growing. Comparing a square against where its contents came from
-     * measures the change in the weather itself.
+     * How fast each block is intensifying, in mm/h per minute, measured after motion
+     * compensation so it is growth rather than rain arriving and leaving.
      */
     private fun estimateTrend(frames: List<RadarField>, motion: MotionField): FloatArray {
         val blocks = motion.blocksAcross * motion.blocksDown
@@ -423,8 +310,7 @@ object RadarNowcaster {
                 val source = traceBack(motion, x.toFloat(), y.toFloat(), minutes)
                 val then = earlier.sampleAt(source)
                 if (then.isNoEcho()) continue
-                // Only where something is actually falling: averaging in the dry
-                // majority would bury every real trend under its own area.
+                // Only where something is falling, so the dry majority does not bury the trend.
                 if (now < RadarField.TRACE_MM_PER_HOUR &&
                     then < RadarField.TRACE_MM_PER_HOUR
                 ) {

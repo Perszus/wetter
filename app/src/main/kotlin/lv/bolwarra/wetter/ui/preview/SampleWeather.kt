@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.preview
 
 import java.time.Duration
@@ -13,22 +16,16 @@ import lv.bolwarra.wetter.domain.model.WeatherLocation
 import lv.bolwarra.wetter.domain.provider.ProviderMetadata
 
 /**
- * A fixed forecast for @Preview and for tests that need something shaped like
- * real data.
- *
- * It is deliberately awkward: a shower that builds, peaks and stops, a null
- * probability in the middle, an overnight stretch, and a day whose minimum is
- * below zero. Sample data that is too tidy hides exactly the layout problems
- * previews exist to catch.
- *
- * Every instant is derived from one fixed epoch, so previews are reproducible and
- * two runs never differ.
+ * A fixed forecast for @Preview and for tests that need something shaped like real
+ * data. Deliberately awkward (a shower that builds and stops, a null probability,
+ * an overnight stretch, a minimum below zero), and derived from one fixed epoch so
+ * previews are reproducible.
  */
 object SampleWeather {
 
     val zone: ZoneId = ZoneId.of("Europe/Riga")
 
-    /** 2026-03-14T09:00Z — a Saturday morning, chosen once and never moved. */
+    /** 2026-03-14T09:00Z, a Saturday morning. */
     val now: Instant = Instant.parse("2026-03-14T09:00:00Z")
 
     val location = WeatherLocation(
@@ -74,8 +71,7 @@ object SampleWeather {
         HourlyWeather(
             timestamp = hourStart,
             temperature = temperatureSeries[index],
-            // A gap at index 12: providers do return nulls, and the timeline has
-            // to survive one without leaving a hole.
+            // A gap at index 12: providers do return nulls.
             precipitationProbability = if (index == 12) null else (mm * 22).toInt().coerceIn(0, 96),
             // A degree or so under the air temperature, as damp March wind is.
             apparentTemperature = temperatureSeries[index] - 1.2,

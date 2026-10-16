@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.data.repository
 
 import java.time.Instant
@@ -9,16 +12,9 @@ import lv.bolwarra.wetter.domain.hazard.HazardAnnouncements
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /**
- * What has already been said about a place, so it is not said twice.
- *
- * The refresh worker wakes every quarter of an hour and finds the same frost in
- * the forecast every time. Without a record of what has gone out, a cold night
- * would arrive as forty identical notifications, which is an app somebody turns
- * off before morning - and then never hears the one warning that mattered.
- *
- * Deliberately dumb. It holds opaque keys and a timestamp and knows nothing
- * about what a hazard is; the domain decides what a key means and when two
- * things are the same warning.
+ * What has already been said about a place, so a frost found on every refresh is
+ * announced once. Holds opaque keys and a timestamp; the domain decides what a key
+ * means.
  */
 class AnnouncedHazardStore internal constructor(private val dao: AnnouncedHazardDao) {
 

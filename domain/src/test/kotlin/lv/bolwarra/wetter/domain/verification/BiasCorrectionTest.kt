@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.verification
 
 import java.time.Duration
@@ -137,9 +140,8 @@ class BiasCorrectionTest {
 
     @Test
     fun `correcting the measured Riga evening moves it the right way`() {
-        // Every model ran warm by roughly a degree and a half that evening. With
-        // enough such evenings recorded, the correction should pull a 15.1
-        // forecast down towards the 14 that was measured.
+        // Every model ran warm by about a degree and a half; with enough such evenings,
+        // a 15.1 forecast is pulled towards the 14 that was measured.
         val bias = BiasCorrection.learn(records(60, error = 1.4), VerifiedVariable.TEMPERATURE)!!
         val corrected = BiasCorrection.correct(15.1, bias)
 

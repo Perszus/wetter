@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.domain.model
 
 import lv.bolwarra.wetter.domain.climate.ClimateNormals
@@ -52,13 +55,8 @@ class WorthNamingTest {
 
     @Test
     fun `a day's total is judged as a total, not as a rate`() {
-        // The month page asked an hourly-rate scale about a whole day's
-        // accumulation, so a tenth of a millimetre spread over twenty-four hours
-        // washed the square - while the climatology squares beside it used the
-        // conventional rain-day line. One grid, two definitions of wet.
-        //
-        // These two constants are in different units on purpose and must not be
-        // confused again; this pins the gap between them.
+        // A day's accumulation is judged against the rain-day line, not the hourly
+        // trace rate: different units, pinned apart here.
         assertEquals(0.1, PrecipitationIntensity.TRACE_MM_PER_HOUR, 0.0001)
         assertEquals(1.0, ClimateNormals.WET_DAY_MM, 0.0001)
         assertTrue(

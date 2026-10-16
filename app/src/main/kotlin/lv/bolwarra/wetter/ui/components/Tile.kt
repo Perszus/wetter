@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
@@ -48,21 +51,12 @@ import kotlin.math.sin
 import lv.bolwarra.wetter.ui.theme.WetterTheme
 
 /**
- * One reading, on its own ground.
+ * One reading, on its own ground: a block of raised surface with a tracked label.
+ * Not a Material card: no shadow, border or elevation, just one step of tone, so a
+ * page of tiles reads as one instrument.
  *
- * A tile is a block of raised surface with a tracked label, and deliberately not
- * a Material card: no shadow, no border, no elevation. The separation comes from
- * a single step of tone, which is enough to group the contents and quiet enough
- * that a page of tiles still reads as one instrument rather than as a pile of
- * floating objects.
- *
- * The label repeats the section vocabulary used elsewhere — small, tracked wide,
- * upper case — so a tile heading and a section heading are recognisably the same
- * kind of thing.
- *
- * @param trailing a reading that belongs to the whole tile, set at its right:
- *   the day's total, the peak, the count. It is the one number somebody can take
- *   from the tile without reading the rest of it.
+ * @param trailing a reading for the whole tile, set at its right: the one number
+ * somebody can take without reading the rest.
  */
 @Composable
 fun Tile(
@@ -70,19 +64,14 @@ fun Tile(
     modifier: Modifier = Modifier,
     trailing: String? = null,
     /**
-     * Whether new numbers are on their way, drawn as a turning arc beside the
-     * label.
-     *
-     * After the label and not over the content, because the content is not
-     * wrong while this is happening - it is the last forecast, which is still
-     * the best answer there is until a better one lands. Covering it with a
-     * spinner would hide a true reading to announce that a truer one is coming.
+     * Whether new numbers are on their way, drawn as a turning mark beside the label
+     * rather than over the content, which stays the best answer until a newer one
+     * lands.
      */
     busy: Boolean = false,
     /**
-     * Somewhere further to go from this reading, set after [trailing]. Given a
-     * full touch target that overhangs the header rather than heightening it,
-     * so a tile with an action lines up with one without.
+     * Somewhere further to go from this reading, set after [trailing]. Its touch target
+     * overhangs the header rather than heightening it.
      */
     action: TileAction? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -143,9 +132,8 @@ class TileAction(
 )
 
 /**
- * The action's mark, laid out at the size of its glyph but touchable across a
- * full target around it. The overhang falls inside the tile's own padding, so
- * nothing outside the tile is reachable through it.
+ * The action's mark, laid out at its glyph's size but touchable across a full
+ * target. The overhang falls inside the tile's padding.
  */
 @Composable
 private fun ActionMark(action: TileAction) {
@@ -176,18 +164,10 @@ private val ACTION_GLYPH = 20.dp
 private val ACTION_RADIUS = 12.dp
 
 /**
- * A tile that stays shut until asked.
+ * A tile that stays shut until asked, for readings that are real but not daily.
+ * Collapsed on every launch.
  *
- * For readings that are real but not daily: dew point, pressure, the moon. Left
- * on the main screen they cost every reader attention every day to serve the few
- * who want them once, and the rain chart is what this app is for. Behind one tap
- * they cost nothing and are still there.
- *
- * Collapsed by default and not remembered between launches. Somebody who opened
- * it yesterday to check the pressure did not thereby ask for it every morning.
- *
- * @param summary a hint at what is inside, shown only while collapsed - a closed
- *   drawer labelled only "Advanced" gives no reason to open it.
+ * @param summary a hint at what is inside, shown while collapsed.
  */
 @Composable
 fun ExpandableTile(
@@ -199,9 +179,8 @@ fun ExpandableTile(
     val colors = WetterTheme.colors
     val spacing = WetterTheme.spacing
     var expanded by rememberSaveable { mutableStateOf(false) }
-    // Turned on the same curve and over the same time as the panel it belongs
-    // to, so the arrow and the drawer arrive together rather than the arrow
-    // finishing first and waiting.
+    // On the same curve and duration as the panel, so arrow and drawer arrive
+    // together.
     val turn by animateFloatAsState(
         targetValue = if (expanded) HALF_TURN else 0f,
         animationSpec = Reveal.chevron,
@@ -265,18 +244,8 @@ private val CHEVRON = 20.dp
 private const val HALF_TURN = 180f
 
 /**
- * The mark for "asking again": the dial's own triangle, turning.
- *
- * Drawn rather than borrowed, and drawn as a triangle rather than a ring
- * because this app already has a small filled triangle that means "where you
- * are" - the mark inside the dial's rim. Reusing that shape makes the second
- * one read as the same family rather than as a control panel part that wandered
- * in from another app.
- *
- * A solid triangle also survives being small far better than a hairline arc: at
- * ten density-independent pixels a stroked ring is two or three physical pixels
- * wide and turns into a grey smudge, while a filled shape keeps its corners and
- * its direction.
+ * The mark for "asking again": the dial's own triangle, turning. A filled shape
+ * keeps its corners at ten dp, where a hairline ring smudges.
  */
 @Composable
 internal fun TurningArc(colour: Color, modifier: Modifier = Modifier) {
@@ -285,8 +254,7 @@ internal fun TurningArc(colour: Color, modifier: Modifier = Modifier) {
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            // Linear, because an eased rotation reads as a stutter rather than
-            // as a turn.
+            // Linear: an eased rotation reads as a stutter.
             animation = tween(durationMillis = TURN_MILLIS, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
@@ -295,11 +263,8 @@ internal fun TurningArc(colour: Color, modifier: Modifier = Modifier) {
 
     Canvas(modifier.size(MARK_SIZE)) {
         rotate(degrees = angle) {
-            // Equilateral, built from three points a third of a turn apart on
-            // one circle rather than from a width and a height. That is what
-            // makes the sides equal, and it also puts the centre of the shape
-            // on the centre of rotation - a triangle laid out as a box wobbles
-            // as it turns, because its centroid is not the middle of the box.
+            // Equilateral, from three points on one circle, so the centroid sits on the centre
+            // of rotation and the shape does not wobble.
             val radius = size.minDimension / 2f
             val path = Path()
             repeat(SIDES) { corner ->

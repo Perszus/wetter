@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.map
 
 import androidx.compose.foundation.background
@@ -44,38 +47,17 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 /**
  * A map to put a point on.
  *
- * Deliberately not a map library. The app already owns Web Mercator arithmetic
- * for the radar and already draws on a Compose canvas, so a slippy map is a few
- * hundred lines rather than a native rendering engine, an API key and a
- * download several times the size of the rest of Wetter.
+ * Not a map library: the app already owns Web Mercator arithmetic and draws on a
+ * Compose canvas, so a slippy map costs a few hundred lines rather than a native
+ * engine and an API key.
  *
- * ### What it may and may not do
+ * Tiles come from OpenStreetMap's servers, which permit interactive viewing and
+ * forbid pre-emptive fetching (see [lv.bolwarra.wetter.data.map.MapTileSource]),
+ * so only the tiles the viewport covers are ever requested. The attribution is
+ * drawn on the map, as the licence asks.
  *
- * Tiles come from OpenStreetMap's own servers, which permit interactive viewing
- * and forbid pre-emptive fetching (see [lv.bolwarra.wetter.data.map.MapTileSource]).
- * That shapes this file: [visibleTiles] returns exactly the tiles the viewport
- * covers and nothing is ever requested speculatively - no ring of neighbours to
- * make panning smoother, no pyramid warmed on open. Panning is therefore a
- * little bare at the edges, which is the correct trade for using somebody's
- * donated bandwidth.
- *
- * Attribution is drawn on the map, bottom-right, and not behind a toggle,
- * because the licence asks for exactly that.
- *
- * ### Look first, then choose
- *
- * The map used to have a crosshair welded to the middle, and whatever sat under
- * it was the answer. That made every pan a commitment: no way to move the map to
- * see somewhere without also choosing it, and no way to look at a place you had
- * not picked. Worse, a point was always chosen — the screen opened already
- * claiming an answer nobody had given.
- *
- * The two are separate now. Pan and pinch as much as you like and nothing is
- * chosen; one tap puts the pin where you tapped, and it then stays on that
- * ground while the map moves under it. Tapping again moves it.
- *
- * The pin being *on the map* rather than on the screen is the whole of the
- * change: it is a mark on a place, so it travels with the place.
+ * Panning and zooming choose nothing; a tap places the pin, which then stays on
+ * that ground while the map moves under it.
  */
 @Composable
 fun MapPicker(
@@ -91,15 +73,12 @@ fun MapPicker(
     var zoom by remember { mutableStateOf(START_ZOOM) }
     var size by remember { mutableStateOf(IntSize.Zero) }
 
-    // The centre in world pixels, which is the coordinate system every tile
-    // calculation below is in. Kept rather than derived from the latitude and
-    // longitude each frame, so a drag is a pixel addition and not a round trip
-    // through two trigonometric conversions.
+    // The centre in world pixels, which every tile calculation uses, kept so a drag
+    // is a pixel addition rather than a round trip through trigonometry.
     var world by remember { mutableStateOf(Mercator.worldOf(centre, zoom)) }
 
-    // Re-centred when the caller moves the map from outside, which is what "use
-    // my current location" does. Keyed on the coordinate rather than fired once,
-    // so pressing it again after wandering off brings the map back.
+    // Re-centred when the caller moves the map, as "use my current location" does.
+    // Keyed on the coordinate, so pressing it again brings the map back.
     LaunchedEffect(centre) { world = Mercator.worldOf(centre, zoom) }
 
     val loaded = remember { mutableStateOf<Map<TileKey, ImageBitmap>>(emptyMap()) }
@@ -134,23 +113,15 @@ fun MapPicker(
                             world = Mercator.worldOf(here, next)
                         }
                     }
-                    // The map follows the finger, so the world moves the other
-                    // way: dragging right shows what was to the left.
+                    // The world moves opposite to the finger.
                     world = WorldPoint(world.x - pan.x, world.y - pan.y)
                         .clampedTo(zoom)
                 }
             }
-            // A second handler, so a tap that is really the end of a drag is not
-            // read as a choice: detectTapGestures fires only when the pointer
-            // went down and came up without travelling, and the handler above
-            // consumes anything that moved.
-            //
-            // Keyed on nothing, which matters. It was keyed on the map position
-            // at first, which restarts the whole gesture detector on every frame
-            // of a pan - the position changes continuously while a finger is
-            // down. The values below are read through their state delegates, so
-            // they are already current at the moment the tap lands and the keys
-            // bought nothing but the churn.
+            // A separate handler, so the end of a drag is not read as a tap: the handler
+            // above consumes anything that moved. Keyed on nothing, since the state below is
+            // read through delegates and a changing key would restart detection every frame of
+            // a pan.
             .pointerInput(Unit) {
                 detectTapGestures { at ->
                     onPick(Mercator.coordinatesOf(screenToWorld(at, world, size), zoom))
@@ -169,8 +140,7 @@ fun MapPicker(
             onZoom = { step ->
                 val next = (zoom + step).coerceIn(MIN_ZOOM, MAX_ZOOM)
                 if (next != zoom) {
-                    // Zoom about the middle of the screen: the map stays looking
-                    // at what it was looking at, just closer.
+                    // Zoom about the middle of the screen.
                     val here = Mercator.coordinatesOf(world, zoom)
                     zoom = next
                     world = Mercator.worldOf(here, next)
@@ -185,19 +155,13 @@ fun MapPicker(
 private fun screenToWorld(at: Offset, world: WorldPoint, size: IntSize): WorldPoint =
     WorldPoint(world.x - size.width / 2f + at.x, world.y - size.height / 2f + at.y)
 
-/** And back, so a chosen place can be drawn wherever the map has carried it. */
+/** And back, so a chosen place is drawn wherever the map has carried it. */
 private fun worldToScreen(point: WorldPoint, world: WorldPoint, size: IntSize): Offset =
     Offset(point.x - (world.x - size.width / 2f), point.y - (world.y - size.height / 2f))
 
 /**
- * Plus and minus, because a pinch is a two-handed gesture.
- *
- * The map had pinch and nothing else, which is fine on a table and awkward on a
- * phone held in one hand — and undiscoverable, since nothing on screen said the
- * map could zoom at all. Two buttons say it, and can be worked with a thumb.
- *
- * Bottom-left, opposite the attribution, which is the one thing on this map that
- * is not allowed to move.
+ * Plus and minus, for a phone held in one hand. Bottom-left, opposite the
+ * attribution.
  */
 @Composable
 private fun BoxScope.ZoomControls(canZoomIn: Boolean, canZoomOut: Boolean, onZoom: (Int) -> Unit) {
@@ -215,9 +179,8 @@ private fun ZoomButton(description: String, glyph: String, enabled: Boolean, onC
     androidx.compose.material3.Text(
         text = glyph,
         style = WetterTheme.type.headline,
-        // Fixed inks, for the same reason the pin has them: a basemap is somebody
-        // else's picture, and nothing that varies with our theme can be relied on
-        // to show up on it.
+        // Fixed inks: a basemap is somebody else's picture, and nothing that varies with
+        // the theme can be relied on to show up on it.
         color = if (enabled) PIN_INK else PIN_INK.copy(alpha = ZOOM_DISABLED),
         textAlign = TextAlign.Center,
         modifier = Modifier
@@ -230,19 +193,9 @@ private fun ZoomButton(description: String, glyph: String, enabled: Boolean, onC
 }
 
 /**
- * The point that has been chosen, drawn where it actually is.
- *
- * Drawn in fixed black and white rather than in any palette tone, and this is
- * the whole reason it needs a comment. The app's tones are solved for contrast
- * against its own plate, and the first version used `textPrimary` - which in
- * dark mode is very nearly white, and which was therefore invisible against a
- * basemap that is light whatever theme the phone is in. A map is not our
- * surface: it is somebody else's picture, mostly pale, with dark roads and
- * black labels running through it, and nothing that varies with our theme can
- * be relied on to show up on it.
- *
- * So the mark carries its own contrast: a white ring with a dark ring inside it,
- * which reads on pale fields, on grey streets and on the black of a label.
+ * The point that has been chosen, drawn where it actually is. A white ring with a
+ * dark ring inside, in fixed inks rather than theme tones, so it reads on pale
+ * fields, grey streets and black labels alike.
  */
 @Composable
 internal fun BoxScope.Pin(at: Offset, density: Float) {
@@ -251,8 +204,8 @@ internal fun BoxScope.Pin(at: Offset, density: Float) {
         val stroke = PIN_STROKE_DP * density
         val radius = PIN_RADIUS_DP * density
 
-        // A ring rather than a filled dot: the point being chosen is the ground
-        // underneath, and a solid marker hides the thing it is marking.
+        // A ring rather than a filled dot, so the marker does not hide the ground it
+        // marks.
         drawCircle(
             color = androidx.compose.ui.graphics.Color.White,
             radius = radius + stroke,
@@ -275,11 +228,8 @@ internal fun BoxScope.Pin(at: Offset, density: Float) {
 }
 
 /**
- * The credit the licence requires, where it requires it.
- *
- * Rule 8 says the machinery is our problem and not the reader's, and this is the
- * one exception in the app: it is a licence term attached to the map rather than
- * an explanation of how Wetter works, and it must be on the map and not hidden.
+ * The credit the licence requires, on the map itself: a licence term, not an
+ * explanation of how Wetter works.
  */
 @Composable
 private fun BoxScope.Attribution() {
@@ -318,11 +268,8 @@ private fun DrawScope.drawTiles(
 }
 
 /**
- * Exactly the tiles the viewport covers.
- *
- * Exactly, and not one more. The obvious kindness here is to fetch a ring around
- * the edge so a pan has something to show, and that is precisely the
- * pre-emptive fetching the tile policy prohibits.
+ * Exactly the tiles the viewport covers. A ring around the edge for smoother
+ * panning would be the pre-emptive fetching the tile policy prohibits.
  */
 internal fun visibleTiles(world: WorldPoint, zoom: Int, size: IntSize): List<TileKey> {
     val left = world.x - size.width / 2f
@@ -337,9 +284,8 @@ internal fun visibleTiles(world: WorldPoint, zoom: Int, size: IntSize): List<Til
     val keys = mutableListOf<TileKey>()
     for (y in firstY..lastY) {
         for (x in firstX..lastX) {
-            // Longitude wraps and latitude does not: the world is a cylinder,
-            // so a tile column off one edge is a real column on the other, while
-            // a row off the top is simply not part of the earth.
+            // Longitude wraps and latitude does not: a column off one edge is real on the
+            // other, a row off the top is not part of the earth.
             keys += TileKey(zoom, Math.floorMod(x, span), y)
         }
     }
@@ -364,11 +310,8 @@ fun interface TileLoader {
 /** A position on the world pixel plane at some zoom. */
 data class WorldPoint(val x: Float, val y: Float) {
     /**
-     * Kept on the map.
-     *
-     * Vertically only. Scrolling past the pole would show empty space below a
-     * map that cannot continue; scrolling past the antimeridian is just going
-     * round, which the tile lookup already handles by wrapping.
+     * Kept on the map vertically only: past the pole is empty, while past the
+     * antimeridian the tile lookup wraps.
      */
     fun clampedTo(zoom: Int): WorldPoint {
         val span = (TILE shl zoom).toFloat()
@@ -377,12 +320,9 @@ data class WorldPoint(val x: Float, val y: Float) {
 }
 
 /**
- * Web Mercator, in world pixels.
- *
- * The same projection [lv.bolwarra.wetter.domain.radar.RadarGeometry] uses for
- * radar, expressed for a moving viewport rather than a fixed grid window: this
- * needs the inverse as well, because the whole point is to read a coordinate
- * back off wherever somebody has dragged to.
+ * Web Mercator in world pixels: the projection
+ * [lv.bolwarra.wetter.domain.radar.RadarGeometry] uses, with the inverse as well,
+ * to read a coordinate back off wherever the map was dragged.
  */
 internal object Mercator {
 
@@ -411,11 +351,8 @@ internal object Mercator {
 }
 
 /**
- * Longitude going round, in world pixels.
- *
- * Not [Math.floorMod], which takes integers - and which an extension of the same
- * name does not shadow, so the call silently resolved to the integer overload
- * and would not compile. Hence a name of its own.
+ * Longitude going round, in world pixels. Not [Math.floorMod], which takes
+ * integers.
  */
 private fun wrap(value: Double, span: Double): Double = ((value % span) + span) % span
 

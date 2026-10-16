@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.notify
 
 import android.content.Context
@@ -14,16 +17,8 @@ import lv.bolwarra.wetter.ui.format.formatTime
 import lv.bolwarra.wetter.ui.format.formatWeekday
 
 /**
- * The same words the dial uses, said to a lock screen instead of a screen.
- *
- * Deliberately the same strings rather than a second set written for
- * notifications. A warning that calls it "Damaging wind" on the phone and
- * "Strong wind" in the app is two apps, and the reader has to work out whether
- * they are looking at one thing or two.
- *
- * This exists at all only because the screen's versions are composable - they
- * read from the composition - and a background worker has no composition. The
- * resource ids and the logic are identical.
+ * The dial's own words, for a notification: the same strings, read without a
+ * composition.
  */
 internal fun Hazard.titleRes(): Int = when {
     kind == HazardKind.DAMAGING_WIND && (peak ?: 0.0) >= Hazards.HURRICANE_MS ->
@@ -77,22 +72,10 @@ internal fun hazardWindow(context: Context, hazard: Hazard, zone: ZoneId, now: I
 }
 
 /**
- * The mark that appears in the status bar, and beside the warning in the shade.
- *
- * One per kind rather than a single exclamation triangle. A row of identical
- * triangles says only that the app has something to say; a bolt, a flake and a
- * pair of wind lines say *what* without the phone being unlocked, which is the
- * whole use of an icon that small.
- *
- * They are the app's own glyphs, not a borrowed set - the bolt is the same
- * shape drawn under a storm cloud on the forecast, enlarged to stand alone.
- * Flat silhouettes on transparency, because the system takes the alpha channel
- * and paints it in its own colour: any fill of ours is thrown away, and a hole
- * in the shape becomes a hole in the icon.
- *
- * The triangle survives as the fallback for the two kinds that never reach a
- * notification, so removing that filter one day cannot produce a warning with
- * no mark on it.
+ * The status bar mark, one per kind, so the shade says what without unlocking.
+ * The app's own glyphs as flat silhouettes, since the system paints the alpha
+ * channel in its own colour. The triangle is the fallback for kinds that never
+ * notify.
  */
 @DrawableRes
 internal fun Hazard.iconRes(): Int = when (kind) {

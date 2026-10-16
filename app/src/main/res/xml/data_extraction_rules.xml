@@ -6,7 +6,7 @@
   deprecated and these rules are what the platform actually reads. Everything is
   excluded rather than selectively filtered: the app holds a location list and a
   cached forecast, both of which are trivially rebuilt and neither of which
-  should leave the device (philos.md §16).
+  should leave the device.
 -->
 <data-extraction-rules>
     <cloud-backup>

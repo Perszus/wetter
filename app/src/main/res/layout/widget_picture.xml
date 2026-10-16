@@ -1,20 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Every widget is one image (widget/PictureWidget.kt) - this layout is shared by
-  all of them, and the content description is set per update from what the
-  picture says.
-
-  RemoteViews has no way to draw an arbitrary shape, so the curve arrives as a
-  finished bitmap. The hour labels are in it too, which they did not used to be:
-  they were four TextViews of equal weight, and equal cells cannot put text
-  beside an hour rule that is offset from the quarters. When the next whole hour
-  is nearly an hour away the indent needed to reach it is the whole cell, and
-  every label clips at once.
-
-  Drawing them costs the reader's font-scale setting, which is a real loss and
-  the reason it was not done first. It is the same trade the app's own time axis
-  already makes - see drawTimeAxis in RainCurve.kt - and the picture is rendered
-  at the screen's own density, so the type is not upscaled.
+  Every widget is one image (widget/PictureWidget.kt), drawn at the screen's own
+  density; this layout is shared by all of them, and the content description is
+  set on each update from what the picture says.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"

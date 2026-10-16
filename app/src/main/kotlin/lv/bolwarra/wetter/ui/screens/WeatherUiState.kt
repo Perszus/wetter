@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Roberts Kains
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package lv.bolwarra.wetter.ui.screens
 
 import androidx.compose.runtime.Immutable
@@ -10,16 +13,10 @@ import lv.bolwarra.wetter.domain.model.WeatherForecast
 import lv.bolwarra.wetter.domain.model.WeatherLocation
 
 /**
- * Everything the weather screen renders from.
- *
- * There is deliberately no `lastUpdated` field: [WeatherForecast.fetchedAt]
- * already is that value, and two fields that must agree eventually stop
- * agreeing. The screen computes the age against a
- * clock that ticks, rather than against a timestamp captured when the state was
- * built — otherwise "2 min ago" would still say so an hour later.
- *
- * A forecast and an error are not mutually exclusive: the normal offline case is
- * a cached forecast *and* a failed refresh, and the screen must show both.
+ * Everything the weather screen renders from. No `lastUpdated`:
+ * [WeatherForecast.fetchedAt] is that value, and the age is computed against a
+ * ticking clock. A forecast and an error can coexist: offline is a cached forecast
+ * and a failed refresh, both shown.
  */
 @Immutable
 data class WeatherUiState(
