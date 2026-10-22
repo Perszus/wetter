@@ -162,8 +162,11 @@ fdroid import --url https://github.com/Perszus/wetter --subdir app
 This writes `metadata/lv.bolwarra.wetter.yml`, which then needs editing by hand
 to add what it cannot infer. The finished result is kept in this repository at
 [`fdroid/lv.bolwarra.wetter.yml`](../fdroid/lv.bolwarra.wetter.yml) and can be
-copied across verbatim — it is already in `fdroid rewritemeta` canonical form and
-passes `fdroid lint` with no findings.
+copied across, with one change: fdroiddata wants the `commit` of a build block to
+be the tag's full commit hash (`git rev-parse v1.0^{commit}`), not the tag name.
+The copy here keeps the tag, because it cannot know the hash of its own commit.
+It is otherwise in `fdroid rewritemeta` canonical form and passes `fdroid lint`
+with no findings.
 
 **3. Check it with their tools before opening anything.**
 
