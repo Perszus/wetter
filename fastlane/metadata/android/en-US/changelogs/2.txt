@@ -1,0 +1,1 @@
+Builds on F-Droid's servers: the app now compiles with any JDK from 17 on. Nothing in the app itself changes.

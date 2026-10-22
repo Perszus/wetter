@@ -9,10 +9,19 @@ plugins {
     `java-test-fixtures`
 }
 
+// Java 17 bytecode from whatever JDK runs Gradle, like :app and :data. A
+// toolchain would demand a JDK 17 installation, which F-Droid's builder lacks.
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 kotlin {
-    jvmToolchain(17)
-    // A warning is a defect that has not been fixed yet; it fails the build instead.
-    compilerOptions { allWarningsAsErrors.set(true) }
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // A warning is a defect that has not been fixed yet; it fails the build instead.
+        allWarningsAsErrors.set(true)
+    }
 }
 
 // Deliberately almost empty, and it should stay that way. Weather models,

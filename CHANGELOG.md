@@ -3,6 +3,14 @@
 Notable changes to Wetter. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] — 2026-10-22
+
+### Fixed
+
+- Builds with any JDK from 17 on. The domain module asked Gradle for a JDK 17
+  installation specifically, which F-Droid's build server does not have; it now
+  targets Java 17 like the other modules.
+
 ## [1.0] — 2026-10-16
 
 The first release.
@@ -37,4 +45,5 @@ The first release.
 - Units in Celsius or Fahrenheit, millimetres or inches, and four wind units;
   light and dark themes.
 
+[1.0.1]: https://github.com/Perszus/wetter/releases/tag/v1.0.1
 [1.0]: https://github.com/Perszus/wetter/releases/tag/v1.0

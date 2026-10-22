@@ -185,7 +185,7 @@ no category called `Time` — the app is `Weather`.
 **4. Open a merge request** against <https://gitlab.com/fdroid/fdroiddata> once
 the CI pipeline on your fork passes.
 
-After that, `AutoUpdateMode: Version v%v` means F-Droid picks up new tags on its
+After that, `AutoUpdateMode: Version` means F-Droid picks up new tags on its
 own, and a release usually appears within a few days. Nothing needs doing per
 release beyond pushing the tag — unless the build recipe changes, in which case
 update both copies of the yml.
