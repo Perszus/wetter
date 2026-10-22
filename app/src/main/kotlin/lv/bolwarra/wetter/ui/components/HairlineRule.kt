@@ -18,7 +18,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
  * A rule exactly one physical pixel tall.
  *
  * 1.dp is three pixels on a modern phone, which reads as a border. Dividing by
- * the display density gives the thinnest line the screen can draw — the weight a
+ * the display density gives the thinnest line the screen can draw: the weight a
  * drawn instrument uses, and the reason sections here can be separated by a line
  * instead of being boxed into cards.
  */

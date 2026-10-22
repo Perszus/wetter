@@ -6,13 +6,13 @@ project expects; the reasoning lives in
 
 ## Getting it building
 
-Requires JDK 17 and the Android SDK. Nothing else — no keys, no accounts, no
+Requires JDK 17 and the Android SDK. Nothing else: no keys, no accounts, no
 signing material.
 
 ```sh
 ./gradlew test            # every module's unit tests
 ./gradlew ktlintFormat    # fix formatting
-./gradlew check           # tests, lint and formatting — what CI runs
+./gradlew check           # tests, lint and formatting (what CI runs)
 ./gradlew assembleDebug   # a runnable APK
 ```
 
@@ -27,7 +27,7 @@ If you build from the command line without it, set `ANDROID_HOME`.
 
 - **`:domain`** is a plain Kotlin library. Weather models, the provider
   abstraction, the selection policy and the solar geometry. It has no
-  dependencies beyond the standard library, and that is the point — an Android
+  dependencies beyond the standard library, and that is the point: an Android
   or networking import appearing here means the code is in the wrong module.
 - **`:data`** is an Android library. Provider implementations, the router that
   chooses between them, and caching. The concrete providers and the HTTP client
@@ -41,12 +41,12 @@ before writing the code.
 ## What a good patch looks like
 
 **It explains why.** What the code does is visible in the diff. Why it does it
-that way, and what you rejected, is not — and that is the part a reviewer and
+that way, and what you rejected, is not, and that is the part a reviewer and
 the next person actually need. Comments in this codebase are written in that
 spirit; please match it.
 
 **It is tested where it can break.** Arithmetic, policy, mappers and the offline
-contract have tests. Layout does not. Coverage is not a target — a test that
+contract have tests. Layout does not. Coverage is not a target: a test that
 cannot fail is worse than no test, because it costs the same to maintain and
 tells you nothing.
 
@@ -60,7 +60,7 @@ in makes the fix unreviewable. `./gradlew ktlintFormat` is there so formatting i
 never a judgement call, but run it as its own commit if it touches much.
 
 **It keeps abstraction earned.** An interface with one implementation needs a
-reason — usually that a second is genuinely coming. There is no
+reason, usually that a second is genuinely coming. There is no
 dependency-injection framework here, no event bus and no charting library, and
 adding one needs a case that names what it buys.
 
@@ -81,7 +81,7 @@ require touching anything else.
    far it forecasts.
 4. Register it in `WeatherData.providers`. That is the whole integration.
 5. Add a recorded response under `data/src/test/resources` and a mapper test
-   covering its awkward parts — nulls, short arrays, changes of resolution —
+   covering its awkward parts: nulls, short arrays, changes of resolution,
    rather than its easy ones.
 6. Add the attribution to `docs/providers.md` and the README.
 
@@ -104,5 +104,5 @@ the additional permission in [LICENSE-EXCEPTION.txt](../LICENSE-EXCEPTION.txt)**
 That permission allows Wetter to be distributed through application stores whose
 terms would otherwise conflict with section 6 of the GPL. It is asked for up
 front because it is trivial to grant now and effectively impossible to collect
-from a dozen contributors later. It grants nothing else — your work stays
+from a dozen contributors later. It grants nothing else; your work stays
 copyleft, and nobody may ship a closed fork of it.

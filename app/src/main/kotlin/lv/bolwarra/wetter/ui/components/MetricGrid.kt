@@ -29,7 +29,7 @@ data class Metric(val label: String, val value: String)
  * Two columns rather than a list, because these are short pairs and a single
  * column of them would run the tile down the page for no gain. Labels sit above
  * values rather than beside them so the numbers line up in a column the eye can
- * run down — which is the only reason to put them in a grid at all.
+ * run down, which is the only reason to put them in a grid at all.
  */
 @Composable
 fun MetricGrid(metrics: List<Metric>, modifier: Modifier = Modifier) {

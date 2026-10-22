@@ -7,7 +7,7 @@ package lv.bolwarra.wetter.domain.provider
  * What a provider can actually deliver, as opposed to what it advertises.
  *
  * Filled in from the provider's own documentation and from what its responses
- * are observed to contain — a field that is documented but null in practice
+ * are observed to contain: a field that is documented but null in practice
  * should be absent here, because the selector's job is to predict what will
  * arrive, not what was promised.
  */

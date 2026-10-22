@@ -15,7 +15,7 @@ import org.junit.Test
  * The moon phase against dates nobody can argue with.
  *
  * Eclipses are the anchor. A solar eclipse can only happen at a new moon and a
- * lunar one only at a full moon — that is what an eclipse *is* — so their dates
+ * lunar one only at a full moon (that is what an eclipse *is*), so their dates
  * are independently known phases that owe nothing to the model being tested.
  *
  * [MoonPhase] is a mean synodic model and says so: it carries no correction for

@@ -22,8 +22,8 @@ matching places.
 - Requests carry **no identifier**: no account, no device id, no advertising
   id, no cookie, no session. They carry a User-Agent naming the app and its
   version, which MET Norway's terms require.
-- Coordinates sent to MET Norway are **truncated to four decimal places** —
-  about eleven metres — as their terms ask.
+- Coordinates sent to MET Norway are **truncated to four decimal places**,
+  about eleven metres, as their terms ask.
 
 The services and what each is asked:
 

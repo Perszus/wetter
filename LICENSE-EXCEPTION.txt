@@ -14,7 +14,7 @@ every recipient, under section 7 of that licence.
 
     This permission applies only to conveying the work through such a platform.
     It grants no permission to add restrictions of any other kind, and it does
-    not affect any other requirement of the licence — in particular, the
+    not affect any other requirement of the licence, in particular, the
     corresponding source must remain available under the GNU General Public
     License version 3 or later.
 
@@ -28,7 +28,7 @@ Wetter is meant to be installable by anyone, from wherever they already get
 software. For many people that is Google Play, and Play's Developer Distribution
 Agreement places conditions on redistribution that section 6 of the GPL can be
 read as forbidding. The copyright holder may distribute their own work on any
-terms they choose, so this changes nothing while there is one author — but it
+terms they choose, so this changes nothing while there is one author, but it
 would become a real obstacle the moment somebody else contributes, and it is
 much easier to grant now than to collect from a dozen contributors later.
 
@@ -36,7 +36,7 @@ The permission is deliberately narrow. It removes an obstacle to distribution an
 nothing else: the source stays copyleft, modifications stay copyleft, and nobody
 gains the right to ship a closed fork.
 
-Note that Wetter on F-Droid and Wetter on Google Play cannot share a signature —
+Note that Wetter on F-Droid and Wetter on Google Play cannot share a signature,
 Play holds the signing key for anything distributed through it. Install from one
 or the other.
 

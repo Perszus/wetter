@@ -108,7 +108,7 @@ class MetNorwayProviderTest {
         val tomorrow = provider().getForecast(riga).getOrThrow().daily
             .single { it.date == LocalDate.of(2026, 3, 15) }
 
-        // Only next_6_hours is available for that step, so it is what counts —
+        // Only next_6_hours is available for that step, so it is what counts,
         // not the wider next_12_hours window that overlaps the following day.
         assertEquals(1.2, tomorrow.precipitationTotal!!, 1e-9)
     }

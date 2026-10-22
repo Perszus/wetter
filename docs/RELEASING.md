@@ -75,7 +75,7 @@ On a phone or emulator, with the build being released:
 
 ## Google Play
 
-Needs `keystore.properties` in the repository root — gitignored, and the only
+Needs `keystore.properties` in the repository root, gitignored, and the only
 copy of the upload key. **If it is lost, the Play listing cannot be updated by
 anyone, ever.** Keep it and the keystore off this machine as well as on it.
 
@@ -95,11 +95,11 @@ Then:
 
 `bundleRelease` fails immediately if the keystore is missing, rather than
 letting a long upload be rejected at the far end. `assembleRelease` deliberately
-does not — see below.
+does not, see below.
 
 Upload through the Play Console. First time only, the console also needs:
 
-- **Privacy policy URL** — required for every app. Use
+- **Privacy policy URL**, required for every app. Use
   <https://github.com/Perszus/wetter/blob/main/docs/privacy-policy.md>, or a
   GitHub Pages copy if a rendered page is preferred.
 - **App icon**, 512×512 PNG, no alpha.
@@ -115,7 +115,7 @@ Upload through the Play Console. First time only, the console also needs:
 | Question | Answer |
 |---|---|
 | Does your app collect or share any required user data types? | **No** |
-| Is all user data encrypted in transit? | Yes — every request is HTTPS |
+| Is all user data encrypted in transit? | Yes, every request is HTTPS |
 | Do you provide a way for users to request data deletion? | Not applicable; no data is collected. Uninstalling removes local storage |
 | Data types collected | None |
 | Data types shared | None |
@@ -134,7 +134,7 @@ this; "not collected" is the accurate answer to what it asks.
 ## F-Droid
 
 F-Droid builds from the tag, on their servers, with no keystore present. That is
-why `assembleRelease` succeeds unsigned rather than failing — a guard there would
+why `assembleRelease` succeeds unsigned rather than failing: a guard there would
 break their build.
 
 Submitting the app the first time follows F-Droid's own documented process
@@ -180,21 +180,21 @@ fdroid build -v -l lv.bolwarra.wetter  # builds the way their servers will
 
 `fdroid lint` validates `Categories` against `config/categories.yml` in the
 fdroiddata checkout, so it only means anything when run from inside one. There is
-no category called `Time` — the app is `Weather`.
+no category called `Time`; the app is `Weather`.
 
 **4. Open a merge request** against <https://gitlab.com/fdroid/fdroiddata> once
 the CI pipeline on your fork passes.
 
 After that, `AutoUpdateMode: Version` means F-Droid picks up new tags on its
 own, and a release usually appears within a few days. Nothing needs doing per
-release beyond pushing the tag — unless the build recipe changes, in which case
+release beyond pushing the tag, unless the build recipe changes, in which case
 update both copies of the yml.
 
 ### Why the metadata carries no description
 
 `Summary` and `Description` are valid fields, and are deliberately absent.
-F-Droid reads `fastlane/metadata/android/` from this repository instead — the
-same directory Play reads — so the store text has one source rather than two
+F-Droid reads `fastlane/metadata/android/` from this repository instead (the
+same directory Play reads), so the store text has one source rather than two
 that drift.
 
 ### What the inclusion policy requires
@@ -207,12 +207,12 @@ already true, and the point is not to break it:
   "strictly forbidden", and there are none.
 - **Built with a 100% FLOSS toolchain.** No Oracle JDK, no proprietary build
   step.
-- **Binary dependencies only from trusted sources** — Maven Central, Google's
+- **Binary dependencies only from trusted sources**: Maven Central, Google's
   Maven repository for AndroidX, the Android SDK. No vendored blobs.
 - **No executable downloaded at runtime** without explicit opt-in. Wetter
   downloads JSON and map and radar images, nothing executable.
 - **A distinct application id.** Duplicates are automatically rejected.
-- **Actually maintained and actually useful** — not a demo, not a rebranding,
+- **Actually maintained and actually useful**: not a demo, not a rebranding,
   not a website in a WebView.
 
 ### Keeping F-Droid able to build it
@@ -225,7 +225,7 @@ satisfied; the point is not to break them.
 - **No API key baked into the source.** None of the services the app uses needs
   one, which is part of why they were chosen.
 - **Buildable from a clean checkout** with `./gradlew assembleRelease` and
-  nothing else — no prebuild step, no network fetch outside Gradle, no binary
+  nothing else: no prebuild step, no network fetch outside Gradle, no binary
   blob that cannot be rebuilt.
 - **`dependenciesInfo` stays disabled.** The metadata AGP would otherwise embed
   is signed with a Google key and is not reproducible from source.
@@ -235,7 +235,7 @@ satisfied; the point is not to break them.
   of the git checkout the build came from, which was the one and only thing that
   differed between two independent builds of the same commit.
 
-### The release build is reproducible — check it
+### Check that the release build is reproducible
 
 Two builds of the same commit produce a byte-identical APK. That is worth
 keeping true, so verify it when anything about the build configuration changes:
@@ -247,7 +247,7 @@ sha256sum app/build/outputs/apk/release/app-release-unsigned.apk
 # must match the same command run anywhere else on the same commit
 ```
 
-If the hashes diverge, unzip both and diff the entry hashes — that names the
+If the hashes diverge, unzip both and diff the entry hashes: that names the
 offending file immediately, which is how `version-control-info.textproto` was
 found.
 

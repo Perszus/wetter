@@ -3,7 +3,7 @@
     <!--
       Parented on the platform theme rather than Theme.Material3.* so the app does
       not need the com.google.android.material view library: nothing here draws
-      Views. windowBackground is the only property that matters — the system paints
+      Views. windowBackground is the only property that matters: the system paints
       it before Compose's first frame, and a mismatch shows as a flash on launch.
       The real theme is WetterTheme in ui/theme/Theme.kt.
 

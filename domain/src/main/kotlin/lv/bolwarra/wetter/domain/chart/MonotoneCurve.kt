@@ -17,7 +17,7 @@ object MonotoneCurve {
      * Tangents for a monotone cubic Hermite spline through [values], assumed to
      * be evenly spaced.
      *
-     * Even spacing is not a simplification — a forecast series is one sample per
+     * Even spacing is not a simplification: a forecast series is one sample per
      * fixed interval by construction, and if that ever stops being true the
      * chart has a bigger problem than its tangents.
      */

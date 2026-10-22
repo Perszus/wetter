@@ -21,9 +21,9 @@ import lv.bolwarra.wetter.domain.provider.ProviderMetadata
  * Open-Meteo's response, turned into Wetter's models.
  *
  * The whole file is pure: response in, forecast out, no clock and no network. It
- * is where the awkward parts of the API are absorbed — parallel arrays that can
+ * is where the awkward parts of the API are absorbed: parallel arrays that can
  * disagree in length, missing blocks, and a timezone that is resolved by the
- * server rather than known by the caller — so that nothing above it has to.
+ * server rather than known by the caller, so that nothing above it has to.
  */
 object OpenMeteoMapper {
 

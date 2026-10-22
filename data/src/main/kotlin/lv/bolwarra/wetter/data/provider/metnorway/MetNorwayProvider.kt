@@ -135,8 +135,8 @@ internal class MetNorwayProvider(
     )
 
     /**
-     * MET Norway's terms ask for no more than four decimals — about eleven
-     * metres — so that requests land on shared cache entries instead of one per
+     * MET Norway's terms ask for no more than four decimals (about eleven
+     * metres), so that requests land on shared cache entries instead of one per
      * user.
      */
     private fun Double.toFourDecimals(): Double = round(this * 10_000.0) / 10_000.0

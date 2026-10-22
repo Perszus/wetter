@@ -57,7 +57,7 @@ install count to solve a problem it does not actually solve.
 store text.**
 `fastlane/metadata/android/` is read by both, so the description and changelog
 are written once. The build needs no flavours, because there is nothing
-Play-specific in the app to flavour — no billing, no services, no proprietary
+Play-specific in the app to flavour: no billing, no services, no proprietary
 anything.
 
 **The two stores will carry different signatures, and this is not fixable.**
@@ -68,7 +68,7 @@ the reverse.
 **Release signing is optional, and deliberately so.**
 `assembleRelease` succeeds without a keystore and produces an unsigned APK,
 because that is exactly what F-Droid's build servers do and failing there would
-break them. `bundleRelease` — which only ever exists to be uploaded to Play —
+break them. `bundleRelease`, which only ever exists to be uploaded to Play,
 fails immediately without one, so an unsigned upload is caught in a second
 rather than at the end of a long transfer.
 
@@ -86,14 +86,14 @@ Two independent builds of a commit produce an identical APK. Getting there took
 one setting: AGP embeds `META-INF/version-control-info.textproto` describing the
 git checkout, and that was the only file that differed. Neither store requires
 this, but it is what lets anyone confirm that a published binary contains this
-source and nothing else — which is the point of shipping free software.
+source and nothing else, which is the point of shipping free software.
 docs/RELEASING.md has the command to check it.
 
 **GPL-3.0-or-later, with an additional permission under section 7 for
 distribution through application stores.**
 Play's Developer Distribution Agreement can be read as imposing the further
 restrictions section 6 forbids. The copyright holder may distribute their own
-work however they like, so this changes nothing today — but it would become an
+work however they like, so this changes nothing today, but it would become an
 obstacle the moment somebody else contributes, and it is far easier to grant now
 than to collect from a dozen people later. The permission is narrow: it removes
 an obstacle to distribution and grants nothing else. See LICENSE-EXCEPTION.txt.
@@ -105,8 +105,8 @@ are interchangeable behind the router and fail over to one another, Open-Meteo
 is itself free software that the provider can be pointed at a self-hosted copy
 of, and radar, observations, place names and map tiles each degrade to nothing
 rather than breaking the app. The submission lists every service the app
-contacts — Open-Meteo, MET Norway, RainViewer, the NOAA/NWS Aviation Weather
-Center, Photon and OpenStreetMap — so reviewers can judge it themselves.
+contacts (Open-Meteo, MET Norway, RainViewer, the NOAA/NWS Aviation Weather
+Center, Photon and OpenStreetMap), so reviewers can judge it themselves.
 
 **Backup is off, explicitly and twice.**
 `allowBackup="false"` covers older releases, and a `data_extraction_rules` file
@@ -159,7 +159,7 @@ MET Norway reports it, and in a northern winter it is much of what falls.
 
 **Sunrise, sunset and daylight are computed rather than fetched.**
 The NOAA solar position equations, in `SolarTime`. Not every provider publishes
-them, and the timeline's night shading is not optional decoration — an unshaded
+them, and the timeline's night shading is not optional decoration: an unshaded
 03:00 reads as an afternoon. Computing it costs one file of arithmetic, works
 offline, and agrees with itself across providers. The alternative was a second
 network call to a second service with a second set of terms.
@@ -176,7 +176,7 @@ call, and its failure leaves what is on screen exactly where it is.
 The radar's cadence. Models publish at a different minute for every service and
 run, and asking costs little when nothing has changed: MET Norway answers "not
 modified" to a conditional request and the HTTP cache answers inside `Expires`.
-A manual refresh ignores the window — somebody who asks has a reason.
+A manual refresh ignores the window: somebody who asks has a reason.
 
 **Cache keys round coordinates to four decimals.**
 A position read from the device differs in the far decimals every time. An
@@ -202,7 +202,7 @@ variable appeared upstream.
 ## Deliberately not done
 
 **No dependency-injection framework.**
-The entire object graph is `WetterContainer` — about a dozen lines, read top to
+The entire object graph is `WetterContainer`, about a dozen lines, read top to
 bottom. A framework would add a compiler plugin, an annotation vocabulary and a
 layer of indirection to solve a problem this app does not have.
 
@@ -246,8 +246,8 @@ The app has one thing worth saying without being opened.
 
 **A hazard threshold is a property of the place, not of the planet.**
 Heat, cold and wind are judged against what the location itself does at this
-time of year — the 95th and 99th percentiles of a decade of ERA5, from the same
-archive the Month page keeps — bounded by the published physiological bands so
+time of year, the 95th and 99th percentiles of a decade of ERA5, from the same
+archive the Month page keeps, bounded by the published physiological bands so
 the local figure can move the bar without moving it off the scale.
 
 This is not an invention. Meteoalarm publishes one colour scale and leaves every
@@ -261,7 +261,7 @@ Wind is the exception and only tightens. Beaufort and the NWS gust criteria
 agree to within a few per cent across two centuries and neither adjusts for
 location, so a calm place does not earn a lower bar; a windy one earns a higher.
 
-Rain and snow keep absolute thresholds because theirs are *rates* — 20 mm in an
+Rain and snow keep absolute thresholds because theirs are *rates*: 20 mm in an
 hour overwhelms drainage anywhere. Ice keeps its because freezing rain is rare
 and dangerous everywhere.
 
@@ -279,7 +279,7 @@ the fall, the hazard. `WeatherCondition.atRate` handles intensity and
 rather than the raw symbol: the hour, the day, and the current conditions on the
 dial.
 
-Only two pairs are renamed — drizzle against rain, snow grains against snow.
+Only two pairs are renamed: drizzle against rain, snow grains against snow.
 Showers stay showers, because intermittency is not intensity and a rate cannot
 see it. Thunder stays thunder. Freezing drizzle and freezing rain stay as
 reported: the difference between them is a hazard level rather than a word, and a

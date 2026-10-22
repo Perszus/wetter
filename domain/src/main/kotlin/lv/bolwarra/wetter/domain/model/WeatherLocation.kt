@@ -17,7 +17,7 @@ data class WeatherLocation(
     val latitude: Double,
     val longitude: Double,
     val zone: ZoneId,
-    /** Admin area — disambiguates the many places that share a name. */
+    /** Admin area. Disambiguates the many places that share a name. */
     val region: String? = null,
     val country: String? = null,
     /**

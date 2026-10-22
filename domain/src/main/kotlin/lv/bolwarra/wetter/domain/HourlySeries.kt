@@ -79,7 +79,7 @@ fun List<HourlyWeather>.precipitationSpells(): List<PrecipitationSpell> {
 }
 
 /**
- * The next spell that has not finished by [instant] — the one in progress if it
+ * The next spell that has not finished by [instant], the one in progress if it
  * is raining, otherwise the next to begin.
  */
 fun List<HourlyWeather>.nextPrecipitation(instant: Instant): PrecipitationSpell? =

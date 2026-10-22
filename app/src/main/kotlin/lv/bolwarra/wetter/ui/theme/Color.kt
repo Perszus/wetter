@@ -412,5 +412,5 @@ fun WetterColors.toMaterialScheme(): ColorScheme {
 }
 
 val LocalWetterColors = staticCompositionLocalOf<WetterColors> {
-    error("No WetterColors provided — wrap the content in WetterTheme { }.")
+    error("No WetterColors provided; wrap the content in WetterTheme { }.")
 }

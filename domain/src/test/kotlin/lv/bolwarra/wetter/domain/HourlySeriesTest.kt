@@ -20,8 +20,8 @@ import org.junit.Test
 /**
  * Reading a shower out of an hourly forecast.
  *
- * These are the answers the whole app is built to give — when does it start, how
- * hard does it get, when does it stop — so the awkward cases matter: a gap in
+ * These are the answers the whole app is built to give (when does it start, how
+ * hard does it get, when does it stop), so the awkward cases matter: a gap in
  * the middle, a spell that has already begun, and one that runs off the end of
  * the data and therefore has no end anybody can honestly state.
  */
@@ -177,7 +177,7 @@ class HourlySeriesTest {
         val hours = series(0.0, 2.0, 2.0, 2.0, 0.0)
 
         // Asked at 02:00, mid-shower, "when does it rain" must not skip to
-        // tomorrow — the useful answer is that it is raining and stops at 04:00.
+        // tomorrow, the useful answer is that it is raining and stops at 04:00.
         val next = hours.nextPrecipitation(at(2))!!
         assertEquals(at(1), next.start)
         assertEquals(at(4), next.end)

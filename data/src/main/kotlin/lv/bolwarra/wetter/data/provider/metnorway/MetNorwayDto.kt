@@ -25,7 +25,7 @@ data class MetNorwayProperties(
 
 @Serializable
 data class MetNorwayMeta(
-    /** When this model run was published — the one provider that tells us. */
+    /** When this model run was published. MET Norway is the one provider that tells us. */
     @SerialName("updated_at") val updatedAt: String? = null,
 )
 

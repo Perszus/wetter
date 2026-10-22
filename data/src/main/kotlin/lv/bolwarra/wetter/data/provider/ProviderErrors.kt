@@ -24,7 +24,7 @@ import lv.bolwarra.wetter.domain.model.WeatherError
  * an offline failure says nothing about the provider and must not count against
  * its health, or a week without signal would demote every provider Wetter has.
  *
- * The offline test is a heuristic — a DNS failure could equally mean the
+ * The offline test is a heuristic: a DNS failure could equally mean the
  * provider's own domain is broken. It errs towards blaming the network, because
  * wrongly resting a healthy provider is the more expensive mistake.
  */

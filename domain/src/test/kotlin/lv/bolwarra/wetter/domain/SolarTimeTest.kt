@@ -17,9 +17,9 @@ import org.junit.Test
  * Solar geometry, checked against things that must be true rather than against a
  * table of numbers copied from somewhere.
  *
- * The invariants — longer days in June than December in the north, the reverse
+ * The invariants, longer days in June than December in the north, the reverse
  * in the south, twelve hours at the equator, no sunrise at all inside the arctic
- * circle in midwinter — would each fail loudly for a sign error, an
+ * circle in midwinter, would each fail loudly for a sign error, an
  * hour-angle mistake or a degrees/radians slip, which are the three ways this
  * algorithm actually goes wrong. Solar noon and the equinox day length are then
  * derived from first principles in the tests themselves, which pins the absolute
@@ -149,8 +149,8 @@ class SolarTimeTest {
     @Test
     fun `solar noon falls where the longitude and the equation of time put it`() {
         // Derived rather than looked up. Riga keeps UTC+2 in mid-March, whose
-        // meridian is 30 degrees east; at 24.105 east the sun is 5.9 degrees —
-        // about 23.6 minutes — late on the clock. The equation of time near
+        // meridian is 30 degrees east; at 24.105 east the sun is 5.9 degrees,
+        // about 23.6 minutes, late on the clock. The equation of time near
         // 14 March is roughly minus nine minutes, delaying it a further nine.
         // So solar noon should sit at about 12:33 local, and sunrise and sunset
         // must straddle it symmetrically.
@@ -195,7 +195,7 @@ class SolarTimeTest {
     fun `the days lengthen towards the equinox at the expected rate`() {
         // Six days before the equinox at 57 degrees north the day gains roughly
         // four and a half minutes daily, so it should be a little under twelve
-        // hours — which is what pins the absolute answer, not just its shape.
+        // hours, which is what pins the absolute answer, not just its shape.
         val before = SolarTime.sunriseSunset(
             LocalDate.of(2026, 3, 14),
             rigaLat,

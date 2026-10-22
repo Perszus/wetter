@@ -11,7 +11,7 @@ import org.junit.Test
  * What an hour says is falling.
  *
  * The interesting case is the one where the provider gives an amount but no
- * breakdown, which is most of MET Norway's output — and therefore most of what
+ * breakdown, which is most of MET Norway's output, and therefore most of what
  * users in the Nordics see, since that is the region it is chosen for. Getting
  * this wrong paints a blizzard in the rain colour.
  */

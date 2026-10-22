@@ -317,10 +317,10 @@ In debug builds the router logs its ranking and the reason for each score:
 
 ```text
 WeatherProviderRouter  ranking for 56.9, 24.1
-WeatherProviderRouter    met-norway: 87.3 — Covers this location; Regional source
+WeatherProviderRouter    met-norway: 87.3: Covers this location; Regional source
                          for the Nordic region; Supplies most variables Wetter
                          uses; Resolution about 2.5 km here
-WeatherProviderRouter    open-meteo: 78.6 — Covers this location; Supplies every
+WeatherProviderRouter    open-meteo: 78.6: Covers this location; Supplies every
                          variable Wetter uses; Resolution about 11.0 km here
 ```
 

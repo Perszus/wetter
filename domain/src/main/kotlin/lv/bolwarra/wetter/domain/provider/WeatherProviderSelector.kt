@@ -24,7 +24,7 @@ data class ProviderSelectionContext(
 /**
  * A provider's suitability, with its reasoning attached.
  *
- * The reasons exist so a decision can be explained — in a log line during
+ * The reasons exist so a decision can be explained, in a log line during
  * development, and eventually in the Advanced section. A selector that cannot
  * say why it chose is one nobody can debug (docs/providers.md).
  */
@@ -36,7 +36,7 @@ data class ProviderScore(
 )
 
 /**
- * Ranks providers for a location. The only place that decision is made —
+ * Ranks providers for a location. This is the only place that decision is made,
  * not in view models, composables, the repository, the clients, or the location
  * code (docs/providers.md).
  */
@@ -129,7 +129,7 @@ class ScoringProviderSelector : WeatherProviderSelector {
         when {
             health.isResting(context.now) -> {
                 total -= RESTING_PENALTY
-                reasons += "Recently unavailable — resting"
+                reasons += "Recently unavailable, resting"
             }
 
             health.consecutiveFailures > 0 -> {
@@ -141,7 +141,7 @@ class ScoringProviderSelector : WeatherProviderSelector {
         // A resting provider stays eligible. If every provider is
         // resting the app must still try the least-bad one, or an outage on both
         // sides of a fallback pair would leave Wetter unable to recover on its
-        // own (docs/providers.md — no permanent demotion).
+        // own (docs/providers.md, no permanent demotion).
         return ProviderScore(provider, total, eligible = true, reasons = reasons)
     }
 
@@ -183,7 +183,7 @@ class ScoringProviderSelector : WeatherProviderSelector {
         /** Supplying the optional variables the screen can use. */
         const val CAPABILITY = 25.0
 
-        /** Model grid spacing — it decides whether a shower exists at all. */
+        /** Model grid spacing. It decides whether a shower exists at all. */
         const val RESOLUTION = 10.0
 
         /** How often a new run is published. Small: every candidate updates hourly. */

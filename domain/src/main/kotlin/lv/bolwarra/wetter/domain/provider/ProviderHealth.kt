@@ -22,7 +22,7 @@ data class ProviderHealth(
     val lastFailure: Instant? = null,
     val consecutiveFailures: Int = 0,
     /**
-     * Set when a provider asked to be left alone — an HTTP 429, or a
+     * Set when a provider asked to be left alone: an HTTP 429, or a
      * Retry-After. Honoured ahead of the computed backoff.
      */
     val cooldownUntil: Instant? = null,
@@ -54,8 +54,8 @@ data class ProviderHealth(
     )
 
     /**
-     * A failure that says nothing about the provider — no network on this device
-     * — must not count against it, or a week on a train would demote every
+     * A failure that says nothing about the provider (no network on this device)
+     * must not count against it, or a week on a train would demote every
      * provider Wetter has.
      */
     fun afterFailure(
@@ -73,7 +73,7 @@ data class ProviderHealth(
 
     companion object {
         /**
-         * One failure is noise — a dropped connection, a lost packet. Backoff
+         * One failure is noise: a dropped connection, a lost packet. Backoff
          * starts at the second consecutive one.
          */
         const val FAILURES_BEFORE_BACKOFF = 2

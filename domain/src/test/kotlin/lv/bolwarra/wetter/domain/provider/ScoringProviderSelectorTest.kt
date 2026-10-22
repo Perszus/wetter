@@ -20,7 +20,7 @@ import org.junit.Test
  *
  * Every case docs/providers.md asks for is here: geographic preference, global
  * fallback, capability filtering, failure, recovery, determinism, and the
- * boundary conditions — which are the ones most likely to be wrong, because a
+ * boundary conditions, which are the ones most likely to be wrong, because a
  * rectangle has edges and the weather does not.
  */
 class ScoringProviderSelectorTest {
@@ -31,7 +31,7 @@ class ScoringProviderSelectorTest {
     private val nordics = GeoBox(south = 54.0, north = 72.0, west = 4.0, east = 32.0)
 
     /**
-     * A global provider running a fine-grid model over the Nordics only — the
+     * A global provider running a fine-grid model over the Nordics only, the
      * shape MET Norway actually has, and the shape that makes geography rather
      * than a single resolution figure decide the outcome.
      */
@@ -82,7 +82,7 @@ class ScoringProviderSelectorTest {
 
     @Test
     fun `far outside its region the global provider wins`() {
-        // Buenos Aires — nothing regional reaches this far.
+        // Buenos Aires: nothing regional reaches this far.
         val chosen = selector.select(context(at(-34.60, -58.38)))
         assertEquals("global", chosen?.id)
     }

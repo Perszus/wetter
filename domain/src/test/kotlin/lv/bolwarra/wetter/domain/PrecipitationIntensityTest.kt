@@ -12,7 +12,7 @@ import org.junit.Test
 
 /**
  * The intensity bands decide every bar height and every rain colour in the app,
- * so the boundaries are pinned here. Each threshold is tested from both sides —
+ * so the boundaries are pinned here. Each threshold is tested from both sides:
  * an off-by-one at 2.5 mm/h is the difference between "light" and "moderate" on
  * the screen, and nothing else would catch it.
  */

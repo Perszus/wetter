@@ -9,15 +9,15 @@ import java.time.Instant
 /**
  * An unbroken run of hours in which something is falling.
  *
- * This is the shape of the answer to the questions the app exists for — when
- * does it start, how hard does it get, when does it stop — so it is a type
+ * This is the shape of the answer to the questions the app exists for (when
+ * does it start, how hard does it get, when does it stop), so it is a type
  * rather than something each screen works out for itself.
  */
 data class PrecipitationSpell(
     /** The start of the first wet hour. */
     val start: Instant,
     /**
-     * The start of the first dry hour after it — exclusive, so a single wet hour
+     * The start of the first dry hour after it. Exclusive, so a single wet hour
      * at 14:00 runs 14:00 to 15:00 and lasts one hour.
      */
     val end: Instant,

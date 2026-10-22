@@ -21,8 +21,8 @@ import org.junit.Test
  * The fusion tests next door check that each source wins where it should. This
  * asks a different question: whether the hand-over is *visible* as a step no
  * weather produced. Two sources can each be right about their own stretch and
- * still produce a chart with a cliff in the middle of it, and a cliff is a claim
- * — it says something happens at that minute, and nothing does. The minute it
+ * still produce a chart with a cliff in the middle of it, and a cliff is a claim:
+ * it says something happens at that minute, and nothing does. The minute it
  * happens at is an implementation detail of which service was asked.
  */
 class SeamTest {

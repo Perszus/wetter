@@ -33,8 +33,8 @@ internal interface ForecastCache {
 /**
  * A cache that lives as long as the process.
  *
- * Explicitly a placeholder. It gives the offline-first *flow* — cached first,
- * network second — without yet giving offline-first *behaviour*, because closing
+ * Explicitly a placeholder. It gives the offline-first *flow* (cached first,
+ * network second) without yet giving offline-first *behaviour*, because closing
  * the app empties it. The widget cannot read it either. Both of those are the
  * reason the persistence phase exists.
  */

@@ -3,7 +3,7 @@
 Notable changes to Wetter. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.1] — 2026-10-22
+## [1.0.1] - 2026-10-22
 
 ### Fixed
 
@@ -11,7 +11,7 @@ Notable changes to Wetter. The format follows
   installation specifically, which F-Droid's build server does not have; it now
   targets Java 17 like the other modules.
 
-## [1.0] — 2026-10-16
+## [1.0] - 2026-10-16
 
 The first release.
 

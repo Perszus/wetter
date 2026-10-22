@@ -229,7 +229,7 @@ internal class WeatherProviderRouter(
         log("ranking for $where")
         ranked.forEach { score ->
             val state = if (score.eligible) "%.1f".format(score.score) else "excluded"
-            log("  ${score.provider.id}: $state — ${score.reasons.joinToString("; ")}")
+            log("  ${score.provider.id}: $state: ${score.reasons.joinToString("; ")}")
         }
     }
 

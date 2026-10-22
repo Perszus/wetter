@@ -27,7 +27,7 @@ import lv.bolwarra.wetter.ui.theme.WetterTheme
 /**
  * The location, and the two ways out of the weather screen.
  *
- * The place name is the navigation control — tapping it opens the location list.
+ * The place name is the navigation control: tapping it opens the location list.
  * That removes a whole navigation bar from the bottom of the screen for the cost
  * of one chevron, which is the trade docs/design-principles.md asks for.
  */
